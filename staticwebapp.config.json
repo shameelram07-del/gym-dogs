@@ -1,0 +1,15 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
+  },
+  "routes": [
+    {
+      "route": "/login",
+      "rewrite": "/login"
+    }
+  ],
+  "platform": {
+    "apiRuntime": "node:18"
+  }
+}
