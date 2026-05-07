@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/BottomNav';
 
 const exercises = [
   {
@@ -53,15 +55,8 @@ const exercises = [
   },
 ];
 
-const navItems = [
-  { icon: '🏠', label: 'Home', href: '/dashboard' },
-  { icon: '📋', label: 'Log', href: '/workout' },
-  { icon: '📈', label: 'Progress', href: '/progress' },
-  { icon: '🏆', label: 'Community', href: '/community' },
-  { icon: '⚙️', label: 'Profile', href: '/profile' },
-];
-
 export default function ExercisePage() {
+  const router = useRouter();
   const [selected, setSelected] = useState(exercises[0]);
   const [activeStep, setActiveStep] = useState(0);
   const [activeCue, setActiveCue] = useState(0);
@@ -73,26 +68,20 @@ export default function ExercisePage() {
     setActiveCue(0);
   };
 
-  const nextStep = () => {
-    if (activeStep < selected.steps.length - 1) {
-      setActiveStep(prev => prev + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (activeStep > 0) {
-      setActiveStep(prev => prev - 1);
-    }
-  };
+  const nextStep = () => { if (activeStep < selected.steps.length - 1) setActiveStep(prev => prev + 1); };
+  const prevStep = () => { if (activeStep > 0) setActiveStep(prev => prev - 1); };
 
   return (
     <div className="min-h-screen bg-[#050810] text-white pb-24">
 
       {/* Header */}
       <div className="px-5 pt-12 pb-4 flex items-center gap-3">
-        <a href="/workout" className="w-9 h-9 bg-white/6 rounded-xl flex items-center justify-center text-lg">
+        <button
+          onClick={() => router.push('/workout')}
+          className="w-9 h-9 bg-white/6 rounded-xl flex items-center justify-center text-lg"
+        >
           ←
-        </a>
+        </button>
         <div className="flex-1">
           <h1 className="text-lg font-black tracking-wider leading-tight">{selected.name}</h1>
           <p className="text-xs text-slate-500 mt-0.5">{selected.muscle}</p>
@@ -123,22 +112,17 @@ export default function ExercisePage() {
 
       {/* Animation stage */}
       <div className="mx-5 rounded-3xl overflow-hidden bg-gradient-to-b from-[#0A1628] to-[#060A14] border border-white/5 relative">
-        
-        {/* Phase badge */}
         <div className="absolute top-3 left-3 z-10">
           <span className="bg-gradient-to-r from-blue-500 to-violet-600 text-white text-xs px-3 py-1 rounded-full font-bold tracking-wider">
             {selected.category}
           </span>
         </div>
-
-        {/* Difficulty */}
         <div className="absolute top-3 right-3 z-10">
           <span className="bg-white/8 border border-white/10 text-slate-300 text-xs px-3 py-1 rounded-full font-bold">
             {selected.difficulty}
           </span>
         </div>
 
-        {/* Character animation area */}
         <div className="flex flex-col items-center justify-center py-10 relative">
           <div className="text-8xl mb-2" style={{
             animation: playing ? 'bounce 1.5s ease-in-out infinite' : 'none',
@@ -152,8 +136,6 @@ export default function ExercisePage() {
               50% { transform: translateY(-10px); }
             }
           `}</style>
-
-          {/* Play/pause */}
           <button
             onClick={() => setPlaying(!playing)}
             className="mt-2 bg-white/8 border border-white/10 rounded-full px-4 py-1.5 text-xs font-bold tracking-wider text-slate-300"
@@ -162,7 +144,6 @@ export default function ExercisePage() {
           </button>
         </div>
 
-        {/* Live cue */}
         <div className="mx-4 mb-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl px-4 py-3 flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0 animate-pulse" />
           <p className="text-xs text-blue-300 font-medium leading-relaxed">
@@ -170,7 +151,6 @@ export default function ExercisePage() {
           </p>
         </div>
 
-        {/* Cue dots */}
         <div className="flex justify-center gap-1.5 pb-4">
           {selected.cues.map((_, i) => (
             <button
@@ -182,7 +162,6 @@ export default function ExercisePage() {
             />
           ))}
         </div>
-
       </div>
 
       {/* Step by step */}
@@ -191,8 +170,6 @@ export default function ExercisePage() {
           <p className="text-xs tracking-[3px] text-slate-500 uppercase">Form Steps</p>
           <p className="text-xs text-slate-600">{activeStep + 1} of {selected.steps.length}</p>
         </div>
-
-        {/* Steps list */}
         <div className="px-4 py-3 flex flex-col gap-2">
           {selected.steps.map((step, i) => (
             <button
@@ -221,8 +198,6 @@ export default function ExercisePage() {
             </button>
           ))}
         </div>
-
-        {/* Step navigation */}
         <div className="px-4 pb-4 flex gap-3">
           <button
             onClick={prevStep}
@@ -246,14 +221,10 @@ export default function ExercisePage() {
         <p className="text-xs tracking-[3px] text-slate-500 uppercase mb-3">Muscles Targeted</p>
         <div className="flex flex-wrap gap-2">
           {selected.muscles_primary.map((m) => (
-            <span key={m} className="bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs px-3 py-1 rounded-full font-semibold">
-              {m}
-            </span>
+            <span key={m} className="bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs px-3 py-1 rounded-full font-semibold">{m}</span>
           ))}
           {selected.muscles_secondary.map((m) => (
-            <span key={m} className="bg-white/5 border border-white/10 text-slate-400 text-xs px-3 py-1 rounded-full">
-              {m}
-            </span>
+            <span key={m} className="bg-white/5 border border-white/10 text-slate-400 text-xs px-3 py-1 rounded-full">{m}</span>
           ))}
         </div>
       </div>
@@ -266,16 +237,7 @@ export default function ExercisePage() {
         </div>
       )}
 
-      {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#0E1624]/95 backdrop-blur border-t border-white/7 flex items-center justify-around px-2 py-2">
-        {navItems.map((item) => (
-          <a key={item.label} href={item.href} className="flex flex-col items-center gap-1 flex-1 py-1">
-            <span className="text-xl opacity-40">{item.icon}</span>
-            <span className="text-xs tracking-wider text-slate-600">{item.label}</span>
-          </a>
-        ))}
-      </div>
-
+      <BottomNav />
     </div>
   );
 }

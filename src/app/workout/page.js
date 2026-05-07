@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/BottomNav';
 
 const exercises = [
   {
@@ -33,6 +35,7 @@ const exercises = [
 ];
 
 export default function WorkoutPage() {
+  const router = useRouter();
   const [logs, setLogs] = useState(
     exercises.reduce((acc, ex) => {
       acc[ex.id] = Array(ex.sets).fill({ kg: '', reps: '', done: false });
@@ -70,7 +73,10 @@ export default function WorkoutPage() {
       {/* Header */}
       <div className="px-5 pt-12 pb-4 bg-gradient-to-b from-blue-500/10 to-transparent">
         <div className="flex items-center gap-3 mb-4">
-          <button className="w-9 h-9 bg-white/6 rounded-xl flex items-center justify-center text-lg">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-9 h-9 bg-white/6 rounded-xl flex items-center justify-center text-lg"
+          >
             ←
           </button>
           <span className="text-xs tracking-[3px] text-slate-500 uppercase">Monday · Week 3</span>
@@ -115,54 +121,39 @@ export default function WorkoutPage() {
 
             {/* Sets table */}
             <div className="px-4 py-3">
-              {/* Header row */}
               <div className="grid grid-cols-4 gap-2 mb-2">
                 {['SET', 'KG', 'REPS', ''].map((h) => (
                   <p key={h} className="text-xs tracking-widest text-slate-600 uppercase text-center">{h}</p>
                 ))}
               </div>
 
-              {/* Set rows */}
               {logs[ex.id].map((set, idx) => (
                 <div key={idx} className="grid grid-cols-4 gap-2 mb-2 items-center">
-                  {/* Set number */}
                   <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-xs text-slate-500 font-mono mx-auto">
                     {idx + 1}
                   </div>
-
-                  {/* KG input */}
                   <input
                     type="number"
                     placeholder="—"
                     value={set.kg}
                     onChange={(e) => updateSet(ex.id, idx, 'kg', e.target.value)}
                     className={`w-full text-center py-2 rounded-xl text-sm font-bold font-mono outline-none border ${
-                      set.kg 
-                        ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' 
-                        : 'bg-white/5 border-white/10 text-slate-400'
+                      set.kg ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400'
                     }`}
                   />
-
-                  {/* Reps input */}
                   <input
                     type="number"
                     placeholder="—"
                     value={set.reps}
                     onChange={(e) => updateSet(ex.id, idx, 'reps', e.target.value)}
                     className={`w-full text-center py-2 rounded-xl text-sm font-bold font-mono outline-none border ${
-                      set.reps 
-                        ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' 
-                        : 'bg-white/5 border-white/10 text-slate-400'
+                      set.reps ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400'
                     }`}
                   />
-
-                  {/* Done toggle */}
                   <button
                     onClick={() => toggleDone(ex.id, idx)}
                     className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto text-sm transition-all ${
-                      set.done 
-                        ? 'bg-teal-500/15 text-teal-400' 
-                        : 'bg-white/4 border border-dashed border-white/15 text-transparent'
+                      set.done ? 'bg-teal-500/15 text-teal-400' : 'bg-white/4 border border-dashed border-white/15 text-transparent'
                     }`}
                   >
                     ✓
@@ -179,25 +170,23 @@ export default function WorkoutPage() {
                 <span className="ml-auto text-xs text-teal-400 font-bold">↑ {ex.increase}</span>
               )}
             </div>
-
           </div>
         ))}
       </div>
 
       {/* Save button */}
-      <div className="fixed bottom-6 left-5 right-5 z-20">
+      <div className="fixed bottom-20 left-5 right-5 z-20">
         <button
           onClick={handleSave}
           className={`w-full py-4 rounded-2xl font-bold text-sm tracking-widest shadow-lg transition-all ${
-            saved 
-              ? 'bg-teal-500 shadow-teal-500/30' 
-              : 'bg-gradient-to-r from-blue-500 to-violet-600 shadow-blue-500/30'
+            saved ? 'bg-teal-500 shadow-teal-500/30' : 'bg-gradient-to-r from-blue-500 to-violet-600 shadow-blue-500/30'
           }`}
         >
           {saved ? '✅ SESSION SAVED!' : '💾 SAVE SESSION'}
         </button>
       </div>
 
+      <BottomNav />
     </div>
   );
 }

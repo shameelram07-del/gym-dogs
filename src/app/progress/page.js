@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import BottomNav from '@/components/BottomNav';
 
 const weeklyData = [
   { week: 'W1', volume: 35 },
@@ -24,14 +25,6 @@ const getLevelStyle = (level) => {
   if (level === 'severe') return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', dot: '🔴' };
   return { color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20', dot: '🟢' };
 };
-
-const navItems = [
-  { icon: '🏠', label: 'Home', href: '/dashboard' },
-  { icon: '📋', label: 'Log', href: '/workout' },
-  { icon: '📈', label: 'Progress', href: '/progress' },
-  { icon: '🏆', label: 'Community', href: '/community' },
-  { icon: '⚙️', label: 'Profile', href: '/profile' },
-];
 
 export default function ProgressPage() {
   const [sorenessLevels, setSorenessLevels] = useState(
@@ -141,16 +134,7 @@ export default function ProgressPage() {
 
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#0E1624]/95 backdrop-blur border-t border-white/7 flex items-center justify-around px-2 py-2">
-        {navItems.map((item) => (
-          <a key={item.label} href={item.href} className="flex flex-col items-center gap-1 flex-1 py-1">
-            <span className={`text-xl ${item.href === '/progress' ? 'opacity-100' : 'opacity-40'}`}>{item.icon}</span>
-            {item.href === '/progress' && <div className="w-1 h-1 rounded-full bg-blue-400" />}
-            <span className={`text-xs tracking-wider ${item.href === '/progress' ? 'text-blue-400' : 'text-slate-600'}`}>{item.label}</span>
-          </a>
-        ))}
-      </div>
-
+      <BottomNav />
     </div>
   );
 }
