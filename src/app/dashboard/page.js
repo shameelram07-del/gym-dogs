@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/BottomNav';
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState('home');
+  const router = useRouter();
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
@@ -21,9 +22,12 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-black tracking-wider">
             SHAMEEL <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">💪</span>
           </h1>
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold">
+          <button
+            onClick={() => router.push('/profile')}
+            className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold"
+          >
             ST
-          </div>
+          </button>
         </div>
 
         {/* Readiness bar */}
@@ -53,7 +57,10 @@ export default function DashboardPage() {
             <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold tracking-wider">6 EXERCISES</span>
             <span className="bg-white/20 rounded-full px-3 py-1 text-xs font-bold tracking-wider">60 MIN</span>
           </div>
-          <button className="mt-4 bg-white text-blue-600 font-bold text-sm tracking-wider px-5 py-2 rounded-xl">
+          <button
+            onClick={() => router.push('/workout')}
+            className="mt-4 bg-white text-blue-600 font-bold text-sm tracking-wider px-5 py-2 rounded-xl"
+          >
             ▶ START SESSION
           </button>
         </div>
@@ -119,32 +126,7 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* BOTTOM NAV */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#0E1624]/95 backdrop-blur border-t border-white/7 flex items-center justify-around px-2 py-2">
-        {[
-          { icon: '🏠', label: 'Home', tab: 'home' },
-          { icon: '📋', label: 'Log', tab: 'log' },
-          { icon: '📈', label: 'Progress', tab: 'progress' },
-          { icon: '🏆', label: 'Community', tab: 'community' },
-          { icon: '⚙️', label: 'Profile', tab: 'profile' }
-        ].map((item) => (
-          <button
-            key={item.tab}
-            onClick={() => setActiveTab(item.tab)}
-            className="flex flex-col items-center gap-1 flex-1 py-1"
-          >
-            <span className={`text-xl ${activeTab === item.tab ? 'opacity-100' : 'opacity-40'}`}>
-              {item.icon}
-            </span>
-            {activeTab === item.tab && (
-              <div className="w-1 h-1 rounded-full bg-blue-400 shadow-lg shadow-blue-400/50" />
-            )}
-            <span className={`text-xs tracking-wider ${activeTab === item.tab ? 'text-blue-400' : 'text-slate-600'}`}>
-              {item.label}
-            </span>
-          </button>
-        ))}
-      </div>
+      <BottomNav />
 
     </div>
   );
