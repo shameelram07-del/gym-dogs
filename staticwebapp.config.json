@@ -4,10 +4,15 @@
     "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
   },
   "routes": [
-    {
-      "route": "/login",
-      "rewrite": "/login"
-    }
+    { "route": "/", "rewrite": "/index.html" },
+    { "route": "/login", "rewrite": "/login.html" },
+    { "route": "/dashboard", "rewrite": "/dashboard.html" },
+    { "route": "/workout", "rewrite": "/workout.html" },
+    { "route": "/progress", "rewrite": "/progress.html" },
+    { "route": "/exercise", "rewrite": "/exercise.html" },
+    { "route": "/profile", "rewrite": "/profile.html" },
+    { "route": "/onboarding", "rewrite": "/onboarding.html" },
+    { "route": "/coach", "rewrite": "/coach.html" }
   ],
   "platform": {
     "apiRuntime": "node:18"
