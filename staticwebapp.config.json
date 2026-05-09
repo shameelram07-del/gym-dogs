@@ -1,18 +1,13 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif}", "/css/*"]
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/_next/*", "/favicon.ico"]
   },
   "routes": [
-    { "route": "/", "rewrite": "/index.html" },
-    { "route": "/login", "rewrite": "/login.html" },
-    { "route": "/dashboard", "rewrite": "/dashboard.html" },
-    { "route": "/workout", "rewrite": "/workout.html" },
-    { "route": "/progress", "rewrite": "/progress.html" },
-    { "route": "/exercise", "rewrite": "/exercise.html" },
-    { "route": "/profile", "rewrite": "/profile.html" },
-    { "route": "/onboarding", "rewrite": "/onboarding.html" },
-    { "route": "/coach", "rewrite": "/coach.html" }
+    {
+      "route": "/*",
+      "rewrite": "/index.html"
+    }
   ],
   "platform": {
     "apiRuntime": "node:18"
