@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-const USER_ID = 'shameel';
 const WEEK = 3;
 const DAY = 'monday';
 
@@ -46,6 +46,7 @@ const emptyLogs = () =>
 
 export default function WorkoutPage() {
   const router = useRouter();
+  const { accounts } = useMsal();
   const [logs, setLogs] = useState(emptyLogs());
   const [lastWeek, setLastWeek] = useState({});
   const [activeGuide, setActiveGuide] = useState(null);
@@ -53,12 +54,25 @@ export default function WorkoutPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userId, setUserId] = useState(null);
 
+  // Auth guard + get real user ID
   useEffect(() => {
+    if (accounts.length === 0) {
+      router.push('/login');
+      return;
+    }
+    const user = accounts[0];
+    setUserId(user.localAccountId);
+  }, [accounts, router]);
+
+  // Fetch last week data once we have the userId
+  useEffect(() => {
+    if (!userId) return;
     const fetchLastWeek = async () => {
       try {
         const res = await fetch(
-          `${API_URL}?userId=${USER_ID}&week=${WEEK - 1}&day=${DAY}`,
+          `${API_URL}?userId=${userId}&week=${WEEK - 1}&day=${DAY}`,
           { headers: { 'x-functions-key': API_KEY } }
         );
         if (res.ok) {
@@ -76,7 +90,7 @@ export default function WorkoutPage() {
       }
     };
     fetchLastWeek();
-  }, []);
+  }, [userId]);
 
   const updateSet = (exId, setIdx, field, value) => {
     setLogs(prev => {
@@ -95,6 +109,7 @@ export default function WorkoutPage() {
   };
 
   const handleSave = async () => {
+    if (!userId) return;
     setSaving(true);
     setError(null);
     try {
@@ -106,7 +121,7 @@ export default function WorkoutPage() {
             'x-functions-key': API_KEY
           },
           body: JSON.stringify({
-            userId: USER_ID,
+            userId: userId,
             week: WEEK,
             day: DAY,
             exIdx: idx,
@@ -132,6 +147,9 @@ export default function WorkoutPage() {
       .map(s => `${s.kg || '?'}kg × ${s.reps || '?'}`)
       .join(', ');
   };
+
+  // Show nothing while checking auth
+  if (!userId) return null;
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white pb-32">
