@@ -1,50 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+
+const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
+
+// For now we use a fixed userId — once real auth is wired we'll pull this from the login token
+const USER_ID = 'shameel';
+const WEEK = 3;
+const DAY = 'monday';
 
 const exercises = [
   {
     id: 1,
     name: 'Incline Dumbbell Press',
     detail: '3 sets · 10-12 reps · 45° incline',
-    lastWeek: '20kg × 12, 12, 10',
-    increase: '+2.5kg',
     sets: 3,
-    safe: true
+    safe: true,
+    guide: '🎯 Keep elbows at 45 degrees. Control the descent — 3 seconds down. Drive up and squeeze at the top. Keep lower back pressed to the bench throughout.'
   },
   {
     id: 2,
     name: 'Cable Lateral Raise',
     detail: '3 sets · 15 reps · each side',
-    lastWeek: '8kg × 15, 15, 14',
-    increase: null,
     sets: 3,
-    safe: true
+    safe: true,
+    guide: '🎯 Lead with your elbow, not your wrist. Stop at shoulder height. Keep a slight bend in the elbow throughout.'
   },
   {
     id: 3,
     name: 'Machine Chest Press',
     detail: '3 sets · 12 reps',
-    lastWeek: '60kg × 12, 12, 11',
-    increase: '+5kg',
     sets: 3,
-    safe: true
+    safe: true,
+    guide: '🎯 Keep your back flat against the pad. Drive through your chest. Control the return — dont let the weight slam.'
   }
 ];
 
+const emptyLogs = () =>
+  exercises.reduce((acc, ex) => {
+    acc[ex.id] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
+    return acc;
+  }, {});
+
 export default function WorkoutPage() {
   const router = useRouter();
-  const [logs, setLogs] = useState(
-    exercises.reduce((acc, ex) => {
-      acc[ex.id] = Array(ex.sets).fill({ kg: '', reps: '', done: false });
-      return acc;
-    }, {})
-  );
-
+  const [logs, setLogs] = useState(emptyLogs());
+  const [lastWeek, setLastWeek] = useState({});
   const [activeGuide, setActiveGuide] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load last week's data on mount
+  useEffect(() => {
+    const fetchLastWeek = async () => {
+      try {
+        const res = await fetch(`${API_URL}?userId=${USER_ID}&week=${WEEK - 1}&day=${DAY}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Build a map of exIdx -> sets_data
+          const map = {};
+          data.forEach((log) => {
+            map[log.exIdx] = JSON.parse(log.sets_data || '[]');
+          });
+          setLastWeek(map);
+        }
+      } catch (e) {
+        console.log('Could not load last week data:', e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLastWeek();
+  }, []);
 
   const updateSet = (exId, setIdx, field, value) => {
     setLogs(prev => {
@@ -62,9 +93,41 @@ export default function WorkoutPage() {
     });
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      // Save each exercise as a separate document
+      const saves = exercises.map((ex, idx) =>
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: USER_ID,
+            week: WEEK,
+            day: DAY,
+            exIdx: idx,
+            sets_data: JSON.stringify(logs[ex.id])
+          })
+        })
+      );
+      await Promise.all(saves);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formatLastWeek = (exIdx) => {
+    const sets = lastWeek[exIdx];
+    if (!sets || sets.length === 0) return null;
+    return sets
+      .filter(s => s.kg || s.reps)
+      .map(s => `${s.kg || '?'}kg × ${s.reps || '?'}`)
+      .join(', ');
   };
 
   return (
@@ -79,23 +142,30 @@ export default function WorkoutPage() {
           >
             ←
           </button>
-          <span className="text-xs tracking-[3px] text-slate-500 uppercase">Monday · Week 3</span>
+          <span className="text-xs tracking-[3px] text-slate-500 uppercase">Monday · Week {WEEK}</span>
         </div>
         <h1 className="text-3xl font-black tracking-wider leading-tight">
           CHEST & <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">SHOULDERS</span>
         </h1>
         <div className="flex gap-2 mt-3 flex-wrap">
           <span className="bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">STRENGTH</span>
-          <span className="bg-white/6 border border-white/10 text-slate-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">WEEK 3</span>
+          <span className="bg-white/6 border border-white/10 text-slate-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">WEEK {WEEK}</span>
           <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">💚 DISC SAFE</span>
         </div>
       </div>
 
+      {/* Error */}
+      {error && (
+        <div className="mx-5 mb-4 bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-red-400 text-sm text-center">
+          {error}
+        </div>
+      )}
+
       {/* Exercises */}
       <div className="px-5 flex flex-col gap-4 mt-2">
-        {exercises.map((ex) => (
+        {exercises.map((ex, exIdx) => (
           <div key={ex.id} className="bg-white/4 border border-white/8 rounded-3xl overflow-hidden">
-            
+
             {/* Exercise header */}
             <div className="px-4 pt-4 pb-3 flex items-start justify-between border-b border-white/5">
               <div>
@@ -113,9 +183,7 @@ export default function WorkoutPage() {
             {/* Guide dropdown */}
             {activeGuide === ex.id && (
               <div className="px-4 py-3 bg-blue-500/5 border-b border-blue-500/10">
-                <p className="text-xs text-blue-300 leading-relaxed">
-                  🎯 Keep elbows pinned. Control the descent — 3 seconds down. Drive up and squeeze at the top. Keep lower back pressed to the bench throughout.
-                </p>
+                <p className="text-xs text-blue-300 leading-relaxed">{ex.guide}</p>
               </div>
             )}
 
@@ -165,11 +233,15 @@ export default function WorkoutPage() {
             {/* Last week reference */}
             <div className="px-4 py-3 border-t border-white/5 flex items-center gap-2">
               <span className="text-xs text-slate-600 tracking-wider">Last week:</span>
-              <span className="text-xs text-teal-400 font-mono">{ex.lastWeek}</span>
-              {ex.increase && (
-                <span className="ml-auto text-xs text-teal-400 font-bold">↑ {ex.increase}</span>
+              {loading ? (
+                <span className="text-xs text-slate-600">Loading...</span>
+              ) : formatLastWeek(exIdx) ? (
+                <span className="text-xs text-teal-400 font-mono">{formatLastWeek(exIdx)}</span>
+              ) : (
+                <span className="text-xs text-slate-600">No data yet</span>
               )}
             </div>
+
           </div>
         ))}
       </div>
@@ -178,11 +250,16 @@ export default function WorkoutPage() {
       <div className="fixed bottom-20 left-5 right-5 z-20">
         <button
           onClick={handleSave}
+          disabled={saving}
           className={`w-full py-4 rounded-2xl font-bold text-sm tracking-widest shadow-lg transition-all ${
-            saved ? 'bg-teal-500 shadow-teal-500/30' : 'bg-gradient-to-r from-blue-500 to-violet-600 shadow-blue-500/30'
+            saved
+              ? 'bg-teal-500 shadow-teal-500/30'
+              : saving
+              ? 'bg-white/10 text-slate-500'
+              : 'bg-gradient-to-r from-blue-500 to-violet-600 shadow-blue-500/30'
           }`}
         >
-          {saved ? '✅ SESSION SAVED!' : '💾 SAVE SESSION'}
+          {saved ? '✅ SESSION SAVED!' : saving ? 'SAVING...' : '💾 SAVE SESSION'}
         </button>
       </div>
 
