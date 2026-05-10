@@ -46,7 +46,7 @@ const emptyLogs = () =>
 
 export default function WorkoutPage() {
   const router = useRouter();
-  const { accounts } = useMsal();
+  const { accounts, inProgress } = useMsal();
   const [logs, setLogs] = useState(emptyLogs());
   const [lastWeek, setLastWeek] = useState({});
   const [activeGuide, setActiveGuide] = useState(null);
@@ -57,14 +57,15 @@ export default function WorkoutPage() {
   const [userId, setUserId] = useState(null);
 
   // Auth guard + get real user ID
-  useEffect(() => {
+useEffect(() => {
+    if (inProgress !== 'none') return; // still loading, wait
     if (accounts.length === 0) {
       router.push('/login');
       return;
     }
     const user = accounts[0];
     setUserId(user.localAccountId);
-  }, [accounts, router]);
+  }, [accounts, inProgress, router]);
 
   // Fetch last week data once we have the userId
   useEffect(() => {
