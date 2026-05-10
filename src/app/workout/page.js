@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-// For now we use a fixed userId — once real auth is wired we'll pull this from the login token
 const USER_ID = 'shameel';
 const WEEK = 3;
 const DAY = 'monday';
@@ -54,14 +54,15 @@ export default function WorkoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load last week's data on mount
   useEffect(() => {
     const fetchLastWeek = async () => {
       try {
-        const res = await fetch(`${API_URL}?userId=${USER_ID}&week=${WEEK - 1}&day=${DAY}`);
+        const res = await fetch(
+          `${API_URL}?userId=${USER_ID}&week=${WEEK - 1}&day=${DAY}`,
+          { headers: { 'x-functions-key': API_KEY } }
+        );
         if (res.ok) {
           const data = await res.json();
-          // Build a map of exIdx -> sets_data
           const map = {};
           data.forEach((log) => {
             map[log.exIdx] = JSON.parse(log.sets_data || '[]');
@@ -97,11 +98,13 @@ export default function WorkoutPage() {
     setSaving(true);
     setError(null);
     try {
-      // Save each exercise as a separate document
       const saves = exercises.map((ex, idx) =>
         fetch(API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-functions-key': API_KEY
+          },
           body: JSON.stringify({
             userId: USER_ID,
             week: WEEK,
