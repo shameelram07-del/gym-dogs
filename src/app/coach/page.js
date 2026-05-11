@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
 
 const clients = [
   {
@@ -92,8 +94,22 @@ const getReadinessLabel = (score) => {
 };
 
 export default function CoachDashboard() {
+  const router = useRouter();
+  const { accounts, inProgress } = useMsal();
+  const [userId, setUserId] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    if (inProgress !== 'none') return;
+    if (accounts.length === 0) {
+      router.push('/login');
+      return;
+    }
+    setUserId(accounts[0].localAccountId);
+  }, [accounts, inProgress, router]);
+
+  if (!userId) return null;
 
   const trainedToday = clients.filter((c) => c.trainedToday).length;
   const alerts = clients.filter((c) => c.alert).length;
@@ -201,27 +217,22 @@ export default function CoachDashboard() {
                   ? 'border-blue-500/40 bg-blue-500/5'
                   : 'border-white/8'
               }`}>
-                {/* Top row */}
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
                       {client.initials}
                     </div>
-                    {/* Online dot */}
                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#080C14] ${client.trainedToday ? 'bg-teal-400' : 'bg-slate-600'}`} />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-black tracking-wider">{client.name.toUpperCase()}</p>
-                      {client.alert && (
-                        <span className="text-orange-400 text-xs">⚠️</span>
-                      )}
+                      {client.alert && <span className="text-orange-400 text-xs">⚠️</span>}
                     </div>
                     <p className="text-xs text-slate-500 tracking-wider">{client.goal}</p>
                   </div>
 
-                  {/* Readiness score */}
                   <div className={`rounded-xl px-3 py-1.5 border ${getReadinessBg(client.readiness)}`}>
                     <p className={`text-lg font-black leading-none ${getReadinessColor(client.readiness)}`}>
                       {client.readiness}
@@ -232,7 +243,6 @@ export default function CoachDashboard() {
                   </div>
                 </div>
 
-                {/* Expanded detail */}
                 {selectedClient?.id === client.id && (
                   <div className="mt-4 pt-4 border-t border-white/6 flex flex-col gap-3">
                     <div className="grid grid-cols-3 gap-2">
@@ -265,7 +275,6 @@ export default function CoachDashboard() {
             </button>
           ))}
         </div>
-
       </div>
     </div>
   );

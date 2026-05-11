@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
 const weeklyData = [
@@ -27,9 +29,23 @@ const getLevelStyle = (level) => {
 };
 
 export default function ProgressPage() {
+  const router = useRouter();
+  const { accounts, inProgress } = useMsal();
+  const [userId, setUserId] = useState(null);
   const [sorenessLevels, setSorenessLevels] = useState(
     bodyAreas.reduce((acc, area) => ({ ...acc, [area]: 'none' }), {})
   );
+
+  useEffect(() => {
+    if (inProgress !== 'none') return;
+    if (accounts.length === 0) {
+      router.push('/login');
+      return;
+    }
+    setUserId(accounts[0].localAccountId);
+  }, [accounts, inProgress, router]);
+
+  if (!userId) return null;
 
   const cycleLevel = (area) => {
     setSorenessLevels(prev => {

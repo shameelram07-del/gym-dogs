@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
 const mockUser = {
@@ -25,9 +27,23 @@ const achievements = [
 ];
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { accounts, inProgress } = useMsal();
+  const [userId, setUserId] = useState(null);
   const [editingStats, setEditingStats] = useState(false);
   const [stats, setStats] = useState(mockStats);
   const [tempStats, setTempStats] = useState(mockStats);
+
+  useEffect(() => {
+    if (inProgress !== 'none') return;
+    if (accounts.length === 0) {
+      router.push('/login');
+      return;
+    }
+    setUserId(accounts[0].localAccountId);
+  }, [accounts, inProgress, router]);
+
+  if (!userId) return null;
 
   const handleSaveStats = () => { setStats(tempStats); setEditingStats(false); };
   const handleCancelEdit = () => { setTempStats(stats); setEditingStats(false); };

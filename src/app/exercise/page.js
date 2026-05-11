@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
 const exercises = [
@@ -57,10 +58,23 @@ const exercises = [
 
 export default function ExercisePage() {
   const router = useRouter();
+  const { accounts, inProgress } = useMsal();
+  const [userId, setUserId] = useState(null);
   const [selected, setSelected] = useState(exercises[0]);
   const [activeStep, setActiveStep] = useState(0);
   const [activeCue, setActiveCue] = useState(0);
   const [playing, setPlaying] = useState(true);
+
+  useEffect(() => {
+    if (inProgress !== 'none') return;
+    if (accounts.length === 0) {
+      router.push('/login');
+      return;
+    }
+    setUserId(accounts[0].localAccountId);
+  }, [accounts, inProgress, router]);
+
+  if (!userId) return null;
 
   const cycleExercise = (ex) => {
     setSelected(ex);
