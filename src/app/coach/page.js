@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
+import BottomNav from '@/components/BottomNav';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
@@ -479,7 +480,9 @@ export default function CoachDashboard() {
             </div>
           </>
         )}
+)}
       </div>
+      <BottomNav />
     </div>
   );
 }
