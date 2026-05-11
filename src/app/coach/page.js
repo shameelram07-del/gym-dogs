@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
+import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
@@ -36,20 +37,20 @@ const getReadinessLabel = (score) => {
   return 'Rest Day';
 };
 
+const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', sets: 3, reps: '10-12', cue: '' });
+
 export default function CoachDashboard() {
   const router = useRouter();
   const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [view, setView] = useState('clients'); // 'clients' or 'plans'
+  const [view, setView] = useState('clients');
 
   // Plan builder state
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
-  const [exercises, setExercises] = useState([
-    { name: '', sets: 3, reps: '10-12', note: '' }
-  ]);
+  const [exercises, setExercises] = useState([emptyExercise()]);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
   const [activePlan, setActivePlan] = useState(null);
@@ -83,11 +84,35 @@ export default function CoachDashboard() {
   };
 
   const addExercise = () => {
-    setExercises(prev => [...prev, { name: '', sets: 3, reps: '10-12', note: '' }]);
+    setExercises(prev => [...prev, emptyExercise()]);
   };
 
   const removeExercise = (idx) => {
     setExercises(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateMuscleGroup = (idx, muscleGroup) => {
+    setExercises(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...emptyExercise(), muscleGroup };
+      return updated;
+    });
+  };
+
+  const updateExerciseName = (idx, name) => {
+    const ex = exercises[idx];
+    const found = exerciseLibrary[ex.muscleGroup]?.find(e => e.name === name);
+    setExercises(prev => {
+      const updated = [...prev];
+      updated[idx] = {
+        ...updated[idx],
+        name,
+        sets: found?.defaultSets ?? 3,
+        reps: found?.defaultReps ?? '10-12',
+        cue: found?.cue ?? '',
+      };
+      return updated;
+    });
   };
 
   const updateExercise = (idx, field, value) => {
@@ -104,7 +129,7 @@ export default function CoachDashboard() {
       return;
     }
     if (exercises.some(e => !e.name.trim())) {
-      setSaveMsg({ type: 'error', text: 'Please fill in all exercise names' });
+      setSaveMsg({ type: 'error', text: 'Please select all exercise names' });
       return;
     }
     setSaving(true);
@@ -131,7 +156,7 @@ export default function CoachDashboard() {
         if (isActive) {
           setActivePlan(plan);
           setPlanName('');
-          setExercises([{ name: '', sets: 3, reps: '10-12', note: '' }]);
+          setExercises([emptyExercise()]);
         }
       } else {
         setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
@@ -159,7 +184,6 @@ export default function CoachDashboard() {
   return (
     <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
 
-      {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/3 right-0 w-64 h-64 bg-violet-500/8 rounded-full blur-3xl" />
@@ -172,12 +196,9 @@ export default function CoachDashboard() {
           <h1 className="text-3xl font-black tracking-wider">
             COACH <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">HQ</span>
           </h1>
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold">
-            SC
-          </div>
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold">SC</div>
         </div>
 
-        {/* Summary stats */}
         <div className="grid grid-cols-3 gap-3 mt-5">
           {[
             { val: `${trainedToday}/${clients.length}`, label: 'Trained Today', color: 'text-teal-400' },
@@ -191,28 +212,22 @@ export default function CoachDashboard() {
           ))}
         </div>
 
-        {/* View toggle */}
         <div className="flex gap-2 mt-4">
           <button
             onClick={() => setView('clients')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${
-              view === 'clients' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'
-            }`}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'clients' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
           >
             👥 Clients
           </button>
           <button
             onClick={() => setView('plans')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${
-              view === 'plans' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'
-            }`}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'plans' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
           >
             💪 Plan Builder
           </button>
         </div>
       </div>
 
-      {/* SCROLLABLE CONTENT */}
       <div className="relative z-10 px-5 pb-24 flex flex-col gap-4 overflow-y-auto">
 
         {/* ── CLIENTS VIEW ── */}
@@ -225,9 +240,7 @@ export default function CoachDashboard() {
                   {clients.filter((c) => c.alert).map((c) => (
                     <div key={c.id} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold">
-                          {c.initials}
-                        </div>
+                        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold">{c.initials}</div>
                         <span className="text-sm text-white font-medium">{c.name}</span>
                       </div>
                       <span className="text-xs text-orange-300 font-semibold tracking-wider">{c.alert}</span>
@@ -248,11 +261,7 @@ export default function CoachDashboard() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${
-                    filter === f.key
-                      ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white'
-                      : 'bg-white/4 border border-white/8 text-slate-400'
-                  }`}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${filter === f.key ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
                 >
                   {f.label}
                 </button>
@@ -266,14 +275,10 @@ export default function CoachDashboard() {
                   onClick={() => setSelectedClient(selectedClient?.id === client.id ? null : client)}
                   className="w-full text-left"
                 >
-                  <div className={`bg-white/4 border rounded-2xl p-4 transition-all duration-200 ${
-                    selectedClient?.id === client.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/8'
-                  }`}>
+                  <div className={`bg-white/4 border rounded-2xl p-4 transition-all duration-200 ${selectedClient?.id === client.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/8'}`}>
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                          {client.initials}
-                        </div>
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">{client.initials}</div>
                         <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#080C14] ${client.trainedToday ? 'bg-teal-400' : 'bg-slate-600'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -318,18 +323,16 @@ export default function CoachDashboard() {
         {/* ── PLAN BUILDER VIEW ── */}
         {view === 'plans' && (
           <>
-            {/* Active plan display */}
             {activePlan && (
               <div className="bg-teal-500/10 border border-teal-500/20 rounded-2xl p-4">
                 <p className="text-xs tracking-[3px] text-teal-400 uppercase mb-1">Currently Active</p>
                 <p className="text-base font-black text-white">{activePlan.name}</p>
-                <p className="text-xs text-slate-400 mt-1">{activePlan.exercises?.length} exercises</p>
+                <p className="text-xs text-slate-400 mt-1">{activePlan.exercises?.length} exercises · {activePlan.tag}</p>
               </div>
             )}
 
             <p className="text-xs tracking-[3px] text-slate-500 uppercase mt-1">Create New Session</p>
 
-            {/* Session name */}
             <div className="bg-white/4 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
               <div>
                 <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Name</p>
@@ -341,8 +344,6 @@ export default function CoachDashboard() {
                   className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50"
                 />
               </div>
-
-              {/* Tag */}
               <div>
                 <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Type</p>
                 <div className="flex gap-2 flex-wrap">
@@ -350,11 +351,7 @@ export default function CoachDashboard() {
                     <button
                       key={t}
                       onClick={() => setPlanTag(t)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${
-                        planTag === t
-                          ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400'
-                          : 'bg-white/4 border border-white/8 text-slate-500'
-                      }`}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${planTag === t ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}
                     >
                       {t}
                     </button>
@@ -363,7 +360,6 @@ export default function CoachDashboard() {
               </div>
             </div>
 
-            {/* Exercises */}
             <p className="text-xs tracking-[3px] text-slate-500 uppercase">Exercises</p>
             <div className="flex flex-col gap-3">
               {exercises.map((ex, idx) => (
@@ -371,21 +367,42 @@ export default function CoachDashboard() {
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-blue-400 font-bold tracking-wider">EXERCISE {idx + 1}</p>
                     {exercises.length > 1 && (
-                      <button
-                        onClick={() => removeExercise(idx)}
-                        className="text-red-400 text-xs font-bold tracking-wider"
-                      >
-                        REMOVE
-                      </button>
+                      <button onClick={() => removeExercise(idx)} className="text-red-400 text-xs font-bold tracking-wider">REMOVE</button>
                     )}
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Exercise name"
-                    value={ex.name}
-                    onChange={(e) => updateExercise(idx, 'name', e.target.value)}
-                    className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500/50"
-                  />
+
+                  {/* Muscle group selector */}
+                  <div>
+                    <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Muscle Group</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {muscleGroups.map((mg) => (
+                        <button
+                          key={mg}
+                          onClick={() => updateMuscleGroup(idx, mg)}
+                          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${ex.muscleGroup === mg ? 'bg-violet-500/20 border border-violet-500/40 text-violet-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}
+                        >
+                          {mg}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Exercise dropdown */}
+                  <div>
+                    <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Exercise</p>
+                    <select
+                      value={ex.name}
+                      onChange={(e) => updateExerciseName(idx, e.target.value)}
+                      className="w-full bg-[#0E1624] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-blue-500/50"
+                    >
+                      <option value="">— Select exercise —</option>
+                      {exerciseLibrary[ex.muscleGroup]?.map((e) => (
+                        <option key={e.name} value={e.name}>{e.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Sets and reps */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Sets</p>
@@ -400,20 +417,25 @@ export default function CoachDashboard() {
                       <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Reps</p>
                       <input
                         type="text"
-                        placeholder="e.g. 10-12"
                         value={ex.reps}
                         onChange={(e) => updateExercise(idx, 'reps', e.target.value)}
                         className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50"
                       />
                     </div>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Coach note (optional)"
-                    value={ex.note}
-                    onChange={(e) => updateExercise(idx, 'note', e.target.value)}
-                    className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-blue-500/50"
-                  />
+
+                  {/* Form cue — auto filled, editable */}
+                  {ex.cue ? (
+                    <div className="bg-blue-500/6 border border-blue-500/15 rounded-xl p-3">
+                      <p className="text-xs text-blue-400 font-bold tracking-wider mb-1">FORM CUE</p>
+                      <textarea
+                        value={ex.cue}
+                        onChange={(e) => updateExercise(idx, 'cue', e.target.value)}
+                        rows={3}
+                        className="w-full bg-transparent text-xs text-slate-300 leading-relaxed outline-none resize-none"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -426,11 +448,7 @@ export default function CoachDashboard() {
             </button>
 
             {saveMsg && (
-              <div className={`rounded-2xl p-3 text-sm text-center font-bold ${
-                saveMsg.type === 'success'
-                  ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400'
-                  : 'bg-red-500/10 border border-red-500/20 text-red-400'
-              }`}>
+              <div className={`rounded-2xl p-3 text-sm text-center font-bold ${saveMsg.type === 'success' ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
                 {saveMsg.text}
               </div>
             )}
