@@ -1,62 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
+import { loginRequest } from '@/lib/authConfig';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [msalInstance, setMsalInstance] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { instance, accounts, inProgress } = useMsal();
 
-  // Load MSAL only on client side
+  // If already logged in, go straight to dashboard
   useEffect(() => {
-    const initMsal = async () => {
-      const { PublicClientApplication } = await import('@azure/msal-browser');
-      const { msalConfig } = await import('@/lib/authConfig');
-      const instance = new PublicClientApplication(msalConfig);
-      await instance.initialize();
+    if (inProgress !== 'none') return;
+    if (accounts.length > 0) {
+      router.push('/dashboard');
+    }
+  }, [accounts, inProgress, router]);
 
-      // Handle redirect response (when user comes back after login)
-      const result = await instance.handleRedirectPromise();
+  // Handle the redirect coming back from Microsoft
+  useEffect(() => {
+    instance.handleRedirectPromise().then((result) => {
       if (result && result.account) {
         router.push('/dashboard');
-        return;
       }
+    }).catch(console.error);
+  }, [instance, router]);
 
-      setMsalInstance(instance);
-    };
-
-    initMsal().catch(console.error);
-  }, [router]);
-
-  const handleSignIn = async () => {
-    if (!msalInstance) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const { loginRequest } = await import('@/lib/authConfig');
-      await msalInstance.loginRedirect(loginRequest);
-    } catch (err) {
-      setError('Sign in failed. Please try again.');
-      setLoading(false);
-    }
+  const handleSignIn = () => {
+    instance.loginRedirect(loginRequest);
   };
 
-  const handleCreateAccount = async () => {
-    if (!msalInstance) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const { loginRequest } = await import('@/lib/authConfig');
-      await msalInstance.loginRedirect({
-        ...loginRequest,
-        prompt: 'create',
-      });
-    } catch (err) {
-      setError('Sign up failed. Please try again.');
-      setLoading(false);
-    }
+  const handleCreateAccount = () => {
+    instance.loginRedirect({ ...loginRequest, prompt: 'create' });
   };
 
   return (
@@ -80,19 +55,13 @@ export default function LoginPage() {
       {/* BUTTONS */}
       <div className="relative z-10 px-5 flex flex-col gap-4 flex-1">
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-sm text-center">
-            {error}
-          </div>
-        )}
-
         {/* Sign In */}
         <button
           onClick={handleSignIn}
-          disabled={loading || !msalInstance}
+          disabled={inProgress !== 'none'}
           className="w-full bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 text-white font-black tracking-widest text-sm uppercase shadow-lg shadow-blue-500/25 disabled:opacity-50"
         >
-          {loading ? 'LOADING...' : 'SIGN IN →'}
+          {inProgress !== 'none' ? 'LOADING...' : 'SIGN IN →'}
         </button>
 
         {/* Divider */}
@@ -105,7 +74,7 @@ export default function LoginPage() {
         {/* Create Account */}
         <button
           onClick={handleCreateAccount}
-          disabled={loading || !msalInstance}
+          disabled={inProgress !== 'none'}
           className="w-full bg-white/4 border border-white/8 rounded-2xl py-4 text-white font-bold text-sm tracking-wider disabled:opacity-50"
         >
           Create Account →
