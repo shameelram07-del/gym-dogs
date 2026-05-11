@@ -48,7 +48,6 @@ export default function CoachDashboard() {
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('clients');
 
-  // Plan builder state
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -85,13 +84,9 @@ export default function CoachDashboard() {
     }
   };
 
-  const addExercise = () => {
-    setExercises(prev => [...prev, emptyExercise()]);
-  };
+  const addExercise = () => setExercises(prev => [...prev, emptyExercise()]);
 
-  const removeExercise = (idx) => {
-    setExercises(prev => prev.filter((_, i) => i !== idx));
-  };
+  const removeExercise = (idx) => setExercises(prev => prev.filter((_, i) => i !== idx));
 
   const updateMuscleGroup = (idx, muscleGroup) => {
     setExercises(prev => {
@@ -126,14 +121,8 @@ export default function CoachDashboard() {
   };
 
   const handlePublish = async (isActive) => {
-    if (!planName.trim()) {
-      setSaveMsg({ type: 'error', text: 'Please enter a session name' });
-      return;
-    }
-    if (exercises.some(e => !e.name.trim())) {
-      setSaveMsg({ type: 'error', text: 'Please select all exercise names' });
-      return;
-    }
+    if (!planName.trim()) { setSaveMsg({ type: 'error', text: 'Please enter a session name' }); return; }
+    if (exercises.some(e => !e.name.trim())) { setSaveMsg({ type: 'error', text: 'Please select all exercise names' }); return; }
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -148,10 +137,7 @@ export default function CoachDashboard() {
       };
       const res = await fetch(PLANS_API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-functions-key': PLANS_API_KEY
-        },
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY },
         body: JSON.stringify(plan)
       });
       if (res.ok) {
@@ -177,7 +163,6 @@ export default function CoachDashboard() {
   const trainedToday = clients.filter((c) => c.trainedToday).length;
   const alerts = clients.filter((c) => c.alert).length;
   const avgReadiness = Math.round(clients.reduce((a, c) => a + c.readiness, 0) / clients.length);
-
   const filteredClients = clients.filter((c) => {
     if (filter === 'trained') return c.trainedToday;
     if (filter === 'alerts') return c.alert;
@@ -193,7 +178,6 @@ export default function CoachDashboard() {
         <div className="absolute bottom-1/3 right-0 w-64 h-64 bg-violet-500/8 rounded-full blur-3xl" />
       </div>
 
-      {/* HEADER */}
       <div className="relative z-10 px-5 pt-12 pb-5 bg-gradient-to-b from-blue-500/10 to-transparent">
         <p className="text-xs tracking-[3px] text-slate-500 uppercase">Coach View</p>
         <div className="flex items-center justify-between mt-1">
@@ -217,16 +201,10 @@ export default function CoachDashboard() {
         </div>
 
         <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setView('clients')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'clients' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
-          >
+          <button onClick={() => setView('clients')} className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'clients' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
             👥 Clients
           </button>
-          <button
-            onClick={() => setView('plans')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'plans' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
-          >
+          <button onClick={() => setView('plans')} className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'plans' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
             💪 Plan Builder
           </button>
         </div>
@@ -234,7 +212,6 @@ export default function CoachDashboard() {
 
       <div className="relative z-10 px-5 pb-24 flex flex-col gap-4 overflow-y-auto">
 
-        {/* ── CLIENTS VIEW ── */}
         {view === 'clients' && (
           <>
             {alerts > 0 && (
@@ -262,11 +239,7 @@ export default function CoachDashboard() {
                 { key: 'rest', label: '😴 Rest' },
                 { key: 'alerts', label: '⚠️ Alerts' },
               ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${filter === f.key ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}
-                >
+                <button key={f.key} onClick={() => setFilter(f.key)} className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${filter === f.key ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
                   {f.label}
                 </button>
               ))}
@@ -274,11 +247,7 @@ export default function CoachDashboard() {
 
             <div className="flex flex-col gap-3">
               {filteredClients.map((client) => (
-                <button
-                  key={client.id}
-                  onClick={() => setSelectedClient(selectedClient?.id === client.id ? null : client)}
-                  className="w-full text-left"
-                >
+                <button key={client.id} onClick={() => setSelectedClient(selectedClient?.id === client.id ? null : client)} className="w-full text-left">
                   <div className={`bg-white/4 border rounded-2xl p-4 transition-all duration-200 ${selectedClient?.id === client.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/8'}`}>
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -324,7 +293,6 @@ export default function CoachDashboard() {
           </>
         )}
 
-        {/* ── PLAN BUILDER VIEW ── */}
         {view === 'plans' && (
           <>
             {activePlan && (
@@ -340,23 +308,13 @@ export default function CoachDashboard() {
             <div className="bg-white/4 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
               <div>
                 <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Name</p>
-                <input
-                  type="text"
-                  placeholder="e.g. Chest & Shoulders"
-                  value={planName}
-                  onChange={(e) => setPlanName(e.target.value)}
-                  className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50"
-                />
+                <input type="text" placeholder="e.g. Chest & Shoulders" value={planName} onChange={(e) => setPlanName(e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50" />
               </div>
               <div>
                 <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Type</p>
                 <div className="flex gap-2 flex-wrap">
                   {['STRENGTH', 'HYPERTROPHY', 'CARDIO', 'DELOAD', 'FULL BODY'].map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setPlanTag(t)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${planTag === t ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}
-                    >
+                    <button key={t} onClick={() => setPlanTag(t)} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${planTag === t ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}>
                       {t}
                     </button>
                   ))}
@@ -364,12 +322,7 @@ export default function CoachDashboard() {
               </div>
               <div>
                 <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Date</p>
-                <input
-                  type="date"
-                  value={sessionDate}
-                  onChange={(e) => setSessionDate(e.target.value)}
-                  className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50"
-                />
+                <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50" />
               </div>
             </div>
 
@@ -383,76 +336,46 @@ export default function CoachDashboard() {
                       <button onClick={() => removeExercise(idx)} className="text-red-400 text-xs font-bold tracking-wider">REMOVE</button>
                     )}
                   </div>
-
                   <div>
                     <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Muscle Group</p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {muscleGroups.map((mg) => (
-                        <button
-                          key={mg}
-                          onClick={() => updateMuscleGroup(idx, mg)}
-                          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${ex.muscleGroup === mg ? 'bg-violet-500/20 border border-violet-500/40 text-violet-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}
-                        >
+                        <button key={mg} onClick={() => updateMuscleGroup(idx, mg)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${ex.muscleGroup === mg ? 'bg-violet-500/20 border border-violet-500/40 text-violet-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}>
                           {mg}
                         </button>
                       ))}
                     </div>
                   </div>
-
                   <div>
                     <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Exercise</p>
-                    <select
-                      value={ex.name}
-                      onChange={(e) => updateExerciseName(idx, e.target.value)}
-                      className="w-full bg-[#0E1624] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-blue-500/50"
-                    >
+                    <select value={ex.name} onChange={(e) => updateExerciseName(idx, e.target.value)} className="w-full bg-[#0E1624] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-blue-500/50">
                       <option value="">— Select exercise —</option>
                       {exerciseLibrary[ex.muscleGroup]?.map((e) => (
                         <option key={e.name} value={e.name}>{e.name}</option>
                       ))}
                     </select>
                   </div>
-
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Sets</p>
-                      <input
-                        type="number"
-                        value={ex.sets}
-                        onChange={(e) => updateExercise(idx, 'sets', parseInt(e.target.value))}
-                        className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50"
-                      />
+                      <input type="number" value={ex.sets} onChange={(e) => updateExercise(idx, 'sets', parseInt(e.target.value))} className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50" />
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Reps</p>
-                      <input
-                        type="text"
-                        value={ex.reps}
-                        onChange={(e) => updateExercise(idx, 'reps', e.target.value)}
-                        className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50"
-                      />
+                      <input type="text" value={ex.reps} onChange={(e) => updateExercise(idx, 'reps', e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50" />
                     </div>
                   </div>
-
                   {ex.cue ? (
                     <div className="bg-blue-500/6 border border-blue-500/15 rounded-xl p-3">
                       <p className="text-xs text-blue-400 font-bold tracking-wider mb-1">FORM CUE</p>
-                      <textarea
-                        value={ex.cue}
-                        onChange={(e) => updateExercise(idx, 'cue', e.target.value)}
-                        rows={3}
-                        className="w-full bg-transparent text-xs text-slate-300 leading-relaxed outline-none resize-none"
-                      />
+                      <textarea value={ex.cue} onChange={(e) => updateExercise(idx, 'cue', e.target.value)} rows={3} className="w-full bg-transparent text-xs text-slate-300 leading-relaxed outline-none resize-none" />
                     </div>
                   ) : null}
                 </div>
               ))}
             </div>
 
-            <button
-              onClick={addExercise}
-              className="w-full bg-white/4 border border-dashed border-white/15 rounded-2xl py-3 text-slate-400 text-sm font-bold tracking-wider"
-            >
+            <button onClick={addExercise} className="w-full bg-white/4 border border-dashed border-white/15 rounded-2xl py-3 text-slate-400 text-sm font-bold tracking-wider">
               + ADD EXERCISE
             </button>
 
@@ -463,25 +386,17 @@ export default function CoachDashboard() {
             )}
 
             <div className="flex gap-3">
-              <button
-                onClick={() => handlePublish(false)}
-                disabled={saving}
-                className="flex-1 bg-white/4 border border-white/8 rounded-2xl py-4 text-sm font-bold tracking-wider text-slate-300 disabled:opacity-50"
-              >
+              <button onClick={() => handlePublish(false)} disabled={saving} className="flex-1 bg-white/4 border border-white/8 rounded-2xl py-4 text-sm font-bold tracking-wider text-slate-300 disabled:opacity-50">
                 Save Draft
               </button>
-              <button
-                onClick={() => handlePublish(true)}
-                disabled={saving}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 text-sm font-bold tracking-widest uppercase shadow-lg shadow-blue-500/25 disabled:opacity-50"
-              >
+              <button onClick={() => handlePublish(true)} disabled={saving} className="flex-1 bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 text-sm font-bold tracking-widest uppercase shadow-lg shadow-blue-500/25 disabled:opacity-50">
                 {saving ? 'Publishing...' : '🚀 Publish & Activate'}
               </button>
             </div>
           </>
         )}
-)}
       </div>
+
       <BottomNav />
     </div>
   );
