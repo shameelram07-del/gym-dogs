@@ -2,15 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
+
+const COACH_ID = '9f8448ed-aabf-476e-b729-c5af231aec0c';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { accounts } = useMsal();
+
+  const isCoach = accounts[0]?.localAccountId === COACH_ID;
 
   const tabs = [
     { icon: '🏠', label: 'Home', path: '/dashboard' },
     { icon: '📋', label: 'Log', path: '/workout' },
     { icon: '📈', label: 'Progress', path: '/progress' },
     { icon: '🏆', label: 'Community', path: '/community' },
+    ...(isCoach ? [{ icon: '🎯', label: 'Coach', path: '/coach' }] : []),
     { icon: '⚙️', label: 'Profile', path: '/profile' },
   ];
 

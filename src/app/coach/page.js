@@ -50,6 +50,7 @@ export default function CoachDashboard() {
   // Plan builder state
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [exercises, setExercises] = useState([emptyExercise()]);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
@@ -139,6 +140,7 @@ export default function CoachDashboard() {
         id: Date.now().toString(),
         name: planName,
         tag: planTag,
+        date: sessionDate,
         exercises,
         isActive,
         createdAt: new Date().toISOString(),
@@ -156,6 +158,7 @@ export default function CoachDashboard() {
         if (isActive) {
           setActivePlan(plan);
           setPlanName('');
+          setSessionDate(new Date().toISOString().split('T')[0]);
           setExercises([emptyExercise()]);
         }
       } else {
@@ -327,7 +330,7 @@ export default function CoachDashboard() {
               <div className="bg-teal-500/10 border border-teal-500/20 rounded-2xl p-4">
                 <p className="text-xs tracking-[3px] text-teal-400 uppercase mb-1">Currently Active</p>
                 <p className="text-base font-black text-white">{activePlan.name}</p>
-                <p className="text-xs text-slate-400 mt-1">{activePlan.exercises?.length} exercises · {activePlan.tag}</p>
+                <p className="text-xs text-slate-400 mt-1">{activePlan.exercises?.length} exercises · {activePlan.tag} · {activePlan.date}</p>
               </div>
             )}
 
@@ -358,6 +361,15 @@ export default function CoachDashboard() {
                   ))}
                 </div>
               </div>
+              <div>
+                <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Date</p>
+                <input
+                  type="date"
+                  value={sessionDate}
+                  onChange={(e) => setSessionDate(e.target.value)}
+                  className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50"
+                />
+              </div>
             </div>
 
             <p className="text-xs tracking-[3px] text-slate-500 uppercase">Exercises</p>
@@ -371,7 +383,6 @@ export default function CoachDashboard() {
                     )}
                   </div>
 
-                  {/* Muscle group selector */}
                   <div>
                     <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Muscle Group</p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -387,7 +398,6 @@ export default function CoachDashboard() {
                     </div>
                   </div>
 
-                  {/* Exercise dropdown */}
                   <div>
                     <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Exercise</p>
                     <select
@@ -402,7 +412,6 @@ export default function CoachDashboard() {
                     </select>
                   </div>
 
-                  {/* Sets and reps */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Sets</p>
@@ -424,7 +433,6 @@ export default function CoachDashboard() {
                     </div>
                   </div>
 
-                  {/* Form cue — auto filled, editable */}
                   {ex.cue ? (
                     <div className="bg-blue-500/6 border border-blue-500/15 rounded-xl p-3">
                       <p className="text-xs text-blue-400 font-bold tracking-wider mb-1">FORM CUE</p>
