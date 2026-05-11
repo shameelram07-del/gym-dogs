@@ -11,6 +11,7 @@ export default function BottomNav() {
   const { accounts } = useMsal();
 
   const isCoach = accounts[0]?.localAccountId === COACH_ID;
+  console.log('My ID:', accounts[0]?.localAccountId);
 
   const tabs = [
     { icon: '🏠', label: 'Home', path: '/dashboard' },
