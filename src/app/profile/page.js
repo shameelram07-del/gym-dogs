@@ -28,7 +28,7 @@ const achievements = [
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { accounts, inProgress } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
   const [editingStats, setEditingStats] = useState(false);
   const [stats, setStats] = useState(mockStats);
@@ -47,6 +47,11 @@ export default function ProfilePage() {
 
   const handleSaveStats = () => { setStats(tempStats); setEditingStats(false); };
   const handleCancelEdit = () => { setTempStats(stats); setEditingStats(false); };
+  const handleSignOut = () => {
+    instance.logoutRedirect({
+      postLogoutRedirectUri: '/login',
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
@@ -164,7 +169,9 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        <button className="w-full bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-sm font-bold tracking-widest uppercase hover:bg-red-500/15 transition-colors">
+        <button
+          onClick={handleSignOut}
+          className="w-full bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 text-sm font-bold tracking-widest uppercase hover:bg-red-500/15 transition-colors">
           Sign Out
         </button>
       </div>
