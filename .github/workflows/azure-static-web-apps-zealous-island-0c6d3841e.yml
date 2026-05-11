@@ -27,8 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js
+- name: Build Next.js
         run: npm run build
+        env:
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          NEXT_PUBLIC_PLANS_API_KEY: ${{ secrets.NEXT_PUBLIC_PLANS_API_KEY }}
 
       - name: Build And Deploy
         uses: Azure/static-web-apps-deploy@v1
