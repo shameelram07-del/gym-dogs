@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 
-const COACH_ID = '9f8448ed-aabf-476e-b729-c5af231aec0c';
+const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 export default function BottomNav() {
   const pathname = usePathname();
