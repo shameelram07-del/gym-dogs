@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
-  const router = useRouter();
+
 export default function DashboardPage() {
   const router = useRouter();
   const { accounts, inProgress } = useMsal();
@@ -20,8 +20,10 @@ export default function DashboardPage() {
   }, [accounts, inProgress, router]);
 
   if (!userId) return null;
+
+  return (
     <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
-      
+
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
