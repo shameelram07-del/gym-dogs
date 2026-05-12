@@ -9,13 +9,16 @@ const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewe
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
+const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
+const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
-const TODAY = new Date().toISOString().split('T')[0]; // e.g. "2026-05-12"
+const TODAY = new Date().toISOString().split('T')[0];
 
 export default function WorkoutPage() {
   const router = useRouter();
   const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState('');
 
   const [activePlan, setActivePlan] = useState(null);
   const [planLoading, setPlanLoading] = useState(true);
@@ -28,6 +31,10 @@ export default function WorkoutPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
+  // AI coach note state
+  const [coachNote, setCoachNote] = useState(null);
+  const [coachNoteLoading, setCoachNoteLoading] = useState(false);
+
   // Auth guard
   useEffect(() => {
     if (inProgress !== 'none') return;
@@ -35,7 +42,12 @@ export default function WorkoutPage() {
       router.push('/login');
       return;
     }
-    setUserId(accounts[0].localAccountId);
+    const user = accounts[0];
+    setUserId(user.localAccountId);
+    const name = user.name && user.name !== 'unknown'
+      ? user.name.split(' ')[0]
+      : user.username?.split('@')[0] || 'Athlete';
+    setUserName(name);
   }, [accounts, inProgress, router]);
 
   // Fetch active plan
@@ -49,7 +61,6 @@ export default function WorkoutPage() {
         if (res.ok) {
           const data = await res.json();
           setActivePlan(data);
-          // Init empty logs for each exercise
           const emptyLogs = {};
           data.exercises.forEach((ex, idx) => {
             emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
@@ -67,7 +78,7 @@ export default function WorkoutPage() {
     fetchPlan();
   }, [userId]);
 
-// Fetch last session data by exercise name
+  // Fetch last session data by exercise name
   useEffect(() => {
     if (!userId || !activePlan) return;
     const fetchLastSession = async () => {
@@ -111,6 +122,29 @@ export default function WorkoutPage() {
     });
   };
 
+  const getAICoachNote = async (sessionSummary) => {
+    setCoachNoteLoading(true);
+    try {
+      const message = `${userName} just finished a ${activePlan.name} session. Here's what they did: ${sessionSummary}. Write a short, personal, motivating post-session note in Shameel's voice as their coach. Keep it to 2-3 sentences. Be specific about their work today.`;
+      const res = await fetch(AI_COACH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-functions-key': AI_COACH_KEY
+        },
+        body: JSON.stringify({ message })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCoachNote(data.reply);
+      }
+    } catch (e) {
+      console.log('AI coach note failed:', e.message);
+    } finally {
+      setCoachNoteLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!userId || !activePlan) return;
     setSaving(true);
@@ -136,6 +170,19 @@ export default function WorkoutPage() {
       );
       await Promise.all(saves);
       setSaved(true);
+
+      // Build session summary for AI
+      const summary = activePlan.exercises.map((ex, idx) => {
+        const sets = logs[idx] || [];
+        const setsStr = sets
+          .filter(s => s.kg || s.reps)
+          .map(s => `${s.kg || '?'}kg x ${s.reps || '?'} reps`)
+          .join(', ');
+        return setsStr ? `${ex.name}: ${setsStr}` : null;
+      }).filter(Boolean).join('. ');
+
+      if (summary) getAICoachNote(summary);
+
       setTimeout(() => setSaved(false), 3000);
     } catch (e) {
       setError('Failed to save. Please try again.');
@@ -155,7 +202,6 @@ export default function WorkoutPage() {
 
   if (!userId) return null;
 
-  // Loading state
   if (planLoading) {
     return (
       <div className="min-h-screen bg-[#080C14] text-white flex items-center justify-center">
@@ -167,14 +213,13 @@ export default function WorkoutPage() {
     );
   }
 
-  // No active plan
   if (planError || !activePlan) {
     return (
       <div className="min-h-screen bg-[#080C14] text-white flex items-center justify-center px-5">
         <div className="text-center">
           <div className="text-4xl mb-4">📋</div>
           <p className="text-white font-bold text-lg mb-2">No Active Session</p>
-          <p className="text-slate-400 text-sm leading-relaxed">{planError || 'Your coach hasn\'t published a session yet. Check back soon!'}</p>
+          <p className="text-slate-400 text-sm leading-relaxed">{planError || "Your coach hasn't published a session yet. Check back soon!"}</p>
           <button
             onClick={() => router.push('/dashboard')}
             className="mt-6 bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl px-6 py-3 text-sm font-bold tracking-wider"
@@ -225,12 +270,32 @@ export default function WorkoutPage() {
         </div>
       )}
 
+      {/* AI Coach Note — shows after save */}
+      {(coachNote || coachNoteLoading) && (
+        <div className="mx-5 mb-4 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 flex gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+            SC
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-violet-400 font-bold tracking-wider mb-1">COACH SHAMEEL · POST SESSION</p>
+            {coachNoteLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" />
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{animationDelay: '0.1s'}} />
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{animationDelay: '0.2s'}} />
+              </div>
+            ) : (
+              <p className="text-sm text-slate-300 italic leading-relaxed">"{coachNote}"</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Exercises */}
       <div className="px-5 flex flex-col gap-4 mt-2">
         {activePlan.exercises.map((ex, exIdx) => (
           <div key={exIdx} className="bg-white/4 border border-white/8 rounded-3xl overflow-hidden">
 
-            {/* Exercise header */}
             <div className="px-4 pt-4 pb-3 flex items-start justify-between border-b border-white/5">
               <div>
                 <h3 className="font-bold text-base leading-tight">{ex.name}</h3>
@@ -246,14 +311,12 @@ export default function WorkoutPage() {
               )}
             </div>
 
-            {/* Guide dropdown */}
             {activeGuide === exIdx && ex.cue && (
               <div className="px-4 py-3 bg-blue-500/5 border-b border-blue-500/10">
                 <p className="text-xs text-blue-300 leading-relaxed">🎯 {ex.cue}</p>
               </div>
             )}
 
-            {/* Sets table */}
             <div className="px-4 py-3">
               <div className="grid grid-cols-4 gap-2 mb-2">
                 {['SET', 'KG', 'REPS', ''].map((h) => (
@@ -296,7 +359,6 @@ export default function WorkoutPage() {
               ))}
             </div>
 
-            {/* Last session reference */}
             <div className="px-4 py-3 border-t border-white/5 flex items-center gap-2">
               <span className="text-xs text-slate-600 tracking-wider">Last time:</span>
               {formatLastSession(exIdx) ? (
