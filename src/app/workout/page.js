@@ -67,23 +67,27 @@ export default function WorkoutPage() {
     fetchPlan();
   }, [userId]);
 
-  // Fetch last session data
+// Fetch last session data by exercise name
   useEffect(() => {
     if (!userId || !activePlan) return;
     const fetchLastSession = async () => {
       try {
-        const res = await fetch(
-          `${API_URL}?userId=${userId}&planId=${activePlan.id}&session=last`,
-          { headers: { 'x-functions-key': API_KEY } }
+        const results = {};
+        await Promise.all(
+          activePlan.exercises.map(async (ex, idx) => {
+            const res = await fetch(
+              `${API_URL}?userId=${userId}&exName=${encodeURIComponent(ex.name)}&session=last`,
+              { headers: { 'x-functions-key': API_KEY } }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              if (data.length > 0) {
+                results[idx] = JSON.parse(data[0].sets_data || '[]');
+              }
+            }
+          })
         );
-        if (res.ok) {
-          const data = await res.json();
-          const map = {};
-          data.forEach((log) => {
-            map[log.exIdx] = JSON.parse(log.sets_data || '[]');
-          });
-          setLastSession(map);
-        }
+        setLastSession(results);
       } catch (e) {
         console.log('No last session data');
       }
