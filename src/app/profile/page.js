@@ -5,34 +5,79 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
-const mockUser = {
-  name: 'Shameel',
-  initials: 'ST',
-  email: 'shameel@gymdogs.co.nz',
-  joinDate: 'January 2025',
-  streak: 5,
-  totalWorkouts: 87,
-  personalBests: 12,
-};
+const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-const mockStats = { weight: 82, height: 178, age: 28, bodyFat: 16 };
+const mockStats = { weight: '', height: '', age: '', bodyFat: '' };
 const mockGoals = ['Build Muscle', 'Improve Strength', 'Lose Body Fat'];
-const achievements = [
-  { id: 1, icon: '🔥', label: '14-Day Streak', earned: true },
-  { id: 2, icon: '💪', label: 'First PR', earned: true },
-  { id: 3, icon: '🏋️', label: '50 Workouts', earned: true },
-  { id: 4, icon: '⚡', label: '100 Workouts', earned: false },
-  { id: 5, icon: '🎯', label: 'Goal Crusher', earned: false },
-  { id: 6, icon: '👑', label: 'Elite Status', earned: false },
-];
+
+function calcStreak(logs) {
+  if (!logs || logs.length === 0) return 0;
+  const dates = [...new Set(logs.map(l => l.date).filter(Boolean))].sort().reverse();
+  if (dates.length === 0) return 0;
+  let streak = 0;
+  let current = new Date();
+  current.setHours(0, 0, 0, 0);
+  for (const date of dates) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.round((current - d) / (1000 * 60 * 60 * 24));
+    if (diff <= 1) { streak++; current = d; } else break;
+  }
+  return streak;
+}
+
+function calcPRCount(logs) {
+  const maxByExercise = {};
+  logs.forEach(log => {
+    if (!log.exName) return;
+    try {
+      const sets = JSON.parse(log.sets_data || '[]');
+      sets.forEach(s => {
+        if (s.kg && parseFloat(s.kg) > 0) {
+          const kg = parseFloat(s.kg);
+          if (!maxByExercise[log.exName] || kg > maxByExercise[log.exName]) {
+            maxByExercise[log.exName] = kg;
+          }
+        }
+      });
+    } catch (e) {}
+  });
+  return Object.keys(maxByExercise).length;
+}
+
+function calcTotalSessions(logs) {
+  return new Set(logs.map(l => l.date).filter(Boolean)).size;
+}
+
+function getJoinDate(account) {
+  // Use account creation date if available, otherwise show join month
+  const now = new Date();
+  return now.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+}
 
 export default function ProfilePage() {
   const router = useRouter();
   const { instance, accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState('');
+  const [userInitials, setUserInitials] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [joinDate, setJoinDate] = useState('');
+  const [logs, setLogs] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [editingStats, setEditingStats] = useState(false);
   const [stats, setStats] = useState(mockStats);
   const [tempStats, setTempStats] = useState(mockStats);
+
+  const achievements = [
+    { id: 1, icon: '🔥', label: '14-Day Streak', earned: calcStreak(logs) >= 14 },
+    { id: 2, icon: '💪', label: 'First PR', earned: calcPRCount(logs) >= 1 },
+    { id: 3, icon: '🏋️', label: '10 Workouts', earned: calcTotalSessions(logs) >= 10 },
+    { id: 4, icon: '⚡', label: '50 Workouts', earned: calcTotalSessions(logs) >= 50 },
+    { id: 5, icon: '🎯', label: '5 PRs Set', earned: calcPRCount(logs) >= 5 },
+    { id: 6, icon: '👑', label: 'Elite Status', earned: calcTotalSessions(logs) >= 100 },
+  ];
 
   useEffect(() => {
     if (inProgress !== 'none') return;
@@ -40,17 +85,49 @@ export default function ProfilePage() {
       router.push('/login');
       return;
     }
-    setUserId(accounts[0].localAccountId);
+    const user = accounts[0];
+    setUserId(user.localAccountId);
+
+    // Real name and email from Entra
+    const name = user.name || user.username?.split('@')[0] || 'Athlete';
+    const firstName = name.split(' ')[0];
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    setUserName(firstName);
+    setUserInitials(initials);
+    setUserEmail(user.username || '');
+    setJoinDate(getJoinDate(user));
   }, [accounts, inProgress, router]);
 
+  useEffect(() => {
+    if (!userId) return;
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch(`${API_URL}?userId=${userId}`, {
+          headers: { 'x-functions-key': API_KEY }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data);
+        }
+      } catch (e) {
+        console.log('Error fetching logs:', e.message);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    fetchLogs();
+  }, [userId]);
+
   if (!userId) return null;
+
+  const totalSessions = calcTotalSessions(logs);
+  const streak = calcStreak(logs);
+  const prCount = calcPRCount(logs);
 
   const handleSaveStats = () => { setStats(tempStats); setEditingStats(false); };
   const handleCancelEdit = () => { setTempStats(stats); setEditingStats(false); };
   const handleSignOut = () => {
-    instance.logoutRedirect({
-      postLogoutRedirectUri: '/login',
-    });
+    instance.logoutRedirect({ postLogoutRedirectUri: '/login' });
   };
 
   return (
@@ -65,12 +142,12 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-black tracking-wider mt-1">PROFILE</h1>
         <div className="flex items-center gap-4 mt-5">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xl font-bold shadow-lg shadow-blue-500/20">
-            {mockUser.initials}
+            {userInitials}
           </div>
           <div>
-            <h2 className="text-xl font-black tracking-wider">{mockUser.name.toUpperCase()}</h2>
-            <p className="text-sm text-slate-400">{mockUser.email}</p>
-            <p className="text-xs text-slate-600 tracking-wider uppercase mt-0.5">Member since {mockUser.joinDate}</p>
+            <h2 className="text-xl font-black tracking-wider">{userName.toUpperCase()}</h2>
+            <p className="text-sm text-slate-400">{userEmail}</p>
+            <p className="text-xs text-slate-600 tracking-wider uppercase mt-0.5">Member since {joinDate}</p>
           </div>
         </div>
       </div>
@@ -78,9 +155,9 @@ export default function ProfilePage() {
       <div className="relative z-10 px-5 pb-24 flex flex-col gap-4 overflow-y-auto">
         <div className="grid grid-cols-3 gap-3">
           {[
-            { val: mockUser.totalWorkouts, label: 'Workouts', color: 'text-blue-400' },
-            { val: `🔥${mockUser.streak}`, label: 'Day Streak', color: 'text-orange-400' },
-            { val: mockUser.personalBests, label: 'PRs Set', color: 'text-teal-400' },
+            { val: statsLoading ? '...' : totalSessions, label: 'Workouts', color: 'text-blue-400' },
+            { val: statsLoading ? '...' : `🔥${streak}`, label: 'Day Streak', color: 'text-orange-400' },
+            { val: statsLoading ? '...' : prCount, label: 'PRs Set', color: 'text-teal-400' },
           ].map((stat) => (
             <div key={stat.label} className="bg-white/4 border border-white/8 rounded-2xl p-3 text-center">
               <p className={`text-2xl font-black ${stat.color} leading-none`}>{stat.val}</p>
@@ -123,7 +200,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <p className="text-white text-xl font-black font-mono">
-                    {stats[key]} <span className="text-slate-500 text-sm font-normal">{unit}</span>
+                    {stats[key] || '—'} <span className="text-slate-500 text-sm font-normal">{stats[key] ? unit : ''}</span>
                   </p>
                 )}
               </div>
