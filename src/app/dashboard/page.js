@@ -83,7 +83,9 @@ export default function DashboardPage() {
     setUserId(user.localAccountId);
 
     // Get name from Entra account
-    const name = user.name || user.username?.split('@')[0] || 'Athlete';
+   const name = user.name && user.name !== 'unknown' 
+  ? user.name 
+  : user.username?.split('@')[0] || 'Athlete';
     const firstName = name.split(' ')[0];
     setUserName(firstName.toUpperCase());
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);

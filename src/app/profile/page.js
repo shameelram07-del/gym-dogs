@@ -89,7 +89,9 @@ export default function ProfilePage() {
     setUserId(user.localAccountId);
 
     // Real name and email from Entra
-    const name = user.name || user.username?.split('@')[0] || 'Athlete';
+  const name = user.name && user.name !== 'unknown' 
+  ? user.name 
+  : user.username?.split('@')[0] || 'Athlete';
     const firstName = name.split(' ')[0];
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     setUserName(firstName);
