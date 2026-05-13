@@ -86,7 +86,7 @@ export default function ProfilePage() {
   ];
 
   useEffect(() => {
-    if (inProgress !== 'none') return;
+    if (inProgress === 'startup') return;
     if (accounts.length === 0) {
       router.push('/login');
       return;
