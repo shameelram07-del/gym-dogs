@@ -8,7 +8,7 @@ import BottomNav from '@/components/BottomNav';
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
-const PROFILES_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const mockStats = { weight: '', height: '', age: '', bodyFat: '' };
 const mockGoals = ['Build Muscle', 'Improve Strength', 'Lose Body Fat'];
