@@ -6,7 +6,9 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 
 const mockStats = { weight: '', height: '', age: '', bodyFat: '' };
 const mockGoals = ['Build Muscle', 'Improve Strength', 'Lose Body Fat'];
@@ -50,8 +52,7 @@ function calcTotalSessions(logs) {
   return new Set(logs.map(l => l.date).filter(Boolean)).size;
 }
 
-function getJoinDate(account) {
-  // Use account creation date if available, otherwise show join month
+function getJoinDate() {
   const now = new Date();
   return now.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
 }
@@ -70,6 +71,11 @@ export default function ProfilePage() {
   const [stats, setStats] = useState(mockStats);
   const [tempStats, setTempStats] = useState(mockStats);
 
+  // Display name editing
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+
   const achievements = [
     { id: 1, icon: '🔥', label: '14-Day Streak', earned: calcStreak(logs) >= 14 },
     { id: 2, icon: '💪', label: 'First PR', earned: calcPRCount(logs) >= 1 },
@@ -86,18 +92,42 @@ export default function ProfilePage() {
       return;
     }
     const user = accounts[0];
-    setUserId(user.localAccountId);
+    const uid = user.localAccountId;
+    setUserId(uid);
+    setUserEmail(user.username || '');
+    setJoinDate(getJoinDate());
 
-    // Real name and email from Entra
-  const name = user.name && user.name !== 'unknown' 
-  ? user.name 
-  : user.username?.split('@')[0] || 'Athlete';
-    const firstName = name.split(' ')[0];
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    // Fallback name from Entra in case CosmosDB has nothing
+    const entraName = user.name && user.name !== 'unknown'
+      ? user.name
+      : user.username?.split('@')[0] || 'Athlete';
+    const firstName = entraName.split(' ')[0];
+    const initials = entraName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     setUserName(firstName);
     setUserInitials(initials);
-    setUserEmail(user.username || '');
-    setJoinDate(getJoinDate(user));
+
+    // Try to load saved display name from CosmosDB
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, {
+          headers: { 'x-functions-key': PROFILES_KEY }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // data is an array — find this user's profile
+          const profile = Array.isArray(data) ? data.find(p => p.userId === uid) : null;
+          if (profile && profile.name && profile.name !== uid) {
+            const savedFirst = profile.name.split(' ')[0];
+            const savedInitials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            setUserName(savedFirst);
+            setUserInitials(savedInitials);
+          }
+        }
+      } catch (e) {
+        console.log('Could not load profile:', e.message);
+      }
+    };
+    fetchProfile();
   }, [accounts, inProgress, router]);
 
   useEffect(() => {
@@ -119,6 +149,36 @@ export default function ProfilePage() {
     };
     fetchLogs();
   }, [userId]);
+
+  const handleSaveName = async () => {
+    if (!tempName.trim()) return;
+    setSavingName(true);
+    try {
+      const initials = tempName.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const res = await fetch(PROFILES_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-functions-key': PROFILES_KEY
+        },
+        body: JSON.stringify({
+          userId,
+          name: tempName.trim(),
+          initials
+        })
+      });
+      if (res.ok) {
+        const firstName = tempName.trim().split(' ')[0];
+        setUserName(firstName);
+        setUserInitials(initials);
+        setEditingName(false);
+      }
+    } catch (e) {
+      console.log('Error saving name:', e.message);
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   if (!userId) return null;
 
@@ -235,8 +295,15 @@ export default function ProfilePage() {
 
         <p className="text-xs tracking-[3px] text-slate-500 uppercase mt-1">Account</p>
         <div className="bg-white/4 border border-white/8 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { setTempName(userName); setEditingName(true); }}
+            className="w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-white/4 transition-colors border-b border-white/5"
+          >
+            <span className="text-lg">✏️</span>
+            <span className="text-sm font-medium text-slate-300 tracking-wide flex-1">Edit Display Name</span>
+            <span className="text-slate-600 text-sm">›</span>
+          </button>
           {[
-            { label: 'Edit Profile Info', icon: '✏️' },
             { label: 'Notification Preferences', icon: '🔔' },
             { label: 'Privacy Settings', icon: '🔒' },
           ].map((item, i, arr) => (
@@ -254,6 +321,37 @@ export default function ProfilePage() {
           Sign Out
         </button>
       </div>
+
+      {/* Edit Name Modal */}
+      {editingName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#0E1624] border border-white/10 rounded-3xl p-6 w-full max-w-sm">
+            <h3 className="text-lg font-black tracking-wider mb-1">DISPLAY NAME</h3>
+            <p className="text-xs text-slate-500 tracking-wide mb-5">This is how you'll appear in the app and on the leaderboard</p>
+            <input
+              type="text"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              placeholder="e.g. Shoeb or Shoeb Dar"
+              className="w-full bg-white/6 border border-white/12 rounded-xl px-4 py-3 text-white text-base outline-none focus:border-blue-500/60 mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditingName(false)}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-slate-400 text-sm font-bold tracking-wider">
+                CANCEL
+              </button>
+              <button
+                onClick={handleSaveName}
+                disabled={savingName || !tempName.trim()}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-violet-600 text-white text-sm font-bold tracking-wider disabled:opacity-50">
+                {savingName ? 'SAVING...' : 'SAVE'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
