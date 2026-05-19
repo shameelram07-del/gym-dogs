@@ -125,17 +125,12 @@ export default function LoginPage() {
         <button
           onClick={handleSignIn}
           disabled={inProgress !== 'none'}
-          className="w-full flex items-center rounded-2xl overflow-hidden mb-4 shadow-lg shadow-blue-500/20 disabled:opacity-50 active:scale-98 transition-transform"
+          className="w-full bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50 active:scale-98 transition-transform mb-4"
         >
-          <div className="bg-white/10 p-4 flex items-center justify-center">
-            <span className="text-xl">🐾</span>
-          </div>
-          <div className="flex-1 bg-gradient-to-r from-blue-500 to-violet-600 py-4 flex items-center justify-center gap-2">
-            <span className="font-black tracking-[3px] text-sm uppercase">
-              {inProgress !== 'none' ? 'Loading...' : 'Sign In'}
-            </span>
-            <span className="text-base">→</span>
-          </div>
+          <span className="font-black tracking-[3px] text-sm uppercase">
+            {inProgress !== 'none' ? 'Loading...' : 'Sign In'}
+          </span>
+          <span className="text-base">→</span>
         </button>
 
         {/* Divider */}
@@ -149,15 +144,10 @@ export default function LoginPage() {
         <button
           onClick={handleCreateAccount}
           disabled={inProgress !== 'none'}
-          className="w-full flex items-center bg-white/5 border border-white/8 rounded-2xl overflow-hidden mt-4 disabled:opacity-50 active:scale-98 transition-transform"
+          className="w-full bg-white/5 border border-white/8 rounded-2xl py-4 flex items-center justify-center gap-2 mt-4 disabled:opacity-50 active:scale-98 transition-transform"
         >
-          <div className="bg-white/5 p-4 flex items-center justify-center">
-            <span className="text-xl">🐾</span>
-          </div>
-          <div className="flex-1 py-4 flex items-center justify-center gap-2">
-            <span className="font-bold tracking-[2px] text-sm text-slate-300">Create Account</span>
-            <span className="text-base text-slate-400">→</span>
-          </div>
+          <span className="font-bold tracking-[2px] text-sm text-slate-300">Create Account</span>
+          <span className="text-base text-slate-400">→</span>
         </button>
 
         {/* Footer */}
