@@ -7,6 +7,8 @@ import BottomNav from '@/components/BottomNav';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const bodyAreas = ['Chest', 'Shoulders', 'Back', 'Legs', 'Core', 'Arms'];
 const levels = ['none', 'mild', 'moderate', 'severe'];
@@ -97,17 +99,43 @@ export default function ProgressPage() {
   const [userId, setUserId] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [profileRef, setProfileRef] = useState(null);
   const [sorenessLevels, setSorenessLevels] = useState(
     bodyAreas.reduce((acc, area) => ({ ...acc, [area]: 'none' }), {})
   );
+  const [savingSoreness, setSavingSoreness] = useState(false);
+  const [sorenessSaved, setSorenessSaved] = useState(false);
 
   useEffect(() => {
-    if (inProgress !== 'none') return;
+    if (inProgress === 'startup') return;
     if (accounts.length === 0) {
       router.push('/login');
       return;
     }
-    setUserId(accounts[0].localAccountId);
+    const uid = accounts[0].localAccountId;
+    setUserId(uid);
+
+    // Load soreness from CosmosDB
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, {
+          headers: { 'x-functions-key': PROFILES_KEY }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const profile = Array.isArray(data) ? data.find(p => p.userId === uid) : null;
+          if (profile) {
+            setProfileRef(profile);
+            if (profile.soreness) {
+              setSorenessLevels(profile.soreness);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Could not load soreness:', e.message);
+      }
+    };
+    fetchProfile();
   }, [accounts, inProgress, router]);
 
   useEffect(() => {
@@ -130,20 +158,42 @@ export default function ProgressPage() {
     fetchLogs();
   }, [userId]);
 
+  const cycleLevel = async (area) => {
+    const current = sorenessLevels[area];
+    const next = levels[(levels.indexOf(current) + 1) % levels.length];
+    const updated = { ...sorenessLevels, [area]: next };
+    setSorenessLevels(updated);
+
+    // Save to CosmosDB
+    setSavingSoreness(true);
+    try {
+      await fetch(PROFILES_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-functions-key': PROFILES_KEY
+        },
+        body: JSON.stringify({
+          ...(profileRef || {}),
+          userId,
+          soreness: updated
+        })
+      });
+      setSorenessSaved(true);
+      setTimeout(() => setSorenessSaved(false), 1500);
+    } catch (e) {
+      console.log('Error saving soreness:', e.message);
+    } finally {
+      setSavingSoreness(false);
+    }
+  };
+
   if (!userId) return null;
 
   const weeklyData = calcWeeklyVolume(logs);
   const prs = calcPRs(logs);
   const totalVolume = calcTotalVolume(logs);
   const totalSessions = new Set(logs.map(l => l.date).filter(Boolean)).size;
-
-  const cycleLevel = (area) => {
-    setSorenessLevels(prev => {
-      const current = prev[area];
-      const next = levels[(levels.indexOf(current) + 1) % levels.length];
-      return { ...prev, [area]: next };
-    });
-  };
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white pb-24">
@@ -218,7 +268,9 @@ export default function ProgressPage() {
         <div className="bg-white/4 border border-white/8 rounded-3xl p-4">
           <div className="flex justify-between items-center mb-4">
             <p className="text-xs tracking-[3px] text-slate-500 uppercase">Soreness Check-in</p>
-            <p className="text-xs text-blue-400">Tap to update</p>
+            <p className="text-xs text-blue-400">
+              {savingSoreness ? 'Saving...' : sorenessSaved ? '✓ Saved' : 'Tap to update'}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {bodyAreas.map((area) => {
