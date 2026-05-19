@@ -10,7 +10,7 @@ const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.az
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
-const mockStats = { weight: '', height: '', age: '', bodyFat: '' };
+const emptyStats = { weight: '', height: '', age: '', bodyFat: '' };
 const mockGoals = ['Build Muscle', 'Improve Strength', 'Lose Body Fat'];
 
 function calcStreak(logs) {
@@ -68,13 +68,18 @@ export default function ProfilePage() {
   const [logs, setLogs] = useState([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [editingStats, setEditingStats] = useState(false);
-  const [stats, setStats] = useState(mockStats);
-  const [tempStats, setTempStats] = useState(mockStats);
+  const [savingStats, setSavingStats] = useState(false);
+  const [statsSaved, setStatsSaved] = useState(false);
+  const [stats, setStats] = useState(emptyStats);
+  const [tempStats, setTempStats] = useState(emptyStats);
 
   // Display name editing
   const [editingName, setEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const [savingName, setSavingName] = useState(false);
+
+  // Stored profile reference for merging on save
+  const [profileRef, setProfileRef] = useState(null);
 
   const achievements = [
     { id: 1, icon: '🔥', label: '14-Day Streak', earned: calcStreak(logs) >= 14 },
@@ -97,7 +102,7 @@ export default function ProfilePage() {
     setUserEmail(user.username || '');
     setJoinDate(getJoinDate());
 
-    // Fallback name from Entra in case CosmosDB has nothing
+    // Fallback name from Entra
     const entraName = user.name && user.name !== 'unknown'
       ? user.name
       : user.username?.split('@')[0] || 'Athlete';
@@ -106,7 +111,7 @@ export default function ProfilePage() {
     setUserName(firstName);
     setUserInitials(initials);
 
-    // Try to load saved display name from CosmosDB
+    // Load profile from CosmosDB — name AND body stats
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, {
@@ -114,13 +119,27 @@ export default function ProfilePage() {
         });
         if (res.ok) {
           const data = await res.json();
-          // data is an array — find this user's profile
           const profile = Array.isArray(data) ? data.find(p => p.userId === uid) : null;
-          if (profile && profile.name && profile.name !== uid) {
-            const savedFirst = profile.name.split(' ')[0];
-            const savedInitials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-            setUserName(savedFirst);
-            setUserInitials(savedInitials);
+          if (profile) {
+            setProfileRef(profile);
+
+            // Load saved name
+            if (profile.name && profile.name !== uid) {
+              const savedFirst = profile.name.split(' ')[0];
+              const savedInitials = profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+              setUserName(savedFirst);
+              setUserInitials(savedInitials);
+            }
+
+            // Load saved body stats
+            const savedStats = {
+              weight: profile.weight || '',
+              height: profile.height || '',
+              age: profile.age || '',
+              bodyFat: profile.bodyFat || '',
+            };
+            setStats(savedStats);
+            setTempStats(savedStats);
           }
         }
       } catch (e) {
@@ -162,6 +181,7 @@ export default function ProfilePage() {
           'x-functions-key': PROFILES_KEY
         },
         body: JSON.stringify({
+          ...(profileRef || {}),
           userId,
           name: tempName.trim(),
           initials
@@ -180,17 +200,49 @@ export default function ProfilePage() {
     }
   };
 
+  // Save body stats to CosmosDB
+  const handleSaveStats = async () => {
+    setSavingStats(true);
+    try {
+      const res = await fetch(PROFILES_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-functions-key': PROFILES_KEY
+        },
+        body: JSON.stringify({
+          ...(profileRef || {}),
+          userId,
+          name: userName,
+          weight: tempStats.weight,
+          height: tempStats.height,
+          age: tempStats.age,
+          bodyFat: tempStats.bodyFat,
+        })
+      });
+      if (res.ok) {
+        setStats(tempStats);
+        setEditingStats(false);
+        setStatsSaved(true);
+        setTimeout(() => setStatsSaved(false), 2000);
+      }
+    } catch (e) {
+      console.log('Error saving stats:', e.message);
+    } finally {
+      setSavingStats(false);
+    }
+  };
+
+  const handleCancelEdit = () => { setTempStats(stats); setEditingStats(false); };
+  const handleSignOut = () => {
+    instance.logoutRedirect({ postLogoutRedirectUri: '/login' });
+  };
+
   if (!userId) return null;
 
   const totalSessions = calcTotalSessions(logs);
   const streak = calcStreak(logs);
   const prCount = calcPRCount(logs);
-
-  const handleSaveStats = () => { setStats(tempStats); setEditingStats(false); };
-  const handleCancelEdit = () => { setTempStats(stats); setEditingStats(false); };
-  const handleSignOut = () => {
-    instance.logoutRedirect({ postLogoutRedirectUri: '/login' });
-  };
 
   return (
     <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
@@ -233,11 +285,16 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-bold tracking-wider text-white">MEASUREMENTS</p>
             {!editingStats ? (
-              <button onClick={() => setEditingStats(true)} className="text-blue-400 text-sm font-semibold tracking-wider">EDIT</button>
+              <button onClick={() => { setTempStats(stats); setEditingStats(true); }} className="text-blue-400 text-sm font-semibold tracking-wider">EDIT</button>
             ) : (
               <div className="flex gap-4">
                 <button onClick={handleCancelEdit} className="text-slate-500 text-sm tracking-wider">CANCEL</button>
-                <button onClick={handleSaveStats} className="text-blue-400 text-sm font-semibold tracking-wider">SAVE</button>
+                <button
+                  onClick={handleSaveStats}
+                  disabled={savingStats}
+                  className="text-blue-400 text-sm font-semibold tracking-wider disabled:opacity-50">
+                  {savingStats ? 'SAVING...' : statsSaved ? '✓ SAVED' : 'SAVE'}
+                </button>
               </div>
             )}
           </div>
