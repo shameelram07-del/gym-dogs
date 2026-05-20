@@ -67,7 +67,7 @@ export default function DashboardPage() {
   async function loadDashboardData(uid) {
     try {
       const logsRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/gymLogs?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_API_KEY || '' } }
       );
       const logs = await logsRes.json();
@@ -103,7 +103,7 @@ export default function DashboardPage() {
       });
 
       const plansRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/workoutPlans?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' } }
       );
       const plans = await plansRes.json();
@@ -114,7 +114,7 @@ export default function DashboardPage() {
       }
 
       const profileRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/userProfiles?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' } }
       );
       const profile = await profileRes.json();
@@ -125,7 +125,7 @@ export default function DashboardPage() {
         if (profile.name)     setUserName(profile.name.toUpperCase());
       }
 
-      const noteRes = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/aiCoach', {
+      const noteRes = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
