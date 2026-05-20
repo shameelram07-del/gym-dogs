@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
@@ -14,6 +14,57 @@ const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+// Convert exercise name to image slug
+function toSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Exercise photo component with fallback
+function ExercisePhoto({ name, size = 72 }) {
+  const [error, setError] = useState(false);
+  const slug = toSlug(name);
+  
+  if (error) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: 12, flexShrink: 0,
+        background: 'linear-gradient(135deg, #1a0a3d, #0d1040)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 28,
+      }}>
+        💪
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 12, flexShrink: 0,
+      background: '#0d0d1a', overflow: 'hidden',
+      border: '1px solid rgba(139,92,246,0.2)',
+    }}>
+      <img
+        src={`/images/exercises/${slug}.jpg`}
+        alt={name}
+        onError={() => setError(true)}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </div>
+  );
+}
+
+// Elapsed timer
+function ElapsedTimer() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setSeconds(s => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = (seconds % 60).toString().padStart(2, '0');
+  return <span>{m}:{s}</span>;
+}
+
 export default function WorkoutPage() {
   const router = useRouter();
   const { accounts, inProgress } = useMsal();
@@ -26,22 +77,18 @@ export default function WorkoutPage() {
 
   const [logs, setLogs] = useState({});
   const [lastSession, setLastSession] = useState({});
-  const [activeGuide, setActiveGuide] = useState(null);
+  const [expandedIdx, setExpandedIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
 
-  // AI coach note state
   const [coachNote, setCoachNote] = useState(null);
   const [coachNoteLoading, setCoachNoteLoading] = useState(false);
 
-  // Auth guard
+  // Auth
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) {
-      router.push('/login');
-      return;
-    }
+    if (accounts.length === 0) { router.push('/login'); return; }
     const user = accounts[0];
     setUserId(user.localAccountId);
     const name = user.name && user.name !== 'unknown'
@@ -50,10 +97,10 @@ export default function WorkoutPage() {
     setUserName(name);
   }, [accounts, inProgress, router]);
 
-  // Fetch active plan
+  // Load plan
   useEffect(() => {
     if (!userId) return;
-    const fetchPlan = async () => {
+    (async () => {
       try {
         const res = await fetch(PLANS_API_URL, {
           headers: { 'x-functions-key': PLANS_API_KEY }
@@ -67,21 +114,20 @@ export default function WorkoutPage() {
           });
           setLogs(emptyLogs);
         } else {
-          setPlanError('No active session found. Ask your coach to publish one!');
+          setPlanError('No active session found.');
         }
-      } catch (e) {
-        setPlanError('Could not load session. Please try again.');
+      } catch {
+        setPlanError('Could not load session.');
       } finally {
         setPlanLoading(false);
       }
-    };
-    fetchPlan();
+    })();
   }, [userId]);
 
-  // Fetch last session data by exercise name
+  // Load last session
   useEffect(() => {
     if (!userId || !activePlan) return;
-    const fetchLastSession = async () => {
+    (async () => {
       try {
         const results = {};
         await Promise.all(
@@ -92,18 +138,13 @@ export default function WorkoutPage() {
             );
             if (res.ok) {
               const data = await res.json();
-              if (data.length > 0) {
-                results[idx] = JSON.parse(data[0].sets_data || '[]');
-              }
+              if (data.length > 0) results[idx] = JSON.parse(data[0].sets_data || '[]');
             }
           })
         );
         setLastSession(results);
-      } catch (e) {
-        console.log('No last session data');
-      }
-    };
-    fetchLastSession();
+      } catch { /* silent */ }
+    })();
   }, [userId, activePlan]);
 
   const updateSet = (exIdx, setIdx, field, value) => {
@@ -122,25 +163,33 @@ export default function WorkoutPage() {
     });
   };
 
-  const getAICoachNote = async (sessionSummary) => {
+  const addSet = (exIdx) => {
+    setLogs(prev => ({
+      ...prev,
+      [exIdx]: [...(prev[exIdx] || []), { kg: '', reps: '', done: false }]
+    }));
+  };
+
+  const completedCount = activePlan ? activePlan.exercises.filter((_, idx) => {
+    const sets = logs[idx] || [];
+    return sets.length > 0 && sets.every(s => s.done);
+  }).length : 0;
+
+  const getAICoachNote = async (summary) => {
     setCoachNoteLoading(true);
     try {
-      const message = `${userName} just finished a ${activePlan.name} session. Here's what they did: ${sessionSummary}. Write a short, personal, motivating post-session note in Shameel's voice as their coach. Keep it to 2-3 sentences. Be specific about their work today.`;
       const res = await fetch(AI_COACH_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-functions-key': AI_COACH_KEY
-        },
-        body: JSON.stringify({ message })
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY },
+        body: JSON.stringify({
+          message: `${userName} just finished a ${activePlan.name} session. ${summary}. Write a short motivating post-session note in Shameel's voice. 2-3 sentences, specific to their work.`
+        })
       });
       if (res.ok) {
         const data = await res.json();
         setCoachNote(data.reply);
       }
-    } catch (e) {
-      console.log('AI coach note failed:', e.message);
-    } finally {
+    } catch { /* silent */ } finally {
       setCoachNoteLoading(false);
     }
   };
@@ -150,242 +199,354 @@ export default function WorkoutPage() {
     setSaving(true);
     setError(null);
     try {
-      const saves = activePlan.exercises.map((ex, idx) =>
+      await Promise.all(activePlan.exercises.map((ex, idx) =>
         fetch(API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-functions-key': API_KEY
-          },
+          headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
           body: JSON.stringify({
-            userId,
-            planId: activePlan.id,
-            planName: activePlan.name,
-            date: TODAY,
-            exIdx: idx,
-            exName: ex.name,
+            userId, planId: activePlan.id, planName: activePlan.name,
+            date: TODAY, exIdx: idx, exName: ex.name,
             sets_data: JSON.stringify(logs[idx] || [])
           })
         })
-      );
-      await Promise.all(saves);
+      ));
       setSaved(true);
-
-      // Build session summary for AI
       const summary = activePlan.exercises.map((ex, idx) => {
-        const sets = logs[idx] || [];
-        const setsStr = sets
-          .filter(s => s.kg || s.reps)
-          .map(s => `${s.kg || '?'}kg x ${s.reps || '?'} reps`)
-          .join(', ');
-        return setsStr ? `${ex.name}: ${setsStr}` : null;
+        const sets = (logs[idx] || []).filter(s => s.kg || s.reps)
+          .map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
+        return sets ? `${ex.name}: ${sets}` : null;
       }).filter(Boolean).join('. ');
-
       if (summary) getAICoachNote(summary);
-
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
+    } catch {
       setError('Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const formatLastSession = (exIdx) => {
+  const formatLast = (exIdx) => {
     const sets = lastSession[exIdx];
     if (!sets || sets.length === 0) return null;
-    return sets
-      .filter(s => s.kg || s.reps)
-      .map(s => `${s.kg || '?'}kg × ${s.reps || '?'}`)
-      .join(', ');
+    return sets.filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg × ${s.reps||'?'}`).join('  ·  ');
   };
 
-  if (!userId) return null;
-
-  if (planLoading) {
+  // ── Loading
+  if (!userId || planLoading) {
     return (
-      <div className="min-h-screen bg-[#080C14] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4">💪</div>
-          <p className="text-slate-400 tracking-wider">Loading your session...</p>
-        </div>
+      <div style={{ minHeight: '100vh', background: '#08080F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: '#fff' }}>
+        <div style={{ fontSize: 48 }}>💪</div>
+        <p style={{ color: '#6b7280', letterSpacing: '0.1em', fontSize: 13 }}>Loading your session...</p>
       </div>
     );
   }
 
+  // ── No plan
   if (planError || !activePlan) {
     return (
-      <div className="min-h-screen bg-[#080C14] text-white flex items-center justify-center px-5">
-        <div className="text-center">
-          <div className="text-4xl mb-4">📋</div>
-          <p className="text-white font-bold text-lg mb-2">No Active Session</p>
-          <p className="text-slate-400 text-sm leading-relaxed">{planError || "Your coach hasn't published a session yet. Check back soon!"}</p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="mt-6 bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl px-6 py-3 text-sm font-bold tracking-wider"
-          >
-            Back to Dashboard
-          </button>
-        </div>
+      <div style={{ minHeight: '100vh', background: '#08080F', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: '#fff', padding: '0 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: 48 }}>📋</div>
+        <p style={{ fontWeight: 800, fontSize: 18 }}>No Active Session</p>
+        <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.6 }}>{planError || "Your coach hasn't published a session yet."}</p>
+        <button onClick={() => router.push('/dashboard')} style={{ marginTop: 16, background: 'linear-gradient(135deg, #6d28d9, #4f46e5)', border: 'none', borderRadius: 16, padding: '14px 28px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+          Back to Dashboard
+        </button>
         <BottomNav />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#080C14] text-white pb-32">
+  const total = activePlan.exercises.length;
+  const ringPct = total > 0 ? (completedCount / total) * 100 : 0;
+  const ringCircumference = 2 * Math.PI * 28;
 
-      {/* Header */}
-      <div className="px-5 pt-12 pb-4 bg-gradient-to-b from-blue-500/10 to-transparent">
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="w-9 h-9 bg-white/6 rounded-xl flex items-center justify-center text-lg"
-          >
-            ←
-          </button>
-          <span className="text-xs tracking-[3px] text-slate-500 uppercase">{TODAY}</span>
-        </div>
-        <h1 className="text-3xl font-black tracking-wider leading-tight uppercase">
-          {activePlan.name.split(' ').map((word, i) =>
-            i === 0
-              ? <span key={i}>{word} </span>
-              : <span key={i} className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">{word} </span>
-          )}
-        </h1>
-        <div className="flex gap-2 mt-3 flex-wrap">
-          <span className="bg-blue-500/15 border border-blue-500/30 text-blue-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">
-            {activePlan.tag}
-          </span>
-          <span className="bg-white/6 border border-white/10 text-slate-400 rounded-full px-3 py-1 text-xs font-bold tracking-wider">
-            {activePlan.exercises.length} EXERCISES
-          </span>
+  return (
+    <div style={{ minHeight: '100vh', background: '#08080F', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: 140 }}>
+
+      {/* ── HEADER ── */}
+      <div style={{ padding: '52px 20px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div style={{ flex: 1 }}>
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, width: 36, height: 36, color: '#fff', fontSize: 18, cursor: 'pointer', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              ←
+            </button>
+            <h1 style={{ margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {activePlan.name.split('/').map((part, i) => (
+                <span key={i}>
+                  {i > 0 && <span style={{ color: '#fff' }}> / </span>}
+                  <span style={{ color: i === 0 ? '#fff' : '#a78bfa' }}>{part.trim()}</span>
+                </span>
+              ))}
+            </h1>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', color: '#a5b4fc', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20 }}>
+                {activePlan.tag}
+              </span>
+              <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#9ca3af', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20 }}>
+                {total} EXERCISES
+              </span>
+            </div>
+          </div>
+          {/* Gym Dogs Logo */}
+          <img
+            src="/images/gymdogs_logo.png"
+            alt="Gym Dogs"
+            style={{ width: 72, height: 72, objectFit: 'contain', flexShrink: 0, marginLeft: 12 }}
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
         </div>
       </div>
 
-      {/* Error */}
+      {/* ── PROGRESS CARD ── */}
+      <div style={{ margin: '0 20px 16px' }}>
+        <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Ring */}
+          <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+            <svg width="64" height="64" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="5" />
+              <circle
+                cx="32" cy="32" r="28" fill="none"
+                stroke="url(#progressGrad)" strokeWidth="5"
+                strokeDasharray={`${ringCircumference * ringPct / 100} ${ringCircumference}`}
+                strokeLinecap="round" transform="rotate(-90 32 32)"
+              />
+              <defs>
+                <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#a78bfa" />
+                  <stop offset="100%" stopColor="#6d28d9" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{completedCount}</span>
+              <span style={{ fontSize: 9, color: '#6b7280', fontWeight: 600 }}>of {total}</span>
+            </div>
+          </div>
+
+          {/* Progress text */}
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em' }}>WORKOUT PROGRESS</p>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#e2e8f0' }}>{completedCount} of {total} exercises completed</p>
+          </div>
+
+          {/* Timer */}
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginBottom: 2 }}>
+              <span style={{ fontSize: 12 }}>🕐</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                <ElapsedTimer />
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: 10, color: '#6b7280', fontWeight: 700, letterSpacing: '0.08em' }}>ELAPSED</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── AI COACH NOTE ── */}
+      {(coachNote || coachNoteLoading) && (
+        <div style={{ margin: '0 20px 16px', background: 'rgba(109,40,217,0.1)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 18, padding: '14px 16px', display: 'flex', gap: 12 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>SC</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 10, color: '#a78bfa', fontWeight: 700, letterSpacing: '0.08em' }}>COACH SHAMEEL · POST SESSION</p>
+            {coachNoteLoading ? (
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', animation: 'bounce 0.8s infinite', animationDelay: `${i*0.15}s` }} />)}
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: 13, color: '#c4b5fd', fontStyle: 'italic', lineHeight: 1.5 }}>"{coachNote}"</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── ERROR ── */}
       {error && (
-        <div className="mx-5 mb-4 bg-red-500/10 border border-red-500/20 rounded-2xl p-3 text-red-400 text-sm text-center">
+        <div style={{ margin: '0 20px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 14, padding: '12px 16px', color: '#f87171', fontSize: 13, textAlign: 'center' }}>
           {error}
         </div>
       )}
 
-      {/* AI Coach Note — shows after save */}
-      {(coachNote || coachNoteLoading) && (
-        <div className="mx-5 mb-4 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 flex gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
-            SC
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-violet-400 font-bold tracking-wider mb-1">COACH SHAMEEL · POST SESSION</p>
-            {coachNoteLoading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" />
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{animationDelay: '0.1s'}} />
-                <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{animationDelay: '0.2s'}} />
-              </div>
-            ) : (
-              <p className="text-sm text-slate-300 italic leading-relaxed">"{coachNote}"</p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ── EXERCISE CARDS ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 20px' }}>
+        {activePlan.exercises.map((ex, exIdx) => {
+          const isExpanded = expandedIdx === exIdx;
+          const sets = logs[exIdx] || [];
+          const allDone = sets.length > 0 && sets.every(s => s.done);
+          const lastData = formatLast(exIdx);
 
-      {/* Exercises */}
-      <div className="px-5 flex flex-col gap-4 mt-2">
-        {activePlan.exercises.map((ex, exIdx) => (
-          <div key={exIdx} className="bg-white/4 border border-white/8 rounded-3xl overflow-hidden">
+          return (
+            <div key={exIdx} style={{
+              background: '#111118',
+              border: `1px solid ${isExpanded ? 'rgba(139,92,246,0.5)' : allDone ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.07)'}`,
+              borderRadius: 20,
+              overflow: 'hidden',
+              boxShadow: isExpanded ? '0 0 24px rgba(109,40,217,0.15)' : 'none',
+              transition: 'border-color 0.2s, box-shadow 0.2s',
+            }}>
 
-            <div className="px-4 pt-4 pb-3 flex items-start justify-between border-b border-white/5">
-              <div>
-                <h3 className="font-bold text-base leading-tight">{ex.name}</h3>
-                <p className="text-xs text-slate-500 mt-1">{ex.sets} sets · {ex.reps} reps</p>
-              </div>
-              {ex.cue && (
-                <button
-                  onClick={() => setActiveGuide(activeGuide === exIdx ? null : exIdx)}
-                  className="bg-blue-500/12 border border-blue-500/20 rounded-xl px-3 py-2 text-xs text-blue-400 font-bold tracking-wider flex-shrink-0 ml-2"
-                >
-                  ▶ Guide
-                </button>
-              )}
-            </div>
+              {/* Card header row */}
+              <button
+                onClick={() => setExpandedIdx(isExpanded ? null : exIdx)}
+                style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}
+              >
+                {/* Number circle */}
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${allDone ? '#34d399' : '#6d28d9'}`,
+                  background: allDone ? 'rgba(52,211,153,0.1)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 800, color: allDone ? '#34d399' : '#a78bfa',
+                }}>
+                  {allDone ? '✓' : exIdx + 1}
+                </div>
 
-            {activeGuide === exIdx && ex.cue && (
-              <div className="px-4 py-3 bg-blue-500/5 border-b border-blue-500/10">
-                <p className="text-xs text-blue-300 leading-relaxed">🎯 {ex.cue}</p>
-              </div>
-            )}
+                {/* Exercise photo */}
+                <ExercisePhoto name={ex.name} size={68} />
 
-            <div className="px-4 py-3">
-              <div className="grid grid-cols-4 gap-2 mb-2">
-                {['SET', 'KG', 'REPS', ''].map((h) => (
-                  <p key={h} className="text-xs tracking-widest text-slate-600 uppercase text-center">{h}</p>
-                ))}
-              </div>
+                {/* Name + sets/reps */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{ex.name}</p>
+                  <span style={{ display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 700, color: '#9ca3af', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 10px', letterSpacing: '0.04em' }}>
+                    {ex.sets} SETS · {ex.reps} REPS
+                  </span>
+                </div>
 
-              {(logs[exIdx] || []).map((set, idx) => (
-                <div key={idx} className="grid grid-cols-4 gap-2 mb-2 items-center">
-                  <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-xs text-slate-500 font-mono mx-auto">
-                    {idx + 1}
-                  </div>
-                  <input
-                    type="number"
-                    placeholder="—"
-                    value={set.kg}
-                    onChange={(e) => updateSet(exIdx, idx, 'kg', e.target.value)}
-                    className={`w-full text-center py-2 rounded-xl text-sm font-bold font-mono outline-none border ${
-                      set.kg ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400'
-                    }`}
-                  />
-                  <input
-                    type="number"
-                    placeholder="—"
-                    value={set.reps}
-                    onChange={(e) => updateSet(exIdx, idx, 'reps', e.target.value)}
-                    className={`w-full text-center py-2 rounded-xl text-sm font-bold font-mono outline-none border ${
-                      set.reps ? 'bg-blue-500/8 border-blue-500/30 text-blue-400' : 'bg-white/5 border-white/10 text-slate-400'
-                    }`}
-                  />
+                {/* Chevron */}
+                <span style={{ color: '#6b7280', fontSize: 16, flexShrink: 0 }}>
+                  {isExpanded ? '∧' : '∨'}
+                </span>
+              </button>
+
+              {/* Expanded content */}
+              {isExpanded && (
+                <div style={{ borderTop: '1px solid rgba(139,92,246,0.15)', padding: '12px 16px 16px' }}>
+
+                  {/* Last session reference */}
+                  {lastData && (
+                    <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10 }}>
+                      <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em' }}>LAST TIME: </span>
+                      <span style={{ fontSize: 11, color: '#34d399', fontWeight: 700, fontFamily: 'monospace' }}>{lastData}</span>
+                    </div>
+                  )}
+
+                  {/* Set rows */}
+                  {sets.map((set, setIdx) => (
+                    <div key={setIdx} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
+                      padding: '10px 12px',
+                      background: set.done ? 'rgba(52,211,153,0.05)' : setIdx === 0 ? 'rgba(109,40,217,0.08)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${set.done ? 'rgba(52,211,153,0.2)' : setIdx === 0 ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                      borderRadius: 14,
+                    }}>
+                      {/* Set label */}
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', width: 36, flexShrink: 0, letterSpacing: '0.04em' }}>
+                        SET {setIdx + 1}
+                      </span>
+
+                      {/* KG input */}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 3px', fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.06em' }}>KG</p>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={set.kg}
+                          onChange={(e) => updateSet(exIdx, setIdx, 'kg', e.target.value)}
+                          style={{
+                            width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 18, fontWeight: 800,
+                            outline: 'none', fontFamily: 'monospace', boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      {/* REPS input */}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: '0 0 3px', fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.06em' }}>REPS</p>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={set.reps}
+                          onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
+                          style={{
+                            width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: 10, padding: '8px 10px', color: '#fff', fontSize: 18, fontWeight: 800,
+                            outline: 'none', fontFamily: 'monospace', boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+
+                      {/* Done tick */}
+                      <button
+                        onClick={() => toggleDone(exIdx, setIdx)}
+                        style={{
+                          width: 40, height: 40, borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer',
+                          background: set.done ? 'linear-gradient(135deg, #6d28d9, #4f46e5)' : 'rgba(255,255,255,0.06)',
+                          color: set.done ? '#fff' : '#4b5563',
+                          fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'background 0.2s',
+                        }}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add set */}
                   <button
-                    onClick={() => toggleDone(exIdx, idx)}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto text-sm transition-all ${
-                      set.done ? 'bg-teal-500/15 text-teal-400' : 'bg-white/4 border border-dashed border-white/15 text-transparent'
-                    }`}
+                    onClick={() => addSet(exIdx)}
+                    style={{
+                      width: '100%', background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: '#a78bfa', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+                      padding: '10px 0 2px', textAlign: 'center',
+                    }}
                   >
-                    ✓
+                    + ADD SET
                   </button>
                 </div>
-              ))}
-            </div>
-
-            <div className="px-4 py-3 border-t border-white/5 flex items-center gap-2">
-              <span className="text-xs text-slate-600 tracking-wider">Last time:</span>
-              {formatLastSession(exIdx) ? (
-                <span className="text-xs text-teal-400 font-mono">{formatLastSession(exIdx)}</span>
-              ) : (
-                <span className="text-xs text-slate-600">No data yet</span>
               )}
             </div>
-
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Save button */}
-      <div className="fixed bottom-20 left-5 right-5 z-20">
+      {/* ── BOTTOM BUTTONS ── */}
+      <div style={{
+        position: 'fixed', bottom: 70, left: 0, right: 0,
+        padding: '12px 20px',
+        background: 'linear-gradient(to top, #08080F 60%, transparent)',
+        display: 'flex', gap: 12, zIndex: 50,
+      }}>
+        <button
+          onClick={() => router.push('/coach')}
+          style={{
+            flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, padding: '16px 0', color: '#e2e8f0',
+            fontSize: 13, fontWeight: 800, letterSpacing: '0.05em', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>⊕</span> ADD EXERCISE
+        </button>
         <button
           onClick={handleSave}
           disabled={saving}
-          className={`w-full py-4 rounded-2xl font-bold text-sm tracking-widest shadow-lg transition-all ${
-            saved
-              ? 'bg-teal-500 shadow-teal-500/30'
-              : saving
-              ? 'bg-white/10 text-slate-500'
-              : 'bg-gradient-to-r from-blue-500 to-violet-600 shadow-blue-500/30'
-          }`}
+          style={{
+            flex: 2,
+            background: saved ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #6d28d9, #4f46e5)',
+            border: 'none', borderRadius: 16, padding: '16px 0',
+            color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.05em',
+            cursor: saving ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: saving ? 0.7 : 1,
+            boxShadow: '0 4px 20px rgba(109,40,217,0.4)',
+            transition: 'background 0.3s',
+          }}
         >
-          {saved ? '✅ SESSION SAVED!' : saving ? 'SAVING...' : '💾 SAVE SESSION'}
+          <span style={{ fontSize: 16 }}>💾</span>
+          {saved ? 'SAVED!' : saving ? 'SAVING...' : 'SAVE WORKOUT'}
         </button>
       </div>
 
