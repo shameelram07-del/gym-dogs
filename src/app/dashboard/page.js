@@ -61,6 +61,7 @@ export default function DashboardPage() {
       account.username?.split('@')[0] ||
       'Athlete';
     setUserName(displayName.toUpperCase());
+    console.log('MSAL account:', JSON.stringify(account));
     loadDashboardData(uid);
   }, [accounts]);
 
