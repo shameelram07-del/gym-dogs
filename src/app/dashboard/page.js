@@ -61,14 +61,13 @@ export default function DashboardPage() {
       account.username?.split('@')[0] ||
       'Athlete';
     setUserName(displayName.toUpperCase());
-    console.log('MSAL account:', JSON.stringify(account));
     loadDashboardData(uid);
   }, [accounts]);
 
   async function loadDashboardData(uid) {
     try {
       const logsRes = await fetch(
-        `https://gymdogs-api.azurewebsites.net/api/gymLogs?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/gymLogs?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_API_KEY || '' } }
       );
       const logs = await logsRes.json();
@@ -104,7 +103,7 @@ export default function DashboardPage() {
       });
 
       const plansRes = await fetch(
-        `https://gymdogs-api.azurewebsites.net/api/workoutPlans?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/workoutPlans?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' } }
       );
       const plans = await plansRes.json();
@@ -115,7 +114,7 @@ export default function DashboardPage() {
       }
 
       const profileRes = await fetch(
-        `https://gymdogs-api.azurewebsites.net/api/userProfiles?userId=${uid}`,
+        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/userProfiles?userId=${uid}`,
         { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' } }
       );
       const profile = await profileRes.json();
@@ -126,7 +125,7 @@ export default function DashboardPage() {
         if (profile.name)     setUserName(profile.name.toUpperCase());
       }
 
-      const noteRes = await fetch('https://gymdogs-api.azurewebsites.net/api/aiCoach', {
+      const noteRes = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth.azurewebsites.net/api/aiCoach', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +155,6 @@ export default function DashboardPage() {
   const sessionIntens = todayPlan?.intensity     || 'HIGH';
   const sessionPct    = todayPlan?.completionPct || 0;
 
-  // Shared bottom nav
   const BottomNav = () => (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d1117', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {[
@@ -176,12 +174,9 @@ export default function DashboardPage() {
     </div>
   );
 
-  // ─── MOBILE ───────────────────────────────────────────────
   if (!isDesktop) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
-
-        {/* Header */}
         <div style={{ padding: '20px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <p style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 2px' }}>{getGreeting()}</p>
@@ -199,8 +194,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-
-        {/* Readiness */}
         <div style={{ padding: '12px 18px 0' }}>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/images/icon_9.png" alt="badge" style={{ width: 52, height: 52, flexShrink: 0 }} />
@@ -219,8 +212,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-
-        {/* Session card mobile — cutout inside */}
         <div style={{ padding: '12px 18px 0' }}>
           <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '18px 16px', position: 'relative', overflow: 'hidden', minHeight: '260px' }}>
             <div style={{ position: 'absolute', top: '30%', right: '-20px', width: '280px', height: '280px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
@@ -266,8 +257,6 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-
-        {/* This week mobile */}
         <div style={{ padding: '16px 18px 0' }}>
           <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -287,8 +276,6 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-
-        {/* Coach mobile */}
         <div style={{ padding: '12px 18px 0' }}>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: '#fff' }}>CO</div>
@@ -299,8 +286,6 @@ export default function DashboardPage() {
             <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '7px 10px', color: '#e2e8f0', fontSize: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>VIEW</button>
           </div>
         </div>
-
-        {/* Leaderboard mobile */}
         <div style={{ padding: '14px 18px 0' }}>
           <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
@@ -314,25 +299,19 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-
         <BottomNav />
       </div>
     );
   }
 
-  // ─── DESKTOP ───────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden', position: 'relative' }}>
-
-      {/* Header */}
       <div style={{ padding: '28px 32px 0', position: 'relative', zIndex: 10 }}>
         <p style={{ fontSize: '12px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 4px' }}>{getGreeting()}</p>
         <h1 style={{ fontSize: '34px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
           {loading ? '...' : userName} <span style={{ fontSize: '28px' }}>💪</span>
         </h1>
       </div>
-
-      {/* Top right: level + avatar + quote — zIndex 30, always on top */}
       <div style={{ position: 'absolute', top: '24px', right: '32px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', zIndex: 30 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '20px', padding: '5px 14px 5px 8px' }}>
@@ -349,23 +328,9 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
-
-      {/* Cutout — page level, zIndex 20 (above cards z10, below top-right z30) */}
       {cutout && (
-        <img src={cutout} alt="" style={{
-          position: 'absolute',
-          top: '80px',
-          right: '22%',
-          height: '500px',
-          width: 'auto',
-          objectFit: 'contain',
-          objectPosition: 'top center',
-          pointerEvents: 'none',
-          zIndex: 20,
-        }} />
+        <img src={cutout} alt="" style={{ position: 'absolute', top: '80px', right: '22%', height: '500px', width: 'auto', objectFit: 'contain', objectPosition: 'top center', pointerEvents: 'none', zIndex: 20 }} />
       )}
-
-      {/* Readiness card — 48% wide, zIndex 10 */}
       <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
         <div style={{ maxWidth: '48%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <img src="/images/icon_9.png" alt="badge" style={{ width: 62, height: 62, flexShrink: 0 }} />
@@ -384,13 +349,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Session card — full width, zIndex 10, overflow hidden to clip cutout bottom */}
       <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
         <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '28px 28px', position: 'relative', overflow: 'hidden', minHeight: '300px' }}>
-          {/* Big radial glow */}
           <div style={{ position: 'absolute', top: '50%', left: '55%', transform: 'translate(-50%, -50%)', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingLeft: '100px' }}>
             <img src="/images/icon_17.png" alt="" style={{ width: 14, height: 14 }} />
             <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
@@ -431,8 +392,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* This week desktop */}
       <div style={{ padding: '24px 32px 0', position: 'relative', zIndex: 10 }}>
         <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 12px' }}>THIS WEEK</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
@@ -454,8 +413,6 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-
-      {/* Coach desktop */}
       <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, color: '#fff' }}>CO</div>
@@ -468,8 +425,6 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
-
-      {/* Leaderboard desktop */}
       <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
         <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
@@ -483,7 +438,6 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-
       <BottomNav />
     </div>
   );
