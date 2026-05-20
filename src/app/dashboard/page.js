@@ -3,345 +3,485 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
-import BottomNav from '@/components/BottomNav';
 
-const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
-const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
-const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
-const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
-const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
-
-// Map userId to their cutout image
 const CUTOUT_MAP = {
-  '6d765ac9-47b2-4d3f-b36a-9d784015b917': '/images/shameel Cutout.png', // Shameel
+  '6d765ac9-47b2-4d3f-b36a-9d784015b917': '/images/shameel double_bicep_waist_up.png',
 };
 
+const LEADERBOARD = [
+  { rank: 1, name: 'Joel',    initials: 'J', pts: 5888.1, medal: '🥇' },
+  { rank: 2, name: 'Shameel', initials: 'S', pts: 4698.1, medal: '🥈', isYou: true },
+  { rank: 3, name: 'Harish',  initials: 'H', pts: 3298.1, medal: '🥉' },
+  { rank: 4, name: 'Zai',     initials: 'Z', pts: 2698.1, medal: null },
+];
+
 function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning,';
-  if (hour < 17) return 'Good afternoon,';
-  return 'Good evening,';
-}
-
-function calcStreak(logs) {
-  if (!logs || logs.length === 0) return 0;
-  const dates = [...new Set(logs.map(l => l.date).filter(Boolean))].sort().reverse();
-  if (dates.length === 0) return 0;
-  let streak = 0;
-  let current = new Date();
-  current.setHours(0, 0, 0, 0);
-  for (const date of dates) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    const diff = Math.round((current - d) / (1000 * 60 * 60 * 24));
-    if (diff <= 1) { streak++; current = d; } else break;
-  }
-  return streak;
-}
-
-function calcKgLifted(logs) {
-  let total = 0;
-  logs.forEach(log => {
-    try {
-      const sets = JSON.parse(log.sets_data || '[]');
-      sets.forEach(s => {
-        if (s.kg && s.reps) total += parseFloat(s.kg) * parseFloat(s.reps);
-      });
-    } catch (e) {}
-  });
-  if (total >= 1000) return `${(total / 1000).toFixed(1)}K`;
-  return `${Math.round(total)}`;
-}
-
-function calcSessionsThisWeek(logs) {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-  const dates = new Set(
-    logs.filter(l => l.date && new Date(l.date) >= startOfWeek).map(l => l.date)
-  );
-  return dates.size;
-}
-
-function calcLevel(logs) {
-  const sessions = new Set(logs.map(l => l.date).filter(Boolean)).size;
-  return Math.max(1, Math.floor(sessions / 3) + 1);
+  const h = new Date().getHours();
+  if (h < 12) return 'GOOD MORNING,';
+  if (h < 17) return 'GOOD AFTERNOON,';
+  return 'GOOD EVENING,';
 }
 
 export default function DashboardPage() {
+  const { accounts } = useMsal();
   const router = useRouter();
-  const { accounts, inProgress } = useMsal();
-  const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState('');
-  const [userInitials, setUserInitials] = useState('');
-  const [logs, setLogs] = useState([]);
-  const [activePlan, setActivePlan] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [cutout, setCutout] = useState(null);
+
+  const [userName, setUserName]   = useState('');
+  const [userId, setUserId]       = useState('');
+  const [weekStats, setWeekStats] = useState({ sessions: 0, kgLifted: '0', streak: 0 });
+  const [todayPlan, setTodayPlan] = useState(null);
+  const [coachNote, setCoachNote] = useState('Ready to start your journey? Your coach has a session ready for you!');
+  const [level, setLevel]         = useState(12);
+  const [xp, setXp]               = useState(580);
+  const [xpToNext, setXpToNext]   = useState(1000);
+  const [readiness]               = useState(70);
+  const [loading, setLoading]     = useState(true);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  const cutout = CUTOUT_MAP[userId] || null;
+  const xpPct  = Math.round((xp / xpToNext) * 100);
 
   useEffect(() => {
-    if (inProgress === 'startup') return;
-    if (accounts.length === 0) {
-      router.push('/login');
-      return;
-    }
-    const user = accounts[0];
-    const uid = user.localAccountId;
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    if (!accounts || accounts.length === 0) return;
+    const account = accounts[0];
+    const uid = account.localAccountId;
     setUserId(uid);
-    setCutout(CUTOUT_MAP[uid] || null);
+    const displayName =
+      account.idTokenClaims?.given_name ||
+      account.idTokenClaims?.name ||
+      account.idTokenClaims?.preferred_username ||
+      account.name ||
+      account.username?.split('@')[0] ||
+      'Athlete';
+    setUserName(displayName.toUpperCase());
+    loadDashboardData(uid);
+  }, [accounts]);
 
-    const entraName = user.name && user.name !== 'unknown'
-      ? user.name : user.username?.split('@')[0] || 'Athlete';
-    const firstName = entraName.split(' ')[0];
-    setUserName(firstName.toUpperCase());
-    const initials = entraName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    setUserInitials(initials);
+  async function loadDashboardData(uid) {
+    try {
+      const logsRes = await fetch(
+        `https://gymdogs-api.azurewebsites.net/api/gymLogs?userId=${uid}`,
+        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_API_KEY || '' } }
+      );
+      const logs = await logsRes.json();
+      const allLogs = Array.isArray(logs) ? logs : [];
 
-    // Load saved display name from CosmosDB
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, {
-          headers: { 'x-functions-key': PROFILES_KEY }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const profile = Array.isArray(data) ? data.find(p => p.userId === uid) : null;
-          if (profile && profile.name && profile.name !== uid) {
-            setUserName(profile.name.split(' ')[0].toUpperCase());
-            setUserInitials(profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2));
-          }
-        }
-      } catch (e) {}
-    };
-    fetchProfile();
-  }, [accounts, inProgress, router]);
+      const now = new Date();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
 
-  useEffect(() => {
-    if (!userId) return;
-    const fetchData = async () => {
-      try {
-        const logsRes = await fetch(`${API_URL}?userId=${userId}`, {
-          headers: { 'x-functions-key': API_KEY }
-        });
-        if (logsRes.ok) setLogs(await logsRes.json());
+      const thisWeekLogs = allLogs.filter(l => new Date(l.date) >= weekStart);
+      const totalKg = thisWeekLogs.reduce((sum, log) => {
+        const sets = log.exercises?.flatMap(e => e.sets || []) || [];
+        return sum + sets.reduce((s, set) => s + (parseFloat(set.kg) || 0) * (parseInt(set.reps) || 0), 0);
+      }, 0);
 
-        const planRes = await fetch(PLANS_API_URL, {
-          headers: { 'x-functions-key': PLANS_API_KEY }
-        });
-        if (planRes.ok) setActivePlan(await planRes.json());
-      } catch (e) {
-        console.log('Error fetching dashboard data:', e.message);
-      } finally {
-        setStatsLoading(false);
+      let streak = 0;
+      const sortedDates = [...new Set(allLogs.map(l => l.date?.split('T')[0]))].sort().reverse();
+      let checkDate = new Date();
+      checkDate.setHours(0, 0, 0, 0);
+      for (const d of sortedDates) {
+        const logDate = new Date(d);
+        logDate.setHours(0, 0, 0, 0);
+        const diff = Math.round((checkDate - logDate) / 86400000);
+        if (diff <= 1) { streak++; checkDate = logDate; }
+        else break;
       }
-    };
-    fetchData();
-  }, [userId]);
 
-  if (!userId) return null;
+      setWeekStats({
+        sessions: thisWeekLogs.length,
+        kgLifted: totalKg >= 1000 ? (totalKg / 1000).toFixed(1) + 'K' : Math.round(totalKg).toString(),
+        streak,
+      });
 
-  const sessionsThisWeek = calcSessionsThisWeek(logs);
-  const kgLifted = calcKgLifted(logs);
-  const streak = calcStreak(logs);
-  const level = calcLevel(logs);
-  const xpToNext = Math.max(0, (level * 3 - new Set(logs.map(l => l.date).filter(Boolean)).size) * 100);
+      const plansRes = await fetch(
+        `https://gymdogs-api.azurewebsites.net/api/workoutPlans?userId=${uid}`,
+        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' } }
+      );
+      const plans = await plansRes.json();
+      if (Array.isArray(plans) && plans.length > 0) {
+        const plan = plans[0];
+        const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || null);
+      }
 
-  return (
-    <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
+      const profileRes = await fetch(
+        `https://gymdogs-api.azurewebsites.net/api/userProfiles?userId=${uid}`,
+        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' } }
+      );
+      const profile = await profileRes.json();
+      if (profile && !profile.error) {
+        if (profile.level)    setLevel(profile.level);
+        if (profile.xp)       setXp(profile.xp);
+        if (profile.xpToNext) setXpToNext(profile.xpToNext);
+        if (profile.name)     setUserName(profile.name.toUpperCase());
+      }
 
-      {/* Background glow */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-violet-600/10 rounded-full blur-[80px]" />
-        <div className="absolute bottom-1/3 right-0 w-64 h-64 bg-blue-500/8 rounded-full blur-3xl" />
-      </div>
+      const noteRes = await fetch('https://gymdogs-api.azurewebsites.net/api/aiCoach', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '',
+        },
+        body: JSON.stringify({
+          prompt: `Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${thisWeekLogs.length} sessions this week.`,
+        }),
+      });
+      const noteData = await noteRes.json();
+      if (noteData.message) setCoachNote(noteData.message);
 
-      {/* HEADER */}
-      <div className="relative z-10 px-5 pt-12 pb-0">
-        <div className="flex items-start justify-between">
+    } catch (err) {
+      console.error('Dashboard load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+  const sessionName   = todayPlan?.name         || 'SHOULDER / CHEST';
+  const sessionTags   = todayPlan?.tags          || ['STRENGTH', '4 EXERCISES', 'HIGH INTENSITY'];
+  const sessionMins   = todayPlan?.duration      || 75;
+  const sessionFocus  = todayPlan?.focus         || 'PUSH FOCUS';
+  const sessionXP     = todayPlan?.xp            || 350;
+  const sessionIntens = todayPlan?.intensity     || 'HIGH';
+  const sessionPct    = todayPlan?.completionPct || 0;
+
+  // Shared bottom nav
+  const BottomNav = () => (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d1117', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {[
+        { label: 'Home',      icon: '/images/icon_2.png',        href: '/dashboard',  active: true  },
+        { label: 'Log',       icon: '/images/icon_3.png',        href: '/workout',    active: false },
+        { label: 'Progress',  icon: '/images/icon_4.png',        href: '/progress',   active: false },
+        { label: 'Community', icon: '/images/extra_icon_10.png', href: '/community',  active: false },
+        { label: 'Coach',     icon: '/images/icon_5.png',        href: '/coach',      active: false },
+        { label: 'Profile',   icon: '/images/icon_6.png',        href: '/profile',    active: false },
+      ].map((item) => (
+        <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+          <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4 }} />
+          <span style={{ fontSize: '10px', fontWeight: item.active ? 700 : 400, color: item.active ? '#a78bfa' : '#6b7280' }}>{item.label}</span>
+          {item.active && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa', marginTop: -1 }} />}
+        </button>
+      ))}
+    </div>
+  );
+
+  // ─── MOBILE ───────────────────────────────────────────────
+  if (!isDesktop) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <p className="text-xs tracking-[3px] text-slate-500 uppercase">{getGreeting()}</p>
-            <h1 className="text-3xl font-black tracking-wider mt-0.5">{userName} 💪</h1>
+            <p style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 2px' }}>{getGreeting()}</p>
+            <h1 style={{ fontSize: '24px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {loading ? '...' : userName} <span style={{ fontSize: '20px' }}>💪</span>
+            </h1>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            {/* Streak badge */}
-            <div className="flex items-center gap-1.5 bg-white/6 border border-white/10 rounded-2xl px-3 py-2">
-              <img src="/images/streak_fire.png" alt="streak" className="w-5 h-5 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-              <span className="text-sm font-black text-orange-400">{streak}</span>
-              <span className="text-xs text-slate-500 tracking-wider">DAY</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '20px', padding: '4px 10px 4px 6px' }}>
+              <img src="/images/icon_8.png" alt="level" style={{ width: 18, height: 18 }} />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa' }}>{level}</span>
             </div>
-            {/* Level badge */}
-            <div className="flex items-center gap-1.5 bg-white/6 border border-white/10 rounded-2xl px-3 py-2">
-              <img src="/images/level_shield.png" alt="level" className="w-5 h-5 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-              <span className="text-sm font-black text-violet-400">{level}</span>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', border: '2px solid rgba(167,139,250,0.4)' }}>
+              {userName?.charAt(0) || 'S'}
             </div>
-            {/* Avatar */}
-            <button
-              onClick={() => router.push('/profile')}
-              className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold"
-            >
-              {userInitials}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* SCROLLABLE CONTENT */}
-      <div className="relative z-10 px-5 pb-24 flex flex-col gap-4 mt-4 overflow-y-auto">
-
-        {/* Level + XP card */}
-        <div className="bg-white/4 border border-white/8 rounded-3xl p-4 flex items-center gap-4">
-          <div className="relative flex-shrink-0">
-            <img src="/images/level_badge_1.png" alt="level" className="w-14 h-14 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-            <span className="absolute inset-0 flex items-center justify-center text-lg font-black text-white">{level}</span>
-          </div>
-          <div className="flex-1">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-xs text-violet-400 font-bold tracking-wider uppercase">Level {level}</p>
-              <p className="text-xs text-slate-500">{xpToNext} XP to next</p>
-            </div>
-            <div className="w-full bg-white/10 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-violet-500 h-2 rounded-full transition-all"
-                style={{ width: `${Math.min(100, 100 - (xpToNext / 300) * 100)}%` }}
-              />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {streak > 3 ? "You're on fire! Keep the streak alive." : streak > 0 ? "Let's Keep Going" : "Let's Get Started"}
-            </p>
           </div>
         </div>
 
-        {/* Today's session card with cutout */}
-        {activePlan ? (
-          <div className="relative bg-gradient-to-br from-[#1a1040] via-[#110d30] to-[#0d0a2a] border border-violet-500/20 rounded-3xl overflow-hidden min-h-[220px]">
-            {/* Purple glow background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-blue-600/10 pointer-events-none" />
-
-            {/* Cutout image */}
-            {cutout && (
-              <img
-                src={cutout}
-                alt="Coach"
-                className="absolute right-0 bottom-0 h-[210px] object-contain object-bottom z-10 pointer-events-none"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            )}
-
-            {/* Content */}
-            <div className="relative z-20 p-5 pr-32">
-              <p className="text-xs tracking-[3px] text-violet-400 uppercase font-bold">Today's Workout</p>
-              <h2 className="text-2xl font-black tracking-wider mt-1 leading-tight uppercase">
-                {activePlan.name}
-              </h2>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <span className="bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-full px-3 py-1 text-xs font-bold tracking-wider">{activePlan.tag}</span>
-                <span className="bg-white/10 border border-white/10 text-slate-300 rounded-full px-3 py-1 text-xs font-bold tracking-wider">{activePlan.exercises?.length} EXERCISES</span>
-              </div>
-
-              {/* Session meta */}
-              <div className="flex gap-4 mt-3">
-                <div className="flex items-center gap-1.5">
-                  <img src="/images/timer.png" alt="" className="w-4 h-4 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-                  <span className="text-xs text-slate-400">75 MIN</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <img src="/images/intensity_bolt.png" alt="" className="w-4 h-4 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-                  <span className="text-xs text-slate-400">HIGH</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <img src="/images/push_focus_arm.png" alt="" className="w-4 h-4 object-contain" onError={(e) => { e.target.style.display='none'; }} />
-                  <span className="text-xs text-slate-400">PUSH</span>
+        {/* Readiness */}
+        <div style={{ padding: '12px 18px 0' }}>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/images/icon_9.png" alt="badge" style={{ width: 52, height: 52, flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '28px', fontWeight: 900, color: '#34d399' }}>{readiness}</span>
+                <div>
+                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 700 }}>Let&apos;s Get Started</p>
+                  <p style={{ margin: 0, fontSize: '9px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em' }}>READINESS SCORE</p>
                 </div>
               </div>
+              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '6px', height: '5px', margin: '6px 0 4px' }}>
+                <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: '6px', background: 'linear-gradient(90deg, #34d399, #10b981)' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: '10px', color: '#6b7280' }}>{xpToNext - xp} XP to next level</p>
+            </div>
+          </div>
+        </div>
 
-              <button
-                onClick={() => router.push('/workout')}
-                className="mt-4 bg-gradient-to-r from-blue-500 to-violet-600 font-black text-sm tracking-widest px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/25"
-              >
-                START SESSION →
+        {/* Session card mobile — cutout inside */}
+        <div style={{ padding: '12px 18px 0' }}>
+          <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '18px 16px', position: 'relative', overflow: 'hidden', minHeight: '260px' }}>
+            <div style={{ position: 'absolute', top: '30%', right: '-20px', width: '280px', height: '280px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
+            {cutout && <img src={cutout} alt="" style={{ position: 'absolute', bottom: 0, right: 0, height: '100%', width: 'auto', objectFit: 'contain', objectPosition: 'bottom right', pointerEvents: 'none', zIndex: 1 }} />}
+            <div style={{ position: 'relative', zIndex: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px', paddingLeft: '72px' }}>
+                <img src="/images/icon_17.png" alt="" style={{ width: 11, height: 11 }} />
+                <span style={{ fontSize: '10px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
+              </div>
+              <h2 style={{ fontSize: '24px', fontWeight: 900, margin: '0 0 10px', lineHeight: 1.05, paddingLeft: '72px', maxWidth: '60%' }}>{sessionName}</h2>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px', paddingLeft: '72px' }}>
+                {sessionTags.map((tag, i) => (
+                  <span key={i} style={{ fontSize: '9px', fontWeight: 700, padding: '3px 9px', borderRadius: '20px', background: i === 2 ? 'rgba(239,68,68,0.2)' : i === 1 ? 'rgba(99,102,241,0.2)' : 'rgba(139,92,246,0.2)', border: `1px solid ${i === 2 ? 'rgba(239,68,68,0.5)' : i === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(139,92,246,0.5)'}`, color: i === 2 ? '#f87171' : i === 1 ? '#a5b4fc' : '#c4b5fd' }}>{tag}</span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '14px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                {[
+                  { icon: '/images/icon_12.png', val: `${sessionMins} MIN`, label: 'DURATION' },
+                  { icon: '/images/icon_14.png', val: sessionIntens, label: 'INTENSITY' },
+                  { icon: '/images/icon_13.png', val: sessionFocus, label: 'FOCUS AREA' },
+                  { icon: '/images/icon_10.png', val: `+${sessionXP} XP`, label: 'REWARD' },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={m.icon} alt="" style={{ width: 15, height: 15 }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#e2e8f0' }}>{m.val}</p>
+                      <p style={{ margin: 0, fontSize: '8px', color: '#6b7280', letterSpacing: '0.05em' }}>{m.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => router.push('/workout')} style={{ background: 'linear-gradient(135deg, #5b21b6, #4338ca)', border: '1px solid rgba(139,92,246,0.5)', borderRadius: '12px', padding: '12px 24px', color: '#fff', fontSize: '13px', fontWeight: 800, letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 20px rgba(109,40,217,0.5)' }}>
+                START SESSION <span style={{ fontSize: '16px' }}>›</span>
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="relative bg-white/4 border border-white/8 rounded-3xl p-5 min-h-[160px] flex items-center">
-            {cutout && (
-              <img
-                src={cutout}
-                alt="Coach"
-                className="absolute right-0 bottom-0 h-[150px] object-contain object-bottom opacity-40 pointer-events-none"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            )}
-            <div>
-              <p className="text-xs tracking-[3px] text-slate-500 uppercase">Today's Session</p>
-              <p className="text-white font-bold mt-1">No session yet</p>
-              <p className="text-slate-500 text-xs mt-1">Your coach will push one soon!</p>
-            </div>
-          </div>
-        )}
-
-        {/* Stats row */}
-        <p className="text-xs tracking-[3px] text-slate-500 uppercase">This Week</p>
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { icon: '/images/log.png', val: statsLoading ? '...' : String(sessionsThisWeek), label: 'Sessions', color: 'text-blue-400', sub: '0% of weekly goal' },
-            { icon: '/images/dumbbell.png', val: statsLoading ? '...' : `${kgLifted} KG`, label: 'Lifted', color: 'text-teal-400', sub: '+18% vs last week' },
-            { icon: '/images/streak_fire.png', val: statsLoading ? '...' : String(streak), label: 'Day Streak', color: 'text-orange-400', sub: 'Keep it up!' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white/4 border border-white/8 rounded-2xl p-3">
-              <img src={stat.icon} alt="" className="w-7 h-7 object-contain mb-2" onError={(e) => { e.target.style.display='none'; }} />
-              <p className={`text-xl font-black ${stat.color} leading-none`}>{stat.val}</p>
-              <p className="text-xs text-slate-500 tracking-wider mt-0.5 uppercase">{stat.label}</p>
-              <p className="text-xs text-slate-600 mt-1">{stat.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* AI Coach note */}
-        <div className="bg-violet-500/8 border border-violet-500/15 rounded-2xl p-4 flex gap-3 items-start">
-          <img src="/images/chat_bubble_1.png" alt="" className="w-10 h-10 object-contain flex-shrink-0" onError={(e) => { e.target.style.display='none'; }} />
-          <div className="flex-1">
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {streak > 3
-                ? `${streak} days straight — you're on a roll. Keep pushing!`
-                : streak > 0
-                ? `${sessionsThisWeek} session${sessionsThisWeek !== 1 ? 's' : ''} this week. Stay consistent and the results will come.`
-                : "Ready to start your journey? Your coach has a session ready for you!"}
-            </p>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-violet-400 font-semibold tracking-wider">— Coach Shameel · AI Coach</p>
-              <button className="text-xs text-blue-400 font-bold tracking-wider border border-blue-500/30 rounded-lg px-3 py-1">VIEW MESSAGE</button>
+            <div style={{ position: 'absolute', top: '16px', left: '12px', zIndex: 2 }}>
+              <svg width="68" height="68" viewBox="0 0 68 68">
+                <defs><linearGradient id="rg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></linearGradient></defs>
+                <circle cx="34" cy="34" r="28" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="4"/>
+                <circle cx="34" cy="34" r="28" fill="none" stroke="url(#rg2)" strokeWidth="4" strokeDasharray={`${2*Math.PI*28*0.05} ${2*Math.PI*28}`} strokeLinecap="round" transform="rotate(-90 34 34)"/>
+                <text x="34" y="30" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="800">{sessionPct}%</text>
+                <text x="34" y="43" textAnchor="middle" fill="#6b7280" fontSize="6" fontWeight="600" letterSpacing="0.3">NOT STARTED</text>
+              </svg>
             </div>
           </div>
         </div>
 
-        {/* Leaderboard */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs tracking-[3px] text-slate-500 uppercase">This Week's Leaders</p>
-          <button className="text-xs text-blue-400 tracking-wider">VIEW ALL</button>
-        </div>
-        <div className="bg-white/4 border border-white/8 rounded-2xl overflow-hidden">
-          {[
-            { rank: '🥇', name: 'Joel', pts: '5,888.1', me: false },
-            { rank: '🥈', name: userName, pts: '4,698.1', me: true },
-            { rank: '🥉', name: 'Hamish', pts: '3,298.1', me: false },
-            { rank: '4', name: 'Zafi', pts: '2,698.1', me: false },
-          ].map((user, i, arr) => (
-            <div key={user.name} className={`flex items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? 'border-b border-white/5' : ''} ${user.me ? 'bg-blue-500/8' : ''}`}>
-              <span className="text-lg w-6 text-center">{user.rank}</span>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                {user.name[0]}
+        {/* This week mobile */}
+        <div style={{ padding: '16px 18px 0' }}>
+          <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {[
+              { bg: '#081a10', iconBg: 'rgba(20,184,166,0.2)', icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '0% of goal', subColor: '#4ade80' },
+              { bg: '#080f1a', iconBg: 'rgba(59,130,246,0.2)', icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% last wk', subColor: '#60a5fa' },
+              { bg: '#1a0a00', iconBg: 'rgba(239,68,68,0.15)', icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#fb923c' },
+            ].map((c, i) => (
+              <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src={c.icon} alt={c.label} style={{ width: 26, height: 26 }} />
+                </div>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: 900 }}>{c.val}</p>
+                <p style={{ margin: 0, fontSize: '9px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.04em' }}>{c.label}</p>
+                <p style={{ margin: 0, fontSize: '8px', color: c.subColor }}>{c.sub}</p>
               </div>
-              <span className="flex-1 text-sm font-medium">
-                {user.name} {user.me && <span className="text-xs text-blue-400">(you)</span>}
-              </span>
-              <span className="text-sm text-teal-400 font-mono font-bold">{user.pts} PTS</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Coach mobile */}
+        <div style={{ padding: '12px 18px 0' }}>
+          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: '#fff' }}>CO</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>{coachNote}</p>
+              <p style={{ margin: 0, fontSize: '10px', color: '#6b7280' }}>— Coach Shameel · AI Coach</p>
+            </div>
+            <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '7px 10px', color: '#e2e8f0', fontSize: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>VIEW</button>
+          </div>
+        </div>
+
+        {/* Leaderboard mobile */}
+        <div style={{ padding: '14px 18px 0' }}>
+          <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
+            {LEADERBOARD.map((user, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: i < LEADERBOARD.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', background: user.isYou ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
+                <div style={{ width: 24, textAlign: 'center', fontSize: '16px', flexShrink: 0 }}>{user.medal || <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700 }}>{user.rank}</span>}</div>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', marginLeft: 8, marginRight: 10, background: user.isYou ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{user.initials}</div>
+                <span style={{ flex: 1, fontSize: '13px', fontWeight: user.isYou ? 700 : 500 }}>{user.name}{user.isYou && <span style={{ fontSize: '10px', color: '#a78bfa', marginLeft: 5 }}>(you)</span>}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa' }}>{user.pts.toLocaleString()} <span style={{ fontSize: '9px', color: '#6b7280' }}>PTS</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // ─── DESKTOP ───────────────────────────────────────────────
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden', position: 'relative' }}>
+
+      {/* Header */}
+      <div style={{ padding: '28px 32px 0', position: 'relative', zIndex: 10 }}>
+        <p style={{ fontSize: '12px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 4px' }}>{getGreeting()}</p>
+        <h1 style={{ fontSize: '34px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {loading ? '...' : userName} <span style={{ fontSize: '28px' }}>💪</span>
+        </h1>
+      </div>
+
+      {/* Top right: level + avatar + quote — zIndex 30, always on top */}
+      <div style={{ position: 'absolute', top: '24px', right: '32px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', zIndex: 30 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '20px', padding: '5px 14px 5px 8px' }}>
+            <img src="/images/icon_8.png" alt="level" style={{ width: 22, height: 22 }} />
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#a78bfa' }}>{level}</span>
+          </div>
+          <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, color: '#fff', border: '2px solid rgba(167,139,250,0.4)' }}>
+            {userName?.charAt(0) || 'S'}
+          </div>
+        </div>
+        <div style={{ background: 'rgba(59,36,180,0.55)', border: '1px solid rgba(139,92,246,0.45)', borderRadius: '14px', padding: '12px 18px', width: '185px' }}>
+          <p style={{ margin: 0, fontSize: '13px', color: '#c4b5fd', fontStyle: 'italic', lineHeight: 1.6, textAlign: 'center' }}>
+            &ldquo; Discipline today,<br />strength tomorrow. &rdquo;
+          </p>
+        </div>
+      </div>
+
+      {/* Cutout — page level, zIndex 20 (above cards z10, below top-right z30) */}
+      {cutout && (
+        <img src={cutout} alt="" style={{
+          position: 'absolute',
+          top: '80px',
+          right: '22%',
+          height: '500px',
+          width: 'auto',
+          objectFit: 'contain',
+          objectPosition: 'top center',
+          pointerEvents: 'none',
+          zIndex: 20,
+        }} />
+      )}
+
+      {/* Readiness card — 48% wide, zIndex 10 */}
+      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
+        <div style={{ maxWidth: '48%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <img src="/images/icon_9.png" alt="badge" style={{ width: 62, height: 62, flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '34px', fontWeight: 900, color: '#34d399' }}>{readiness}</span>
+              <div>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Let&apos;s Get Started</p>
+                <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em' }}>READINESS SCORE</p>
+              </div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '6px', height: '7px', margin: '8px 0 5px' }}>
+              <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: '6px', background: 'linear-gradient(90deg, #34d399, #10b981)' }} />
+            </div>
+            <p style={{ margin: 0, fontSize: '11px', color: '#6b7280' }}>{xpToNext - xp} XP to next level</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Session card — full width, zIndex 10, overflow hidden to clip cutout bottom */}
+      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
+        <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '28px 28px', position: 'relative', overflow: 'hidden', minHeight: '300px' }}>
+          {/* Big radial glow */}
+          <div style={{ position: 'absolute', top: '50%', left: '55%', transform: 'translate(-50%, -50%)', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingLeft: '100px' }}>
+            <img src="/images/icon_17.png" alt="" style={{ width: 14, height: 14 }} />
+            <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
+          </div>
+          <h2 style={{ fontSize: '36px', fontWeight: 900, margin: '0 0 16px', lineHeight: 1.0, paddingLeft: '100px', maxWidth: '50%' }}>{sessionName}</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', paddingLeft: '100px' }}>
+            {sessionTags.map((tag, i) => (
+              <span key={i} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', padding: '5px 14px', borderRadius: '20px', background: i === 2 ? 'rgba(239,68,68,0.2)' : i === 1 ? 'rgba(99,102,241,0.2)' : 'rgba(139,92,246,0.2)', border: `1px solid ${i === 2 ? 'rgba(239,68,68,0.5)' : i === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(139,92,246,0.5)'}`, color: i === 2 ? '#f87171' : i === 1 ? '#a5b4fc' : '#c4b5fd' }}>{tag}</span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '28px', marginBottom: '24px' }}>
+            {[
+              { icon: '/images/icon_12.png', val: `${sessionMins} MIN`, label: 'DURATION' },
+              { icon: '/images/icon_14.png', val: sessionIntens, label: 'INTENSITY' },
+              { icon: '/images/icon_13.png', val: sessionFocus, label: 'FOCUS AREA' },
+              { icon: '/images/icon_10.png', val: `+${sessionXP} XP`, label: 'REWARD' },
+            ].map((m, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <img src={m.icon} alt="" style={{ width: 20, height: 20 }} />
+                <div>
+                  <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>{m.val}</p>
+                  <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', letterSpacing: '0.06em' }}>{m.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => router.push('/workout')} style={{ background: 'linear-gradient(135deg, #5b21b6, #4338ca)', border: '1px solid rgba(139,92,246,0.5)', borderRadius: '14px', padding: '15px 40px', color: '#fff', fontSize: '15px', fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 24px rgba(109,40,217,0.5)' }}>
+            START SESSION <span style={{ fontSize: '20px' }}>›</span>
+          </button>
+          <div style={{ position: 'absolute', top: '24px', left: '20px' }}>
+            <svg width="88" height="88" viewBox="0 0 88 88">
+              <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></linearGradient></defs>
+              <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="5"/>
+              <circle cx="44" cy="44" r="38" fill="none" stroke="url(#rg)" strokeWidth="5" strokeDasharray={`${2*Math.PI*38*0.05} ${2*Math.PI*38}`} strokeLinecap="round" transform="rotate(-90 44 44)"/>
+              <text x="44" y="40" textAnchor="middle" fill="#fff" fontSize="15" fontWeight="800">{sessionPct}%</text>
+              <text x="44" y="55" textAnchor="middle" fill="#6b7280" fontSize="7" fontWeight="600" letterSpacing="0.5">NOT STARTED</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* This week desktop */}
+      <div style={{ padding: '24px 32px 0', position: 'relative', zIndex: 10 }}>
+        <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 12px' }}>THIS WEEK</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+          {[
+            { bg: '#081a10', iconBg: 'rgba(20,184,166,0.2)', icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '0% of weekly goal', subColor: '#4ade80' },
+            { bg: '#080f1a', iconBg: 'rgba(59,130,246,0.2)', icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% vs last week', subColor: '#60a5fa' },
+            { bg: '#1a0a00', iconBg: 'rgba(239,68,68,0.15)', icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#fb923c' },
+          ].map((c, i) => (
+            <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '18px 16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '14px', background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <img src={c.icon} alt={c.label} style={{ width: 34, height: 34 }} />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 900 }}>{c.val}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.05em' }}>{c.label}</p>
+                <p style={{ margin: 0, fontSize: '10px', color: c.subColor, marginTop: '2px' }}>{c.sub}</p>
+              </div>
             </div>
           ))}
         </div>
+      </div>
 
+      {/* Coach desktop */}
+      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, color: '#fff' }}>CO</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: '0 0 3px', fontSize: '14px', color: '#e2e8f0', lineHeight: 1.4 }}>{coachNote}</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>— Coach Shameel · AI Coach</p>
+          </div>
+          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '10px 16px', color: '#e2e8f0', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            VIEW MESSAGE <img src="/images/icon_15.png" alt="" style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Leaderboard desktop */}
+      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
+        <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
+          {LEADERBOARD.map((user, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', borderBottom: i < LEADERBOARD.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', background: user.isYou ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
+              <div style={{ width: 30, textAlign: 'center', fontSize: '20px', flexShrink: 0 }}>{user.medal || <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 700 }}>{user.rank}</span>}</div>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', marginLeft: 12, marginRight: 14, background: user.isYou ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{user.initials}</div>
+              <span style={{ flex: 1, fontSize: '15px', fontWeight: user.isYou ? 700 : 500 }}>{user.name}{user.isYou && <span style={{ fontSize: '12px', color: '#a78bfa', marginLeft: 8 }}>(you)</span>}</span>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#a78bfa' }}>{user.pts.toLocaleString()} <span style={{ fontSize: '11px', color: '#6b7280' }}>PTS</span></span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <BottomNav />
