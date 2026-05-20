@@ -223,7 +223,6 @@ export default function DashboardPage() {
         <div style={{ padding: '12px 18px 0' }}>
           <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '18px 16px', position: 'relative', overflow: 'hidden', minHeight: '260px' }}>
             <div style={{ position: 'absolute', top: '30%', right: '-20px', width: '280px', height: '280px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
-            {cutout && <img src={cutout} alt="" style={{ position: 'absolute', bottom: 0, right: 0, height: '100%', width: 'auto', objectFit: 'contain', objectPosition: 'bottom right', pointerEvents: 'none', zIndex: 1 }} />}
             <div style={{ position: 'relative', zIndex: 2 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px', paddingLeft: '72px' }}>
                 <img src="/images/icon_17.png" alt="" style={{ width: 11, height: 11 }} />
