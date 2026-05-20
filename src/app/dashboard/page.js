@@ -15,6 +15,8 @@ const LEADERBOARD = [
   { rank: 4, name: 'Zai',     initials: 'Z', pts: 2698.1, medal: null },
 ];
 
+const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
+
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'GOOD MORNING,';
@@ -66,10 +68,12 @@ export default function DashboardPage() {
 
   async function loadDashboardData(uid) {
     try {
-      const logsRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs?userId=${uid}`,
-        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_API_KEY || '' } }
-      );
+      const key = process.env.NEXT_PUBLIC_API_KEY || '';
+
+      // Load logs
+      const logsRes = await fetch(`${API}/gymLogs?userId=${uid}`, {
+        headers: { 'x-functions-key': key }
+      });
       const logs = await logsRes.json();
       const allLogs = Array.isArray(logs) ? logs : [];
 
@@ -102,10 +106,10 @@ export default function DashboardPage() {
         streak,
       });
 
-      const plansRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans?userId=${uid}`,
-        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' } }
-      );
+      // Load plans
+      const plansRes = await fetch(`${API}/workoutPlans?userId=${uid}`, {
+        headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' }
+      });
       const plans = await plansRes.json();
       if (Array.isArray(plans) && plans.length > 0) {
         const plan = plans[0];
@@ -113,11 +117,17 @@ export default function DashboardPage() {
         setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || null);
       }
 
-      const profileRes = await fetch(
-        `https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles?userId=${uid}`,
-        { headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' } }
-      );
-      const profile = await profileRes.json();
+      // Load profile — handle both array and single object responses
+      const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
+        headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
+      });
+      const profileData = await profileRes.json();
+      
+      // API returns all profiles — find the one matching this user
+      const profile = Array.isArray(profileData)
+        ? profileData.find(p => p.userId === uid || p.id === uid)
+        : profileData;
+
       if (profile && !profile.error) {
         if (profile.level)    setLevel(profile.level);
         if (profile.xp)       setXp(profile.xp);
@@ -125,7 +135,8 @@ export default function DashboardPage() {
         if (profile.name)     setUserName(profile.name.toUpperCase());
       }
 
-      const noteRes = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach', {
+      // AI coach note
+      const noteRes = await fetch(`${API}/aiCoach`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,6 +185,7 @@ export default function DashboardPage() {
     </div>
   );
 
+  // ─── MOBILE ────────────────────────────────────────────────
   if (!isDesktop) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
@@ -304,6 +316,7 @@ export default function DashboardPage() {
     );
   }
 
+  // ─── DESKTOP ───────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden', position: 'relative' }}>
       <div style={{ padding: '28px 32px 0', position: 'relative', zIndex: 10 }}>
