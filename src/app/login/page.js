@@ -79,6 +79,7 @@ export default function LoginPage() {
         marginTop: '-16px',
         flex: 1,
         justifyContent: 'center',
+        maxHeight: '70vh',
       }}>
 
         {/* Mascot hero image */}
