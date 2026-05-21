@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 
-const CUTOUT_MAP = {
-  '6d765ac9-47b2-4d3f-b36a-9d784015b917': '/images/shameel double_bicep_waist_up.png',
-};
+const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 
 const LEADERBOARD = [
   { rank: 1, name: 'Joel',    initials: 'J', pts: 5888.1, medal: '🥇' },
@@ -15,13 +13,26 @@ const LEADERBOARD = [
   { rank: 4, name: 'Zai',     initials: 'Z', pts: 2698.1, medal: null },
 ];
 
-const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'GOOD MORNING,';
   if (h < 17) return 'GOOD AFTERNOON,';
   return 'GOOD EVENING,';
+}
+
+function Avatar({ name, size = 40, fontSize = 16 }) {
+  const initial = name?.charAt(0) || 'S';
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize, fontWeight: 800, color: '#fff', flexShrink: 0,
+      border: '2px solid rgba(167,139,250,0.4)',
+    }}>
+      {initial}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -32,23 +43,14 @@ export default function DashboardPage() {
   const [userId, setUserId]       = useState('');
   const [weekStats, setWeekStats] = useState({ sessions: 0, kgLifted: '0', streak: 0 });
   const [todayPlan, setTodayPlan] = useState(null);
-  const [coachNote, setCoachNote] = useState('Ready to start your journey? Your coach has a session ready for you!');
+  const [coachNote, setCoachNote] = useState('Ready to optimize your performance? I\'ve got a session plan for you.');
   const [level, setLevel]         = useState(12);
   const [xp, setXp]               = useState(580);
   const [xpToNext, setXpToNext]   = useState(1000);
   const [readiness]               = useState(70);
   const [loading, setLoading]     = useState(true);
-  const [isDesktop, setIsDesktop] = useState(false);
 
-  const cutout = CUTOUT_MAP[userId] || null;
-  const xpPct  = Math.round((xp / xpToNext) * 100);
-
-  useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth >= 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const xpPct = Math.round((xp / xpToNext) * 100);
 
   useEffect(() => {
     if (!accounts || accounts.length === 0) return;
@@ -70,7 +72,6 @@ export default function DashboardPage() {
     try {
       const key = process.env.NEXT_PUBLIC_API_KEY || '';
 
-      // Load logs
       const logsRes = await fetch(`${API}/gymLogs?userId=${uid}`, {
         headers: { 'x-functions-key': key }
       });
@@ -102,11 +103,10 @@ export default function DashboardPage() {
 
       setWeekStats({
         sessions: thisWeekLogs.length,
-        kgLifted: totalKg >= 1000 ? (totalKg / 1000).toFixed(1) + 'K' : Math.round(totalKg).toString(),
+        kgLifted: totalKg >= 1000 ? totalKg.toLocaleString() : Math.round(totalKg).toString(),
         streak,
       });
 
-      // Load plans
       const plansRes = await fetch(`${API}/workoutPlans?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' }
       });
@@ -114,16 +114,13 @@ export default function DashboardPage() {
       if (Array.isArray(plans) && plans.length > 0) {
         const plan = plans[0];
         const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-        setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || null);
+        setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || plan);
       }
 
-      // Load profile — handle both array and single object responses
       const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
       });
       const profileData = await profileRes.json();
-      
-      // API returns all profiles — find the one matching this user
       const profile = Array.isArray(profileData)
         ? profileData.find(p => p.userId === uid || p.id === uid)
         : profileData;
@@ -135,13 +132,9 @@ export default function DashboardPage() {
         if (profile.name)     setUserName(profile.name.toUpperCase());
       }
 
-      // AI coach note
       const noteRes = await fetch(`${API}/aiCoach`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '',
-        },
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '' },
         body: JSON.stringify({
           prompt: `Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${thisWeekLogs.length} sessions this week.`,
         }),
@@ -157,301 +150,228 @@ export default function DashboardPage() {
   }
 
   const today = new Date();
-  const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase();
+  const dateStr = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
   const sessionName   = todayPlan?.name         || 'SHOULDER / CHEST';
-  const sessionTags   = todayPlan?.tags          || ['STRENGTH', '4 EXERCISES', 'HIGH INTENSITY'];
   const sessionMins   = todayPlan?.duration      || 75;
-  const sessionFocus  = todayPlan?.focus         || 'PUSH FOCUS';
+  const sessionFocus  = todayPlan?.focus         || 'Push Focus';
   const sessionXP     = todayPlan?.xp            || 350;
-  const sessionIntens = todayPlan?.intensity     || 'HIGH';
-  const sessionPct    = todayPlan?.completionPct || 0;
+  const sessionIntens = todayPlan?.intensity     || 'HIGH INTENSITY';
 
-  const BottomNav = () => (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d1117', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {[
-        { label: 'Home',      icon: '/images/icon_2.png',        href: '/dashboard',  active: true  },
-        { label: 'Log',       icon: '/images/icon_3.png',        href: '/workout',    active: false },
-        { label: 'Progress',  icon: '/images/icon_4.png',        href: '/progress',   active: false },
-        { label: 'Community', icon: '/images/extra_icon_10.png', href: '/community',  active: false },
-        { label: 'Coach',     icon: '/images/icon_5.png',        href: '/coach',      active: false },
-        { label: 'Profile',   icon: '/images/icon_6.png',        href: '/profile',    active: false },
-      ].map((item) => (
-        <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-          <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4 }} />
-          <span style={{ fontSize: '10px', fontWeight: item.active ? 700 : 400, color: item.active ? '#a78bfa' : '#6b7280' }}>{item.label}</span>
-          {item.active && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa', marginTop: -1 }} />}
-        </button>
-      ))}
-    </div>
-  );
+  // Readiness label
+  const readinessLabel = readiness >= 80 ? "Let's Get After It" : readiness >= 60 ? "Good to Go" : "Take It Easy";
+  const readinessSubtext = readiness >= 80 ? "You're ready to crush today." : readiness >= 60 ? "Solid readiness today." : "Consider a lighter session.";
 
-  // ─── MOBILE ────────────────────────────────────────────────
-  if (!isDesktop) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
-        <div style={{ padding: '20px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <p style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 2px' }}>{getGreeting()}</p>
-            <h1 style={{ fontSize: '24px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {loading ? '...' : userName} <span style={{ fontSize: '20px' }}>💪</span>
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '20px', padding: '4px 10px 4px 6px' }}>
-              <img src="/images/icon_8.png" alt="level" style={{ width: 18, height: 18 }} />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa' }}>{level}</span>
-            </div>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', border: '2px solid rgba(167,139,250,0.4)' }}>
-              {userName?.charAt(0) || 'S'}
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: '12px 18px 0' }}>
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src="/images/icon_9.png" alt="badge" style={{ width: 52, height: 52, flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '28px', fontWeight: 900, color: '#34d399' }}>{readiness}</span>
-                <div>
-                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 700 }}>Let&apos;s Get Started</p>
-                  <p style={{ margin: 0, fontSize: '9px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em' }}>READINESS SCORE</p>
-                </div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '6px', height: '5px', margin: '6px 0 4px' }}>
-                <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: '6px', background: 'linear-gradient(90deg, #34d399, #10b981)' }} />
-              </div>
-              <p style={{ margin: 0, fontSize: '10px', color: '#6b7280' }}>{xpToNext - xp} XP to next level</p>
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: '12px 18px 0' }}>
-          <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '18px 16px', position: 'relative', overflow: 'hidden', minHeight: '260px' }}>
-            <div style={{ position: 'absolute', top: '30%', right: '-20px', width: '280px', height: '280px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
-            <div style={{ position: 'relative', zIndex: 2 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px', paddingLeft: '72px' }}>
-                <img src="/images/icon_17.png" alt="" style={{ width: 11, height: 11 }} />
-                <span style={{ fontSize: '10px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
-              </div>
-              <h2 style={{ fontSize: '24px', fontWeight: 900, margin: '0 0 10px', lineHeight: 1.05, paddingLeft: '72px', maxWidth: '60%' }}>{sessionName}</h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px', paddingLeft: '72px' }}>
-                {sessionTags.map((tag, i) => (
-                  <span key={i} style={{ fontSize: '9px', fontWeight: 700, padding: '3px 9px', borderRadius: '20px', background: i === 2 ? 'rgba(239,68,68,0.2)' : i === 1 ? 'rgba(99,102,241,0.2)' : 'rgba(139,92,246,0.2)', border: `1px solid ${i === 2 ? 'rgba(239,68,68,0.5)' : i === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(139,92,246,0.5)'}`, color: i === 2 ? '#f87171' : i === 1 ? '#a5b4fc' : '#c4b5fd' }}>{tag}</span>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: '14px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                {[
-                  { icon: '/images/icon_12.png', val: `${sessionMins} MIN`, label: 'DURATION' },
-                  { icon: '/images/icon_14.png', val: sessionIntens, label: 'INTENSITY' },
-                  { icon: '/images/icon_13.png', val: sessionFocus, label: 'FOCUS AREA' },
-                  { icon: '/images/icon_10.png', val: `+${sessionXP} XP`, label: 'REWARD' },
-                ].map((m, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <img src={m.icon} alt="" style={{ width: 15, height: 15 }} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#e2e8f0' }}>{m.val}</p>
-                      <p style={{ margin: 0, fontSize: '8px', color: '#6b7280', letterSpacing: '0.05em' }}>{m.label}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => router.push('/workout')} style={{ background: 'linear-gradient(135deg, #5b21b6, #4338ca)', border: '1px solid rgba(139,92,246,0.5)', borderRadius: '12px', padding: '12px 24px', color: '#fff', fontSize: '13px', fontWeight: 800, letterSpacing: '0.05em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 20px rgba(109,40,217,0.5)' }}>
-                START SESSION <span style={{ fontSize: '16px' }}>›</span>
-              </button>
-            </div>
-            <div style={{ position: 'absolute', top: '16px', left: '12px', zIndex: 2 }}>
-              <svg width="68" height="68" viewBox="0 0 68 68">
-                <defs><linearGradient id="rg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></linearGradient></defs>
-                <circle cx="34" cy="34" r="28" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="4"/>
-                <circle cx="34" cy="34" r="28" fill="none" stroke="url(#rg2)" strokeWidth="4" strokeDasharray={`${2*Math.PI*28*0.05} ${2*Math.PI*28}`} strokeLinecap="round" transform="rotate(-90 34 34)"/>
-                <text x="34" y="30" textAnchor="middle" fill="#fff" fontSize="12" fontWeight="800">{sessionPct}%</text>
-                <text x="34" y="43" textAnchor="middle" fill="#6b7280" fontSize="6" fontWeight="600" letterSpacing="0.3">NOT STARTED</text>
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div style={{ padding: '16px 18px 0' }}>
-          <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            {[
-              { bg: '#081a10', iconBg: 'rgba(20,184,166,0.2)', icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '0% of goal', subColor: '#4ade80' },
-              { bg: '#080f1a', iconBg: 'rgba(59,130,246,0.2)', icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% last wk', subColor: '#60a5fa' },
-              { bg: '#1a0a00', iconBg: 'rgba(239,68,68,0.15)', icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#fb923c' },
-            ].map((c, i) => (
-              <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ width: 40, height: 40, borderRadius: '10px', background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={c.icon} alt={c.label} style={{ width: 26, height: 26 }} />
-                </div>
-                <p style={{ margin: 0, fontSize: '22px', fontWeight: 900 }}>{c.val}</p>
-                <p style={{ margin: 0, fontSize: '9px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.04em' }}>{c.label}</p>
-                <p style={{ margin: 0, fontSize: '8px', color: c.subColor }}>{c.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ padding: '12px 18px 0' }}>
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '14px 14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: '#fff' }}>CO</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#e2e8f0', lineHeight: 1.4 }}>{coachNote}</p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#6b7280' }}>— Coach Shameel · AI Coach</p>
-            </div>
-            <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '7px 10px', color: '#e2e8f0', fontSize: '10px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>VIEW</button>
-          </div>
-        </div>
-        <div style={{ padding: '14px 18px 0' }}>
-          <p style={{ fontSize: '11px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
-            {LEADERBOARD.map((user, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: i < LEADERBOARD.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', background: user.isYou ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
-                <div style={{ width: 24, textAlign: 'center', fontSize: '16px', flexShrink: 0 }}>{user.medal || <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700 }}>{user.rank}</span>}</div>
-                <div style={{ width: 30, height: 30, borderRadius: '50%', marginLeft: 8, marginRight: 10, background: user.isYou ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{user.initials}</div>
-                <span style={{ flex: 1, fontSize: '13px', fontWeight: user.isYou ? 700 : 500 }}>{user.name}{user.isYou && <span style={{ fontSize: '10px', color: '#a78bfa', marginLeft: 5 }}>(you)</span>}</span>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#a78bfa' }}>{user.pts.toLocaleString()} <span style={{ fontSize: '9px', color: '#6b7280' }}>PTS</span></span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
-  // ─── DESKTOP ───────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#080C14', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden', position: 'relative' }}>
-      <div style={{ padding: '28px 32px 0', position: 'relative', zIndex: 10 }}>
-        <p style={{ fontSize: '12px', color: '#a78bfa', fontWeight: 600, letterSpacing: '0.1em', margin: '0 0 4px' }}>{getGreeting()}</p>
-        <h1 style={{ fontSize: '34px', fontWeight: 900, margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {loading ? '...' : userName} <span style={{ fontSize: '28px' }}>💪</span>
-        </h1>
-      </div>
-      <div style={{ position: 'absolute', top: '24px', right: '32px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', zIndex: 30 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '20px', padding: '5px 14px 5px 8px' }}>
-            <img src="/images/icon_8.png" alt="level" style={{ width: 22, height: 22 }} />
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#a78bfa' }}>{level}</span>
-          </div>
-          <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 700, color: '#fff', border: '2px solid rgba(167,139,250,0.4)' }}>
-            {userName?.charAt(0) || 'S'}
-          </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#09090F', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
+
+      {/* ── HEADER ── */}
+      <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Greeting */}
+        <div>
+          <p style={{ margin: 0, fontSize: 11, color: '#a78bfa', fontWeight: 700, letterSpacing: '0.1em' }}>{getGreeting()}</p>
+          <h1 style={{ margin: '2px 0 0', fontSize: 26, fontWeight: 900, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {loading ? '...' : userName} <span style={{ fontSize: 22 }}>💪</span>
+          </h1>
         </div>
-        <div style={{ background: 'rgba(59,36,180,0.55)', border: '1px solid rgba(139,92,246,0.45)', borderRadius: '14px', padding: '12px 18px', width: '185px' }}>
-          <p style={{ margin: 0, fontSize: '13px', color: '#c4b5fd', fontStyle: 'italic', lineHeight: 1.6, textAlign: 'center' }}>
-            &ldquo; Discipline today,<br />strength tomorrow. &rdquo;
-          </p>
-        </div>
-      </div>
-      {cutout && (
-        <img src={cutout} alt="" style={{ position: 'absolute', top: '80px', right: '22%', height: '500px', width: 'auto', objectFit: 'contain', objectPosition: 'top center', pointerEvents: 'none', zIndex: 20 }} />
-      )}
-      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
-        <div style={{ maxWidth: '48%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src="/images/icon_9.png" alt="badge" style={{ width: 62, height: 62, flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '34px', fontWeight: 900, color: '#34d399' }}>{readiness}</span>
-              <div>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Let&apos;s Get Started</p>
-                <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.06em' }}>READINESS SCORE</p>
-              </div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '6px', height: '7px', margin: '8px 0 5px' }}>
-              <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: '6px', background: 'linear-gradient(90deg, #34d399, #10b981)' }} />
-            </div>
-            <p style={{ margin: 0, fontSize: '11px', color: '#6b7280' }}>{xpToNext - xp} XP to next level</p>
+
+        {/* Right side — bell + avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Bell */}
+          <div style={{ position: 'relative' }}>
+            <img
+              src="/images/icon_bell.png"
+              alt="notifications"
+              style={{ width: 24, height: 24, opacity: 0.7 }}
+              onError={(e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { textContent: '🔔', style: 'font-size:22px' })); }}
+            />
+            <div style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', border: '2px solid #09090F' }} />
           </div>
+          {/* Avatar */}
+          <Avatar name={userName} size={40} fontSize={15} />
         </div>
       </div>
-      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
-        <div style={{ background: 'linear-gradient(135deg, #1a0533 0%, #0d1a40 55%, #060d2a 100%)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: '20px', padding: '28px 28px', position: 'relative', overflow: 'hidden', minHeight: '300px' }}>
-          <div style={{ position: 'absolute', top: '50%', left: '55%', transform: 'translate(-50%, -50%)', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(110,60,255,0.5) 0%, rgba(60,30,180,0.25) 40%, transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingLeft: '100px' }}>
-            <img src="/images/icon_17.png" alt="" style={{ width: 14, height: 14 }} />
-            <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
-          </div>
-          <h2 style={{ fontSize: '36px', fontWeight: 900, margin: '0 0 16px', lineHeight: 1.0, paddingLeft: '100px', maxWidth: '50%' }}>{sessionName}</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', paddingLeft: '100px' }}>
-            {sessionTags.map((tag, i) => (
-              <span key={i} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', padding: '5px 14px', borderRadius: '20px', background: i === 2 ? 'rgba(239,68,68,0.2)' : i === 1 ? 'rgba(99,102,241,0.2)' : 'rgba(139,92,246,0.2)', border: `1px solid ${i === 2 ? 'rgba(239,68,68,0.5)' : i === 1 ? 'rgba(99,102,241,0.5)' : 'rgba(139,92,246,0.5)'}`, color: i === 2 ? '#f87171' : i === 1 ? '#a5b4fc' : '#c4b5fd' }}>{tag}</span>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: '28px', marginBottom: '24px' }}>
-            {[
-              { icon: '/images/icon_12.png', val: `${sessionMins} MIN`, label: 'DURATION' },
-              { icon: '/images/icon_14.png', val: sessionIntens, label: 'INTENSITY' },
-              { icon: '/images/icon_13.png', val: sessionFocus, label: 'FOCUS AREA' },
-              { icon: '/images/icon_10.png', val: `+${sessionXP} XP`, label: 'REWARD' },
-            ].map((m, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <img src={m.icon} alt="" style={{ width: 20, height: 20 }} />
-                <div>
-                  <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>{m.val}</p>
-                  <p style={{ margin: 0, fontSize: '10px', color: '#6b7280', letterSpacing: '0.06em' }}>{m.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => router.push('/workout')} style={{ background: 'linear-gradient(135deg, #5b21b6, #4338ca)', border: '1px solid rgba(139,92,246,0.5)', borderRadius: '14px', padding: '15px 40px', color: '#fff', fontSize: '15px', fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 24px rgba(109,40,217,0.5)' }}>
-            START SESSION <span style={{ fontSize: '20px' }}>›</span>
-          </button>
-          <div style={{ position: 'absolute', top: '24px', left: '20px' }}>
-            <svg width="88" height="88" viewBox="0 0 88 88">
-              <defs><linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#a78bfa"/><stop offset="100%" stopColor="#6d28d9"/></linearGradient></defs>
-              <circle cx="44" cy="44" r="38" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="5"/>
-              <circle cx="44" cy="44" r="38" fill="none" stroke="url(#rg)" strokeWidth="5" strokeDasharray={`${2*Math.PI*38*0.05} ${2*Math.PI*38}`} strokeLinecap="round" transform="rotate(-90 44 44)"/>
-              <text x="44" y="40" textAnchor="middle" fill="#fff" fontSize="15" fontWeight="800">{sessionPct}%</text>
-              <text x="44" y="55" textAnchor="middle" fill="#6b7280" fontSize="7" fontWeight="600" letterSpacing="0.5">NOT STARTED</text>
+
+      {/* ── STREAK PILL ── */}
+      <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 20, padding: '6px 14px' }}>
+          <span style={{ fontSize: 16 }}>🔥</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{weekStats.streak}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em' }}>DAY STREAK</span>
+        </div>
+      </div>
+
+      {/* ── READINESS CARD ── */}
+      <div style={{ margin: '0 20px 16px' }}>
+        <div style={{ background: '#13131A', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18 }}>
+          {/* Ring */}
+          <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <defs>
+                <linearGradient id="readGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#a78bfa" />
+                  <stop offset="100%" stopColor="#6d28d9" />
+                </linearGradient>
+              </defs>
+              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="6" />
+              <circle cx="40" cy="40" r="34" fill="none" stroke="url(#readGrad)" strokeWidth="6"
+                strokeDasharray={`${2 * Math.PI * 34 * readiness / 100} ${2 * Math.PI * 34}`}
+                strokeLinecap="round" transform="rotate(-90 40 40)" />
             </svg>
-          </div>
-        </div>
-      </div>
-      <div style={{ padding: '24px 32px 0', position: 'relative', zIndex: 10 }}>
-        <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 12px' }}>THIS WEEK</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-          {[
-            { bg: '#081a10', iconBg: 'rgba(20,184,166,0.2)', icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '0% of weekly goal', subColor: '#4ade80' },
-            { bg: '#080f1a', iconBg: 'rgba(59,130,246,0.2)', icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% vs last week', subColor: '#60a5fa' },
-            { bg: '#1a0a00', iconBg: 'rgba(239,68,68,0.15)', icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#fb923c' },
-          ].map((c, i) => (
-            <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', padding: '18px 16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: 56, height: 56, borderRadius: '14px', background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img src={c.icon} alt={c.label} style={{ width: 34, height: 34 }} />
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 900 }}>{c.val}</p>
-                <p style={{ margin: 0, fontSize: '11px', color: '#6b7280', fontWeight: 600, letterSpacing: '0.05em' }}>{c.label}</p>
-                <p style={{ margin: 0, fontSize: '10px', color: c.subColor, marginTop: '2px' }}>{c.sub}</p>
-              </div>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{readiness}</span>
+              <span style={{ fontSize: 8, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em', marginTop: 1 }}>READINESS</span>
             </div>
-          ))}
+          </div>
+
+          {/* Text */}
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{readinessLabel}</p>
+            <p style={{ margin: '3px 0 10px', fontSize: 12, color: '#9ca3af' }}>{readinessSubtext}</p>
+            <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 5 }}>
+              <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: 6, background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+              <span style={{ fontSize: 10, color: '#6b7280' }}>{xpToNext - xp} XP to next level</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>LVL {level}</span>
+            </div>
+          </div>
         </div>
       </div>
-      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
-        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, color: '#fff' }}>CO</div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: '0 0 3px', fontSize: '14px', color: '#e2e8f0', lineHeight: 1.4 }}>{coachNote}</p>
-            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>— Coach Shameel · AI Coach</p>
+
+      {/* ── SESSION CARD ── */}
+      <div style={{ margin: '0 20px 16px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #110820 0%, #0c1535 60%, #0a0d28 100%)',
+          border: '1px solid rgba(139,92,246,0.3)',
+          borderRadius: 20, padding: '18px 18px 16px',
+          position: 'relative', overflow: 'hidden', minHeight: 240,
+        }}>
+          {/* Glow */}
+          <div style={{ position: 'absolute', top: '20%', right: '-10%', width: 220, height: 220, background: 'radial-gradient(circle, rgba(109,40,217,0.5) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+          {/* Avatar in card top right */}
+          <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 5 }}>
+            <Avatar name={userName} size={56} fontSize={20} />
           </div>
-          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '10px 16px', color: '#e2e8f0', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            VIEW MESSAGE <img src="/images/icon_15.png" alt="" style={{ width: 14, height: 14 }} />
+
+          {/* Date */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 12 }}>📅</span>
+            <span style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
+          </div>
+
+          {/* Session name */}
+          <h2 style={{ margin: '0 0 10px', fontSize: 34, fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.02em', maxWidth: '65%' }}>
+            {sessionName}
+          </h2>
+
+          {/* Intensity tag */}
+          <div style={{ marginBottom: 14 }}>
+            <span style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              🔥 {sessionIntens}
+            </span>
+          </div>
+
+          {/* Meta row */}
+          <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
+            {[
+              { icon: '⏱', val: `${sessionMins} MIN`, label: 'DURATION' },
+              { icon: '🎯', val: 'FOCUS',              label: sessionFocus },
+              { icon: '⭐', val: `+${sessionXP} XP`,  label: 'REWARD' },
+            ].map((m, i) => (
+              <div key={i}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12 }}>{m.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{m.val}</span>
+                </div>
+                <p style={{ margin: '2px 0 0 20px', fontSize: 9, color: '#6b7280', letterSpacing: '0.05em' }}>{m.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Start button */}
+          <button onClick={() => router.push('/workout')} style={{
+            background: 'linear-gradient(135deg, #6d28d9, #4f46e5)',
+            border: 'none', borderRadius: 14, padding: '14px 0',
+            width: '100%', color: '#fff', fontSize: 15, fontWeight: 800,
+            letterSpacing: '0.08em', cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(109,40,217,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>
+            START SESSION →
           </button>
         </div>
       </div>
-      <div style={{ padding: '16px 32px 0', position: 'relative', zIndex: 10 }}>
-        <p style={{ fontSize: '12px', color: '#6b7280', fontWeight: 700, letterSpacing: '0.1em', margin: '0 0 10px' }}>THIS WEEK&apos;S LEADERS</p>
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '16px', overflow: 'hidden' }}>
-          {LEADERBOARD.map((user, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '14px 20px', borderBottom: i < LEADERBOARD.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', background: user.isYou ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
-              <div style={{ width: 30, textAlign: 'center', fontSize: '20px', flexShrink: 0 }}>{user.medal || <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 700 }}>{user.rank}</span>}</div>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', marginLeft: 12, marginRight: 14, background: user.isYou ? 'linear-gradient(135deg, #7c3aed, #4f46e5)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{user.initials}</div>
-              <span style={{ flex: 1, fontSize: '15px', fontWeight: user.isYou ? 700 : 500 }}>{user.name}{user.isYou && <span style={{ fontSize: '12px', color: '#a78bfa', marginLeft: 8 }}>(you)</span>}</span>
-              <span style={{ fontSize: '15px', fontWeight: 700, color: '#a78bfa' }}>{user.pts.toLocaleString()} <span style={{ fontSize: '11px', color: '#6b7280' }}>PTS</span></span>
+
+      {/* ── THIS WEEK ── */}
+      <div style={{ padding: '0 20px 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.1em' }}>THIS WEEK</p>
+          <button onClick={() => router.push('/progress')} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer' }}>
+            VIEW ALL &gt;
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          {[
+            { icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '80% of goal', subColor: '#a78bfa', barColor: '#7c3aed', barPct: 80, bg: '#0e0e1a' },
+            { icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% vs last week', subColor: '#a78bfa', barColor: '#7c3aed', barPct: 65, bg: '#0e0e1a' },
+            { icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#a78bfa', barColor: '#f97316', barPct: weekStats.streak * 10, bg: '#0e0e1a' },
+          ].map((c, i) => (
+            <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Icon in purple square */}
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={c.icon} alt={c.label} style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display = 'none'; }} />
+              </div>
+              <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1, color: '#fff' }}>{c.val}</p>
+              <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>{c.label}</p>
+              <p style={{ margin: 0, fontSize: 9, color: c.subColor, fontWeight: 600 }}>{c.sub}</p>
+              {/* Progress bar */}
+              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
+                <div style={{ width: `${Math.min(c.barPct, 100)}%`, height: '100%', borderRadius: 4, background: c.barColor }} />
+              </div>
             </div>
           ))}
         </div>
       </div>
-      <BottomNav />
+
+      {/* ── AI COACH CARD ── */}
+      <div style={{ margin: '0 20px 16px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #130d2a, #0d1535)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 20, padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* AI avatar */}
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #4c1d95, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(139,92,246,0.3)' }}>
+            <span style={{ fontSize: 24 }}>🐕</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.04em' }}>AI COACH</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 6, padding: '2px 6px', letterSpacing: '0.06em' }}>BETA</span>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>{coachNote}</p>
+          </div>
+          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            VIEW PLAN <span style={{ fontSize: 14 }}>›</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── BOTTOM NAV ── */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d0d14', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {[
+          { label: 'Home',      icon: '/images/icon_2.png',           href: '/dashboard', active: true  },
+          { label: 'Train',     icon: '/images/icon_train.png',        href: '/workout',   active: false },
+          { label: 'Progress',  icon: '/images/icon_progress.png',     href: '/progress',  active: false },
+          { label: 'Community', icon: '/images/icon_community.png',    href: '/community', active: false },
+          { label: 'Profile',   icon: '/images/icon_profile_nav.png',  href: '/profile',   active: false },
+        ].map((item) => (
+          <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4 }}
+              onError={(e) => { e.target.style.display = 'none'; }} />
+            <span style={{ fontSize: 10, fontWeight: item.active ? 700 : 400, color: item.active ? '#a78bfa' : '#6b7280' }}>{item.label}</span>
+            {item.active && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa' }} />}
+          </button>
+        ))}
+      </div>
+
     </div>
   );
 }
