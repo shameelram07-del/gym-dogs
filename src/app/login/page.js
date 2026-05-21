@@ -71,24 +71,6 @@ export default function LoginPage() {
         pointerEvents: 'none',
       }} />
 
-      {/* ── SMALL LOGO TOP LEFT ── */}
-      <div style={{
-        position: 'relative', zIndex: 10,
-        width: '100%', paddingTop: 'env(safe-area-inset-top, 48px)',
-        paddingTop: '52px',
-        display: 'flex', alignItems: 'center', gap: 8,
-      }}>
-        <img
-          src="/images/gymdogs_logo.png"
-          alt="Gym Dogs"
-          style={{ width: 28, height: 28, objectFit: 'contain' }}
-          onError={(e) => { e.target.style.display = 'none'; }}
-        />
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.08em' }}>
-          GYM <span style={{ color: '#a78bfa' }}>DOGS</span>
-        </span>
-      </div>
-
       {/* ── HERO SECTION ── */}
       <div style={{
         position: 'relative', zIndex: 10,
@@ -184,7 +166,7 @@ export default function LoginPage() {
           <img
             src="/images/icon_start_training.png"
             alt=""
-            style={{ width: 22, height: 22, objectFit: 'contain' }}
+            style={{ width: 32, height: 32, objectFit: 'contain' }}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
           <span>START TRAINING</span>
@@ -215,7 +197,7 @@ export default function LoginPage() {
           <img
             src="/images/icon_create_account.png"
             alt=""
-            style={{ width: 22, height: 22, objectFit: 'contain' }}
+            style={{ width: 32, height: 32, objectFit: 'contain' }}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
           <span>CREATE ACCOUNT</span>
