@@ -360,7 +360,7 @@ export default function DashboardPage() {
           {/* Sessions */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="/images/icon_stats.png" alt="sessions" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
+              <img src="/images/icon_stats.png" alt="sessions" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
             <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
               {weekStats.sessions !== null ? weekStats.sessions : '—'}
@@ -379,7 +379,7 @@ export default function DashboardPage() {
           {/* KG Lifted */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="/images/icon_workout.png" alt="kg" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
+              <img src="/images/icon_workout.png" alt="kg" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
             <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
               {weekStats.kgLifted !== null ? weekStats.kgLifted : '—'}
@@ -394,7 +394,7 @@ export default function DashboardPage() {
           {/* Streak */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <img src="/images/icon_fire.png" alt="streak" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
+              <img src="/images/icon_fire.png" alt="streak" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
             <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
               {weekStats.streak !== null ? weekStats.streak : '—'}
@@ -444,7 +444,7 @@ export default function DashboardPage() {
           { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile',   active: false },
         ].map((item) => (
           <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4 }}
+            <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4, objectFit: 'contain' }}
               onError={(e) => { e.target.style.display='none'; }} />
             <span style={{ fontSize: 10, fontWeight: item.active ? 700 : 400, color: item.active ? '#a78bfa' : '#6b7280' }}>{item.label}</span>
             {item.active && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa' }} />}
