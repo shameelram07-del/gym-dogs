@@ -6,13 +6,6 @@ import { useMsal } from '@azure/msal-react';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 
-const LEADERBOARD = [
-  { rank: 1, name: 'Joel',    initials: 'J', pts: 5888.1, medal: '🥇' },
-  { rank: 2, name: 'Shameel', initials: 'S', pts: 4698.1, medal: '🥈', isYou: true },
-  { rank: 3, name: 'Harish',  initials: 'H', pts: 3298.1, medal: '🥉' },
-  { rank: 4, name: 'Zai',     initials: 'Z', pts: 2698.1, medal: null },
-];
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'GOOD MORNING,';
@@ -41,16 +34,17 @@ export default function DashboardPage() {
 
   const [userName, setUserName]   = useState('');
   const [userId, setUserId]       = useState('');
-  const [weekStats, setWeekStats] = useState({ sessions: 0, kgLifted: '0', streak: 0 });
+  const [weekStats, setWeekStats] = useState({ sessions: null, kgLifted: null, streak: null });
   const [todayPlan, setTodayPlan] = useState(null);
-  const [coachNote, setCoachNote] = useState('Ready to optimize your performance? I\'ve got a session plan for you.');
-  const [level, setLevel]         = useState(12);
-  const [xp, setXp]               = useState(580);
-  const [xpToNext, setXpToNext]   = useState(1000);
-  const [readiness]               = useState(70);
+  const [coachNote, setCoachNote] = useState(null);
+  const [level, setLevel]         = useState(null);
+  const [xp, setXp]               = useState(null);
+  const [xpToNext, setXpToNext]   = useState(null);
+  const [readiness, setReadiness] = useState(null);
+  const [weeklyGoal, setWeeklyGoal] = useState(null);
   const [loading, setLoading]     = useState(true);
 
-  const xpPct = Math.round((xp / xpToNext) * 100);
+  const xpPct = xp && xpToNext ? Math.round((xp / xpToNext) * 100) : null;
 
   useEffect(() => {
     if (!accounts || accounts.length === 0) return;
@@ -72,6 +66,7 @@ export default function DashboardPage() {
     try {
       const key = process.env.NEXT_PUBLIC_API_KEY || '';
 
+      // Logs
       const logsRes = await fetch(`${API}/gymLogs?userId=${uid}`, {
         headers: { 'x-functions-key': key }
       });
@@ -103,10 +98,11 @@ export default function DashboardPage() {
 
       setWeekStats({
         sessions: thisWeekLogs.length,
-        kgLifted: totalKg >= 1000 ? totalKg.toLocaleString() : Math.round(totalKg).toString(),
+        kgLifted: totalKg > 0 ? (totalKg >= 1000 ? (totalKg/1000).toFixed(1)+'K' : Math.round(totalKg).toString()) : '0',
         streak,
       });
 
+      // Plans
       const plansRes = await fetch(`${API}/workoutPlans?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' }
       });
@@ -117,6 +113,7 @@ export default function DashboardPage() {
         setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || plan);
       }
 
+      // Profile
       const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
       });
@@ -126,12 +123,15 @@ export default function DashboardPage() {
         : profileData;
 
       if (profile && !profile.error) {
-        if (profile.level)    setLevel(profile.level);
-        if (profile.xp)       setXp(profile.xp);
-        if (profile.xpToNext) setXpToNext(profile.xpToNext);
-        if (profile.name)     setUserName(profile.name.toUpperCase());
+        if (profile.level)       setLevel(profile.level);
+        if (profile.xp)          setXp(profile.xp);
+        if (profile.xpToNext)    setXpToNext(profile.xpToNext);
+        if (profile.name)        setUserName(profile.name.toUpperCase());
+        if (profile.readiness)   setReadiness(profile.readiness);
+        if (profile.weeklyGoal)  setWeeklyGoal(profile.weeklyGoal);
       }
 
+      // AI coach note
       const noteRes = await fetch(`${API}/aiCoach`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '' },
@@ -151,57 +151,61 @@ export default function DashboardPage() {
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
-  const sessionName   = todayPlan?.name         || 'SHOULDER / CHEST';
-  const sessionMins   = todayPlan?.duration      || 75;
-  const sessionFocus  = todayPlan?.focus         || 'Push Focus';
-  const sessionXP     = todayPlan?.xp            || 350;
-  const sessionIntens = todayPlan?.intensity     || 'HIGH INTENSITY';
+  const sessionName   = todayPlan?.name      || 'No session today';
+  const sessionMins   = todayPlan?.duration  || null;
+  const sessionFocus  = todayPlan?.focus     || null;
+  const sessionXP     = todayPlan?.xp        || null;
+  const sessionIntens = todayPlan?.intensity || null;
 
-  // Readiness label
-  const readinessLabel = readiness >= 80 ? "Let's Get After It" : readiness >= 60 ? "Good to Go" : "Take It Easy";
-  const readinessSubtext = readiness >= 80 ? "You're ready to crush today." : readiness >= 60 ? "Solid readiness today." : "Consider a lighter session.";
+  // Readiness label — only if real data
+  const readinessLabel = readiness
+    ? readiness >= 80 ? "Let's Get After It" : readiness >= 60 ? "Good to Go" : "Take It Easy"
+    : null;
+
+  // Sessions goal progress
+  const sessionGoalPct = weeklyGoal && weekStats.sessions !== null
+    ? Math.min(Math.round((weekStats.sessions / weeklyGoal) * 100), 100)
+    : null;
+
+  // Streak bar — out of 30 days as reference
+  const streakPct = weekStats.streak !== null
+    ? Math.min(Math.round((weekStats.streak / 30) * 100), 100)
+    : null;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#09090F', color: '#fff', fontFamily: "'Inter', sans-serif", paddingBottom: '90px', overflowX: 'hidden' }}>
 
       {/* ── HEADER ── */}
-      <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        {/* Greeting */}
+      <div style={{ padding: '52px 20px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ margin: 0, fontSize: 11, color: '#a78bfa', fontWeight: 700, letterSpacing: '0.1em' }}>{getGreeting()}</p>
           <h1 style={{ margin: '2px 0 0', fontSize: 26, fontWeight: 900, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
             {loading ? '...' : userName} <span style={{ fontSize: 22 }}>💪</span>
           </h1>
         </div>
-
-        {/* Right side — bell + avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Bell */}
           <div style={{ position: 'relative' }}>
-            <img
-              src="/images/icon_bell.png"
-              alt="notifications"
-              style={{ width: 24, height: 24, opacity: 0.7 }}
-              onError={(e) => { e.target.replaceWith(Object.assign(document.createElement('span'), { textContent: '🔔', style: 'font-size:22px' })); }}
-            />
+            <img src="/images/icon_bell.png" alt="notifications" style={{ width: 24, height: 24, opacity: 0.7 }}
+              onError={(e) => { e.target.style.fontSize='22px'; e.target.outerHTML='<span style="font-size:22px">🔔</span>'; }} />
             <div style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: '50%', background: '#a78bfa', border: '2px solid #09090F' }} />
           </div>
-          {/* Avatar */}
           <Avatar name={userName} size={40} fontSize={15} />
         </div>
       </div>
 
       {/* ── STREAK PILL ── */}
-      <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 20, padding: '6px 14px' }}>
+      <div style={{ padding: '0 20px 14px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 20, padding: '6px 14px' }}>
           <span style={{ fontSize: 16 }}>🔥</span>
-          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{weekStats.streak}</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>
+            {weekStats.streak !== null ? weekStats.streak : '—'}
+          </span>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.06em' }}>DAY STREAK</span>
         </div>
       </div>
 
       {/* ── READINESS CARD ── */}
-      <div style={{ margin: '0 20px 16px' }}>
+      <div style={{ margin: '0 20px 14px' }}>
         <div style={{ background: '#13131A', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18 }}>
           {/* Ring */}
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
@@ -213,45 +217,64 @@ export default function DashboardPage() {
                 </linearGradient>
               </defs>
               <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(139,92,246,0.15)" strokeWidth="6" />
-              <circle cx="40" cy="40" r="34" fill="none" stroke="url(#readGrad)" strokeWidth="6"
-                strokeDasharray={`${2 * Math.PI * 34 * readiness / 100} ${2 * Math.PI * 34}`}
-                strokeLinecap="round" transform="rotate(-90 40 40)" />
+              {readiness && (
+                <circle cx="40" cy="40" r="34" fill="none" stroke="url(#readGrad)" strokeWidth="6"
+                  strokeDasharray={`${2 * Math.PI * 34 * readiness / 100} ${2 * Math.PI * 34}`}
+                  strokeLinecap="round" transform="rotate(-90 40 40)" />
+              )}
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{readiness}</span>
-              <span style={{ fontSize: 8, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em', marginTop: 1 }}>READINESS</span>
+              {readiness ? (
+                <>
+                  <span style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>{readiness}</span>
+                  <span style={{ fontSize: 8, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em', marginTop: 1 }}>READINESS</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 11, color: '#4b5563', fontWeight: 600 }}>—</span>
+              )}
             </div>
           </div>
 
           {/* Text */}
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>{readinessLabel}</p>
-            <p style={{ margin: '3px 0 10px', fontSize: 12, color: '#9ca3af' }}>{readinessSubtext}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>
+              {readinessLabel || 'Readiness Pending'}
+            </p>
+            <p style={{ margin: '3px 0 10px', fontSize: 12, color: '#9ca3af' }}>
+              {readiness ? 'Based on your training load.' : 'Complete a check-in to see your score.'}
+            </p>
+
+            {/* XP Bar */}
             <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 5 }}>
-              <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: 6, background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
+              {xpPct !== null && (
+                <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: 6, background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-              <span style={{ fontSize: 10, color: '#6b7280' }}>{xpToNext - xp} XP to next level</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>LVL {level}</span>
+              <span style={{ fontSize: 10, color: '#6b7280' }}>
+                {xp && xpToNext ? `${xpToNext - xp} XP to next level` : 'XP not set yet'}
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>
+                {level ? `LVL ${level}` : '—'}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── SESSION CARD ── */}
-      <div style={{ margin: '0 20px 16px' }}>
+      <div style={{ margin: '0 20px 14px' }}>
         <div style={{
           background: 'linear-gradient(135deg, #110820 0%, #0c1535 60%, #0a0d28 100%)',
           border: '1px solid rgba(139,92,246,0.3)',
           borderRadius: 20, padding: '18px 18px 16px',
-          position: 'relative', overflow: 'hidden', minHeight: 240,
+          position: 'relative', overflow: 'hidden', minHeight: 220,
         }}>
-          {/* Glow */}
           <div style={{ position: 'absolute', top: '20%', right: '-10%', width: 220, height: 220, background: 'radial-gradient(circle, rgba(109,40,217,0.5) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-          {/* Avatar in card top right */}
+          {/* Avatar top right */}
           <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 5 }}>
-            <Avatar name={userName} size={56} fontSize={20} />
+            <Avatar name={userName} size={52} fontSize={18} />
           </div>
 
           {/* Date */}
@@ -261,95 +284,152 @@ export default function DashboardPage() {
           </div>
 
           {/* Session name */}
-          <h2 style={{ margin: '0 0 10px', fontSize: 34, fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.02em', maxWidth: '65%' }}>
+          <h2 style={{ margin: '0 0 10px', fontSize: 30, fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.02em', maxWidth: '65%' }}>
             {sessionName}
           </h2>
 
-          {/* Intensity tag */}
-          <div style={{ marginBottom: 14 }}>
-            <span style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              🔥 {sessionIntens}
-            </span>
-          </div>
+          {/* Intensity tag — only if real */}
+          {sessionIntens && (
+            <div style={{ marginBottom: 14 }}>
+              <span style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                🔥 {sessionIntens}
+              </span>
+            </div>
+          )}
 
-          {/* Meta row */}
-          <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
-            {[
-              { icon: '⏱', val: `${sessionMins} MIN`, label: 'DURATION' },
-              { icon: '🎯', val: 'FOCUS',              label: sessionFocus },
-              { icon: '⭐', val: `+${sessionXP} XP`,  label: 'REWARD' },
-            ].map((m, i) => (
-              <div key={i}>
+          {/* Meta row — only show items with real data */}
+          <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
+            {sessionMins && (
+              <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ fontSize: 12 }}>{m.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{m.val}</span>
+                  <span style={{ fontSize: 12 }}>⏱</span>
+                  <span style={{ fontSize: 13, fontWeight: 800 }}>{sessionMins} MIN</span>
                 </div>
-                <p style={{ margin: '2px 0 0 20px', fontSize: 9, color: '#6b7280', letterSpacing: '0.05em' }}>{m.label}</p>
+                <p style={{ margin: '2px 0 0 20px', fontSize: 9, color: '#6b7280', letterSpacing: '0.05em' }}>DURATION</p>
               </div>
-            ))}
+            )}
+            {sessionFocus && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12 }}>🎯</span>
+                  <span style={{ fontSize: 13, fontWeight: 800 }}>FOCUS</span>
+                </div>
+                <p style={{ margin: '2px 0 0 20px', fontSize: 9, color: '#6b7280', letterSpacing: '0.05em' }}>{sessionFocus}</p>
+              </div>
+            )}
+            {sessionXP && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 12 }}>⭐</span>
+                  <span style={{ fontSize: 13, fontWeight: 800 }}>+{sessionXP} XP</span>
+                </div>
+                <p style={{ margin: '2px 0 0 20px', fontSize: 9, color: '#6b7280', letterSpacing: '0.05em' }}>REWARD</p>
+              </div>
+            )}
           </div>
 
-          {/* Start button */}
-          <button onClick={() => router.push('/workout')} style={{
-            background: 'linear-gradient(135deg, #6d28d9, #4f46e5)',
-            border: 'none', borderRadius: 14, padding: '14px 0',
-            width: '100%', color: '#fff', fontSize: 15, fontWeight: 800,
-            letterSpacing: '0.08em', cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(109,40,217,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}>
-            START SESSION →
-          </button>
+          {/* Start button — only if there's a real plan */}
+          {todayPlan ? (
+            <button onClick={() => router.push('/workout')} style={{
+              background: 'linear-gradient(135deg, #6d28d9, #4f46e5)',
+              border: 'none', borderRadius: 14, padding: '14px 0',
+              width: '100%', color: '#fff', fontSize: 15, fontWeight: 800,
+              letterSpacing: '0.08em', cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(109,40,217,0.4)',
+            }}>
+              START SESSION →
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 14, padding: '14px 0', textAlign: 'center', color: '#6b7280', fontSize: 13, fontWeight: 600 }}>
+              No session assigned yet
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── THIS WEEK ── */}
-      <div style={{ padding: '0 20px 16px' }}>
+      <div style={{ padding: '0 20px 14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.1em' }}>THIS WEEK</p>
-          <button onClick={() => router.push('/progress')} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer' }}>
+          <button onClick={() => router.push('/progress')} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             VIEW ALL &gt;
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          {[
-            { icon: '/images/icon_3.png', val: weekStats.sessions, label: 'SESSIONS', sub: '80% of goal', subColor: '#a78bfa', barColor: '#7c3aed', barPct: 80, bg: '#0e0e1a' },
-            { icon: '/images/icon_9.png', val: weekStats.kgLifted, label: 'KG LIFTED', sub: '+18% vs last week', subColor: '#a78bfa', barColor: '#7c3aed', barPct: 65, bg: '#0e0e1a' },
-            { icon: '/images/icon_13.png', val: weekStats.streak, label: 'DAY STREAK', sub: 'Keep it up!', subColor: '#a78bfa', barColor: '#f97316', barPct: weekStats.streak * 10, bg: '#0e0e1a' },
-          ].map((c, i) => (
-            <div key={i} style={{ background: c.bg, border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {/* Icon in purple square */}
-              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={c.icon} alt={c.label} style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display = 'none'; }} />
-              </div>
-              <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1, color: '#fff' }}>{c.val}</p>
-              <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>{c.label}</p>
-              <p style={{ margin: 0, fontSize: 9, color: c.subColor, fontWeight: 600 }}>{c.sub}</p>
-              {/* Progress bar */}
-              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
-                <div style={{ width: `${Math.min(c.barPct, 100)}%`, height: '100%', borderRadius: 4, background: c.barColor }} />
-              </div>
+
+          {/* Sessions */}
+          <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/images/icon_stats.png" alt="sessions" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
-          ))}
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
+              {weekStats.sessions !== null ? weekStats.sessions : '—'}
+            </p>
+            <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>SESSIONS</p>
+            <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>
+              {weeklyGoal ? `${sessionGoalPct}% of goal` : 'Set a weekly goal'}
+            </p>
+            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
+              {sessionGoalPct !== null && (
+                <div style={{ width: `${sessionGoalPct}%`, height: '100%', borderRadius: 4, background: '#7c3aed' }} />
+              )}
+            </div>
+          </div>
+
+          {/* KG Lifted */}
+          <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/images/icon_workout.png" alt="kg" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
+            </div>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
+              {weekStats.kgLifted !== null ? weekStats.kgLifted : '—'}
+            </p>
+            <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>KG LIFTED</p>
+            <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>—</p>
+            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
+              <div style={{ width: '0%', height: '100%', borderRadius: 4, background: '#7c3aed' }} />
+            </div>
+          </div>
+
+          {/* Streak */}
+          <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src="/images/icon_fire.png" alt="streak" style={{ width: 26, height: 26 }} onError={(e) => { e.target.style.display='none'; }} />
+            </div>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
+              {weekStats.streak !== null ? weekStats.streak : '—'}
+            </p>
+            <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>DAY STREAK</p>
+            <p style={{ margin: 0, fontSize: 9, color: '#f97316', fontWeight: 600 }}>
+              {weekStats.streak > 0 ? 'Keep it up!' : 'Start your streak!'}
+            </p>
+            <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
+              {streakPct !== null && (
+                <div style={{ width: `${streakPct}%`, height: '100%', borderRadius: 4, background: '#f97316' }} />
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
 
       {/* ── AI COACH CARD ── */}
-      <div style={{ margin: '0 20px 16px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #130d2a, #0d1535)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 20, padding: '16px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* AI avatar */}
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #4c1d95, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(139,92,246,0.3)' }}>
-            <span style={{ fontSize: 24 }}>🐕</span>
+      <div style={{ margin: '0 20px 14px' }}>
+        <div style={{ background: 'linear-gradient(135deg, #130d2a, #0d1535)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 20, padding: '16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #4c1d95, #1e1b4b)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(139,92,246,0.3)', fontSize: 24 }}>
+            🐕
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-              <span style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.04em' }}>AI COACH</span>
+              <span style={{ fontSize: 14, fontWeight: 900, letterSpacing: '0.04em' }}>AI COACH</span>
               <span style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 6, padding: '2px 6px', letterSpacing: '0.06em' }}>BETA</span>
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>{coachNote}</p>
+            <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>
+              {coachNote || 'Ready to optimize your performance? I\'ve got a session plan for you.'}
+            </p>
           </div>
-          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            VIEW PLAN <span style={{ fontSize: 14 }}>›</span>
+          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            VIEW PLAN ›
           </button>
         </div>
       </div>
@@ -357,15 +437,15 @@ export default function DashboardPage() {
       {/* ── BOTTOM NAV ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d0d14', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { label: 'Home',      icon: '/images/icon_2.png',           href: '/dashboard', active: true  },
-          { label: 'Train',     icon: '/images/icon_train.png',        href: '/workout',   active: false },
-          { label: 'Progress',  icon: '/images/icon_progress.png',     href: '/progress',  active: false },
-          { label: 'Community', icon: '/images/icon_community.png',    href: '/community', active: false },
-          { label: 'Profile',   icon: '/images/icon_profile_nav.png',  href: '/profile',   active: false },
+          { label: 'Home',      icon: '/images/icon_home.png',          href: '/dashboard', active: true  },
+          { label: 'Train',     icon: '/images/icon_workout.png',       href: '/workout',   active: false },
+          { label: 'Progress',  icon: '/images/Icon_progress.png',    href: '/progress',  active: false },
+          { label: 'Community', icon: '/images/icon_community.png',   href: '/community', active: false },
+          { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile',   active: false },
         ].map((item) => (
           <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4 }}
-              onError={(e) => { e.target.style.display = 'none'; }} />
+              onError={(e) => { e.target.style.display='none'; }} />
             <span style={{ fontSize: 10, fontWeight: item.active ? 700 : 400, color: item.active ? '#a78bfa' : '#6b7280' }}>{item.label}</span>
             {item.active && <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#a78bfa' }} />}
           </button>
