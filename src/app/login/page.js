@@ -1,162 +1,257 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
 
-const FALLBACK_QUOTES = [
-  "The only bad workout is the one that didn't happen.",
-  "Strength doesn't come from what you can do. It comes from overcoming what you thought you couldn't.",
-  "Push yourself because no one else is going to do it for you.",
-  "Your body can stand almost anything. It's your mind you have to convince.",
-  "Don't limit your challenges. Challenge your limits.",
-  "Wake up. Work out. Be better.",
-  "The pain you feel today is the strength you feel tomorrow.",
-  "Champions aren't made in gyms. They're made from something deep inside.",
-];
-
 export default function LoginPage() {
+  const { instance, accounts } = useMsal();
   const router = useRouter();
-  const { instance, accounts, inProgress } = useMsal();
-  const [quote, setQuote] = useState('');
-  const [quoteLoading, setQuoteLoading] = useState(true);
 
-  // If already logged in, go straight to dashboard
+  // If already logged in, redirect to dashboard
   useEffect(() => {
-    if (inProgress !== 'none') return;
-    if (accounts.length > 0) {
+    if (accounts && accounts.length > 0) {
       router.push('/dashboard');
     }
-  }, [accounts, inProgress, router]);
+  }, [accounts, router]);
 
-  // Handle the redirect coming back from Microsoft
-  useEffect(() => {
-    instance.handleRedirectPromise().then((result) => {
-      if (result && result.account) {
-        router.push('/dashboard');
-      }
-    }).catch(console.error);
-  }, [instance, router]);
-
-  // Fetch AI motivational quote on load
-  useEffect(() => {
-    const fetchQuote = async () => {
-      try {
-        const res = await fetch(
-          'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY
-            },
-            body: JSON.stringify({
-              message: 'Give me one short, punchy motivational gym quote. Maximum 12 words. No quotation marks. No attribution. Just the quote itself, nothing else.'
-            })
-          }
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setQuote(data.reply || FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)]);
-        } else {
-          setQuote(FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)]);
-        }
-      } catch (e) {
-        setQuote(FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)]);
-      } finally {
-        setQuoteLoading(false);
-      }
-    };
-    fetchQuote();
-  }, []);
-
-  const handleSignIn = () => {
-    instance.loginRedirect(loginRequest);
+  const handleLogin = () => {
+    instance.loginRedirect({
+      ...loginRequest,
+      prompt: 'login',
+    });
   };
 
-  const handleCreateAccount = () => {
-    instance.loginRedirect({ ...loginRequest, prompt: 'create' });
+  const handleSignUp = () => {
+    instance.loginRedirect({
+      ...loginRequest,
+      prompt: 'create',
+    });
   };
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-white flex flex-col items-center justify-center relative overflow-hidden px-6">
+    <div style={{
+      minHeight: '100vh',
+      minHeight: '100dvh',
+      background: '#080008',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 24px',
+      overflowX: 'hidden',
+      position: 'relative',
+    }}>
 
-      {/* Background glow effects */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-violet-600/15 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+      {/* ── BACKGROUND LAYERS ── */}
+
+      {/* Deep purple radial vignette */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 80% 60% at 50% 30%, rgba(88,28,220,0.35) 0%, rgba(30,0,60,0.5) 50%, #080008 100%)',
+      }} />
+
+      {/* Spotlight glow behind mascot */}
+      <div style={{
+        position: 'absolute', top: '5%', left: '50%',
+        transform: 'translateX(-50%)',
+        width: '340px', height: '340px',
+        background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, rgba(109,40,217,0.15) 40%, transparent 70%)',
+        pointerEvents: 'none',
+        filter: 'blur(20px)',
+      }} />
+
+      {/* Ambient bottom glow */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: '50%',
+        transform: 'translateX(-50%)',
+        width: '300px', height: '200px',
+        background: 'radial-gradient(ellipse, rgba(109,40,217,0.15) 0%, transparent 70%)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── SMALL LOGO TOP LEFT ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        width: '100%', paddingTop: 'env(safe-area-inset-top, 48px)',
+        paddingTop: '52px',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <img
+          src="/images/gymdogs_logo.png"
+          alt="Gym Dogs"
+          style={{ width: 28, height: 28, objectFit: 'contain' }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.08em' }}>
+          GYM <span style={{ color: '#a78bfa' }}>DOGS</span>
+        </span>
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
+      {/* ── HERO SECTION ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center',
+        marginTop: '-16px',
+        flex: 1,
+        justifyContent: 'center',
+      }}>
 
-        {/* Logo */}
-        <div className="mb-6 flex flex-col items-center">
+        {/* Mascot hero image */}
+        <div style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
+          {/* Purple outer glow around mascot */}
+          <div style={{
+            position: 'absolute', top: '10%', left: '50%',
+            transform: 'translateX(-50%)',
+            width: '260px', height: '260px',
+            background: 'radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 70%)',
+            filter: 'blur(16px)',
+            pointerEvents: 'none',
+          }} />
           <img
             src="/images/gymdogs_logo.png"
-            alt="Gym Dogs"
-            className="w-44 h-44 object-contain drop-shadow-2xl"
-            onError={(e) => {
-              e.target.style.display = 'none';
+            alt="Gym Dogs Mascot"
+            style={{
+              width: '100%',
+              maxWidth: '360px',
+              objectFit: 'contain',
+              display: 'block',
+              margin: '0 auto',
+              filter: 'drop-shadow(0 0 30px rgba(139,92,246,0.4)) drop-shadow(0 0 60px rgba(109,40,217,0.2))',
             }}
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
         </div>
 
-        {/* Title */}
-        <h1 className="text-4xl font-black tracking-[4px] uppercase mb-1">GYM DOGS</h1>
-
-        {/* AI Motivational Quote */}
-        <div className="mb-10 min-h-[40px] flex items-center justify-center px-4">
-          {quoteLoading ? (
-            <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce" />
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '0.15s' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '0.3s' }} />
-            </div>
-          ) : (
-            <p className="text-xs tracking-[2px] text-slate-400 uppercase text-center leading-relaxed">
-              {quote}
-            </p>
-          )}
+        {/* Tagline */}
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
+          <p style={{
+            margin: 0,
+            fontSize: 22,
+            fontWeight: 900,
+            letterSpacing: '0.12em',
+            lineHeight: 1.2,
+            color: '#fff',
+          }}>
+            TRAIN HARDER.
+          </p>
+          <p style={{
+            margin: '2px 0 0',
+            fontSize: 22,
+            fontWeight: 900,
+            letterSpacing: '0.12em',
+            lineHeight: 1.2,
+            background: 'linear-gradient(90deg, #a78bfa, #7c3aed)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
+            TRACK EVERYTHING.
+          </p>
         </div>
+      </div>
 
-        {/* Sign In Button */}
+      {/* ── BUTTONS SECTION ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        width: '100%', maxWidth: '400px',
+        display: 'flex', flexDirection: 'column',
+        gap: 12,
+        paddingBottom: 8,
+      }}>
+
+        {/* START TRAINING — primary purple */}
         <button
-          onClick={handleSignIn}
-          disabled={inProgress !== 'none'}
-          className="w-full bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 disabled:opacity-50 active:scale-98 transition-transform mb-4"
+          onClick={handleLogin}
+          style={{
+            width: '100%',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #4c1d95 100%)',
+            border: '1px solid rgba(167,139,250,0.3)',
+            borderRadius: 18,
+            padding: '17px 24px',
+            color: '#fff',
+            fontSize: 15,
+            fontWeight: 800,
+            letterSpacing: '0.1em',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 4px 20px rgba(109,40,217,0.35), 0 1px 0 rgba(255,255,255,0.1) inset',
+          }}
         >
-          <span className="font-black tracking-[3px] text-sm uppercase">
-            {inProgress !== 'none' ? 'Loading...' : 'Sign In'}
-          </span>
-          <span className="text-base">→</span>
+          <img
+            src="/images/icon_start_training.png"
+            alt=""
+            style={{ width: 22, height: 22, objectFit: 'contain' }}
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+          <span>START TRAINING</span>
+          <span style={{ fontSize: 18, opacity: 0.8 }}>→</span>
         </button>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 w-full my-2">
-          <div className="flex-1 h-px bg-white/8" />
-          <p className="text-xs text-slate-600 tracking-[3px]">OR</p>
-          <div className="flex-1 h-px bg-white/8" />
-        </div>
-
-        {/* Create Account Button */}
+        {/* CREATE ACCOUNT — dark glass */}
         <button
-          onClick={handleCreateAccount}
-          disabled={inProgress !== 'none'}
-          className="w-full bg-white/5 border border-white/8 rounded-2xl py-4 flex items-center justify-center gap-2 mt-4 disabled:opacity-50 active:scale-98 transition-transform"
+          onClick={handleSignUp}
+          style={{
+            width: '100%',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(139,92,246,0.35)',
+            borderRadius: 18,
+            padding: '17px 24px',
+            color: '#e2e8f0',
+            fontSize: 15,
+            fontWeight: 800,
+            letterSpacing: '0.1em',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(8px)',
+          }}
         >
-          <span className="font-bold tracking-[2px] text-sm text-slate-300">Create Account</span>
-          <span className="text-base text-slate-400">→</span>
+          <img
+            src="/images/icon_create_account.png"
+            alt=""
+            style={{ width: 22, height: 22, objectFit: 'contain' }}
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+          <span>CREATE ACCOUNT</span>
+          <span style={{ fontSize: 18, opacity: 0.5 }}>→</span>
         </button>
-
-        {/* Footer */}
-        <div className="flex items-center gap-2 mt-8 text-slate-600">
-          <span className="text-sm">🛡️</span>
-          <p className="text-xs tracking-[2px]">Secured by Microsoft Entra</p>
-        </div>
 
       </div>
+
+      {/* ── BOTTOM SECTION ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        width: '100%', maxWidth: '400px',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', gap: 8,
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 16px)',
+        paddingTop: 16,
+      }}>
+
+        {/* Secured by */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13 }}>🔒</span>
+          <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+            Secured by Microsoft Entra
+          </span>
+        </div>
+
+        {/* Terms */}
+        <p style={{ margin: 0, fontSize: 11, color: '#4b5563', textAlign: 'center', lineHeight: 1.6 }}>
+          By continuing you agree to our{' '}
+          <span style={{ color: '#a78bfa', cursor: 'pointer' }}>Terms of Use</span>
+          {' '}and{' '}
+          <span style={{ color: '#a78bfa', cursor: 'pointer' }}>Privacy Policy</span>
+        </p>
+
+      </div>
+
     </div>
   );
 }
