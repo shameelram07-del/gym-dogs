@@ -490,93 +490,90 @@ export default function ProgressPage() {
           </div>
         </div>
 
-        {/* ── BOTTOM ROW: PRs + AI Coach ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-
-          {/* Personal Records */}
-          <div style={{
-            background: '#13131A',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: '20px',
-            padding: '14px',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1.5px', margin: 0 }}>PERSONAL RECORDS</p>
-              <button style={{ fontSize: '11px', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                VIEW ALL ›
-              </button>
-            </div>
-
-            {loading ? (
-              <p style={{ fontSize: '11px', color: '#4b5563', textAlign: 'center', padding: '12px 0' }}>Loading...</p>
-            ) : prs.length === 0 ? (
-              <p style={{ fontSize: '11px', color: '#4b5563', textAlign: 'center', padding: '12px 0' }}>Log a session to start!</p>
-            ) : (
-              prs.map((pr, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 0',
-                  borderBottom: i < prs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                }}>
-                  <Image
-                    src={MEDAL_ICONS[i] || MEDAL_ICONS[2]}
-                    alt="medal"
-                    width={24}
-                    height={24}
-                    style={{ objectFit: 'contain', flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.exercise}</p>
-                    <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>{pr.date}</p>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                    <p style={{ fontSize: '13px', fontWeight: 800, color: '#34d399', margin: 0 }}>{pr.weight}kg</p>
-                    <span style={{ fontSize: '12px', color: '#4b5563' }}>›</span>
-                  </div>
-                </div>
-              ))
-            )}
+        {/* ── PERSONAL RECORDS ── */}
+        <div style={{
+          background: '#13131A',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '20px',
+          padding: '16px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1.5px', margin: 0 }}>PERSONAL RECORDS</p>
+            <button style={{ fontSize: '11px', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              VIEW ALL ›
+            </button>
           </div>
 
-          {/* AI Coach card */}
-          <div style={{
-            background: 'linear-gradient(160deg, rgba(124,58,237,0.2), rgba(109,40,217,0.08))',
-            border: '1px solid rgba(124,58,237,0.3)',
-            borderRadius: '20px',
-            padding: '14px',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
+          {loading ? (
+            <p style={{ fontSize: '12px', color: '#4b5563', textAlign: 'center', padding: '16px 0' }}>Loading...</p>
+          ) : prs.length === 0 ? (
+            <p style={{ fontSize: '12px', color: '#4b5563', textAlign: 'center', padding: '16px 0' }}>Log a session to start tracking PRs!</p>
+          ) : (
+            prs.map((pr, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 0',
+                borderBottom: i < prs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              }}>
+                <Image
+                  src={MEDAL_ICONS[i] || MEDAL_ICONS[2]}
+                  alt="medal"
+                  width={32}
+                  height={32}
+                  style={{ objectFit: 'contain', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.exercise}</p>
+                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>{pr.date}</p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <p style={{ fontSize: '16px', fontWeight: 800, color: '#34d399', margin: 0 }}>{pr.weight}kg</p>
+                  <span style={{ fontSize: '14px', color: '#4b5563' }}>›</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ── AI COACH CARD ── */}
+        <div style={{
+          background: 'linear-gradient(160deg, rgba(124,58,237,0.2), rgba(109,40,217,0.08))',
+          border: '1px solid rgba(124,58,237,0.3)',
+          borderRadius: '20px',
+          padding: '16px',
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'flex-start',
+        }}>
+          {/* Left — brain icon */}
+          <div style={{ flexShrink: 0 }}>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
               background: 'rgba(124,58,237,0.25)',
               borderRadius: '99px',
               padding: '4px 10px',
-              marginBottom: '12px',
-              alignSelf: 'flex-start',
+              marginBottom: '10px',
             }}>
               <p style={{ fontSize: '10px', fontWeight: 700, color: '#a78bfa', margin: 0, letterSpacing: '1px' }}>AI COACH</p>
             </div>
+            <Image
+              src="/images/icon_ai_brain.png"
+              alt="AI brain"
+              width={70}
+              height={70}
+              style={{ objectFit: 'contain', display: 'block' }}
+            />
+          </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-              <Image
-                src="/images/icon_ai_brain.png"
-                alt="AI brain"
-                width={60}
-                height={60}
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-
-            <p style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff', margin: '0 0 6px' }}>AI Recovery Note</p>
-            <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0, lineHeight: 1.5, flex: 1 }}>{aiNote}</p>
-
-            {/* Mini bar chart decoration */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', marginTop: '14px', height: '24px' }}>
+          {/* Right — text + mini chart */}
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: '15px', fontWeight: 700, color: '#ffffff', margin: '0 0 8px' }}>AI Recovery Note</p>
+            <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 14px', lineHeight: 1.6 }}>{aiNote}</p>
+            {/* Mini bar chart */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '28px' }}>
               {[40, 55, 35, 70, 50, 85, 65].map((h, i) => (
                 <div key={i} style={{
                   flex: 1,
