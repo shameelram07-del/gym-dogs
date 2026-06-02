@@ -125,10 +125,9 @@ export default function DashboardPage() {
         if (profile.readiness)  setReadiness(profile.readiness);
         if (profile.weeklyGoal) setWeeklyGoal(profile.weeklyGoal);
         // Set name from CosmosDB — only if it's a real name, not a UUID
-        if (profile.name && profile.name !== uid) {
-          setUserName(profile.name.toUpperCase());
-        } else {
-          setUserName('ATHLETE');
+if (profile.name && profile.name.length < 50) {
+  setUserName(profile.name.toUpperCase());
+}
         }
       } else {
         setUserName('ATHLETE');
