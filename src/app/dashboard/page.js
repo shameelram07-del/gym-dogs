@@ -51,14 +51,8 @@ export default function DashboardPage() {
     const account = accounts[0];
     const uid = account.localAccountId;
     setUserId(uid);
-    const displayName =
-      account.idTokenClaims?.given_name ||
-      account.idTokenClaims?.name ||
-      account.idTokenClaims?.preferred_username ||
-      account.name ||
-      account.username?.split('@')[0] ||
-      'Athlete';
-    setUserName(displayName.toUpperCase());
+    // Show placeholder while CosmosDB loads the real name
+    setUserName('...');
     loadDashboardData(uid);
   }, [accounts]);
 
@@ -113,22 +107,27 @@ export default function DashboardPage() {
         setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || plan);
       }
 
-      // Profile
+      // Profile — fetch name from CosmosDB (MSAL doesn't return real name for Entra External ID)
       const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
       });
       const profileData = await profileRes.json();
-      const profile = Array.isArray(profileData)
-        ? profileData.find(p => p.userId === uid || p.id === uid)
-        : profileData;
+      const profile = Array.isArray(profileData) ? profileData[0] : profileData;
 
       if (profile && !profile.error) {
-        if (profile.level)       setLevel(profile.level);
-        if (profile.xp)          setXp(profile.xp);
-        if (profile.xpToNext)    setXpToNext(profile.xpToNext);
-        if (profile.name)        setUserName(profile.name.toUpperCase());
-        if (profile.readiness)   setReadiness(profile.readiness);
-        if (profile.weeklyGoal)  setWeeklyGoal(profile.weeklyGoal);
+        if (profile.level)      setLevel(profile.level);
+        if (profile.xp)         setXp(profile.xp);
+        if (profile.xpToNext)   setXpToNext(profile.xpToNext);
+        if (profile.readiness)  setReadiness(profile.readiness);
+        if (profile.weeklyGoal) setWeeklyGoal(profile.weeklyGoal);
+        // Set name from CosmosDB — only if it's a real name, not a UUID
+        if (profile.name && profile.name !== uid) {
+          setUserName(profile.name.toUpperCase());
+        } else {
+          setUserName('ATHLETE');
+        }
+      } else {
+        setUserName('ATHLETE');
       }
 
       // AI coach note
@@ -144,6 +143,7 @@ export default function DashboardPage() {
 
     } catch (err) {
       console.error('Dashboard load error:', err);
+      setUserName('ATHLETE');
     } finally {
       setLoading(false);
     }
@@ -157,17 +157,14 @@ export default function DashboardPage() {
   const sessionXP     = todayPlan?.xp        || null;
   const sessionIntens = todayPlan?.intensity || null;
 
-  // Readiness label — only if real data
   const readinessLabel = readiness
     ? readiness >= 80 ? "Let's Get After It" : readiness >= 60 ? "Good to Go" : "Take It Easy"
     : null;
 
-  // Sessions goal progress
   const sessionGoalPct = weeklyGoal && weekStats.sessions !== null
     ? Math.min(Math.round((weekStats.sessions / weeklyGoal) * 100), 100)
     : null;
 
-  // Streak bar — out of 30 days as reference
   const streakPct = weekStats.streak !== null
     ? Math.min(Math.round((weekStats.streak / 30) * 100), 100)
     : null;
@@ -180,7 +177,7 @@ export default function DashboardPage() {
         <div>
           <p style={{ margin: 0, fontSize: 11, color: '#a78bfa', fontWeight: 700, letterSpacing: '0.1em' }}>{getGreeting()}</p>
           <h1 style={{ margin: '2px 0 0', fontSize: 26, fontWeight: 900, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {loading ? '...' : userName} <span style={{ fontSize: 22 }}>💪</span>
+            {userName} <span style={{ fontSize: 22 }}>💪</span>
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -207,7 +204,6 @@ export default function DashboardPage() {
       {/* ── READINESS CARD ── */}
       <div style={{ margin: '0 20px 14px' }}>
         <div style={{ background: '#13131A', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 18 }}>
-          {/* Ring */}
           <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
             <svg width="80" height="80" viewBox="0 0 80 80">
               <defs>
@@ -234,8 +230,6 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-
-          {/* Text */}
           <div style={{ flex: 1 }}>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#fff' }}>
               {readinessLabel || 'Readiness Pending'}
@@ -243,8 +237,6 @@ export default function DashboardPage() {
             <p style={{ margin: '3px 0 10px', fontSize: 12, color: '#9ca3af' }}>
               {readiness ? 'Based on your training load.' : 'Complete a check-in to see your score.'}
             </p>
-
-            {/* XP Bar */}
             <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 6, height: 5 }}>
               {xpPct !== null && (
                 <div style={{ width: `${xpPct}%`, height: '100%', borderRadius: 6, background: 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
@@ -271,24 +263,16 @@ export default function DashboardPage() {
           position: 'relative', overflow: 'hidden', minHeight: 220,
         }}>
           <div style={{ position: 'absolute', top: '20%', right: '-10%', width: 220, height: 220, background: 'radial-gradient(circle, rgba(109,40,217,0.5) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-          {/* Avatar top right */}
           <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 5 }}>
             <Avatar name={userName} size={52} fontSize={18} />
           </div>
-
-          {/* Date */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <span style={{ fontSize: 12 }}>📅</span>
             <span style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, letterSpacing: '0.06em' }}>{dateStr}</span>
           </div>
-
-          {/* Session name */}
           <h2 style={{ margin: '0 0 10px', fontSize: 30, fontWeight: 900, lineHeight: 1.0, letterSpacing: '-0.02em', maxWidth: '65%' }}>
             {sessionName}
           </h2>
-
-          {/* Intensity tag — only if real */}
           {sessionIntens && (
             <div style={{ marginBottom: 14 }}>
               <span style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', padding: '4px 12px', borderRadius: 20, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -296,8 +280,6 @@ export default function DashboardPage() {
               </span>
             </div>
           )}
-
-          {/* Meta row — only show items with real data */}
           <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
             {sessionMins && (
               <div>
@@ -327,8 +309,6 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Start button — only if there's a real plan */}
           {todayPlan ? (
             <button onClick={() => router.push('/workout')} style={{
               background: 'linear-gradient(135deg, #6d28d9, #4f46e5)',
@@ -356,60 +336,39 @@ export default function DashboardPage() {
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-
-          {/* Sessions */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/images/icon_stats.png" alt="sessions" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
-            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
-              {weekStats.sessions !== null ? weekStats.sessions : '—'}
-            </p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{weekStats.sessions !== null ? weekStats.sessions : '—'}</p>
             <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>SESSIONS</p>
-            <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>
-              {weeklyGoal ? `${sessionGoalPct}% of goal` : 'Set a weekly goal'}
-            </p>
+            <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>{weeklyGoal ? `${sessionGoalPct}% of goal` : 'Set a weekly goal'}</p>
             <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
-              {sessionGoalPct !== null && (
-                <div style={{ width: `${sessionGoalPct}%`, height: '100%', borderRadius: 4, background: '#7c3aed' }} />
-              )}
+              {sessionGoalPct !== null && <div style={{ width: `${sessionGoalPct}%`, height: '100%', borderRadius: 4, background: '#7c3aed' }} />}
             </div>
           </div>
-
-          {/* KG Lifted */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/images/icon_workout.png" alt="kg" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
-            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
-              {weekStats.kgLifted !== null ? weekStats.kgLifted : '—'}
-            </p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{weekStats.kgLifted !== null ? weekStats.kgLifted : '—'}</p>
             <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>KG LIFTED</p>
             <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>—</p>
             <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
               <div style={{ width: '0%', height: '100%', borderRadius: 4, background: '#7c3aed' }} />
             </div>
           </div>
-
-          {/* Streak */}
           <div style={{ background: '#0e0e1a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(109,40,217,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img src="/images/icon_fire.png" alt="streak" style={{ width: 22, height: 22 }} onError={(e) => { e.target.style.display='none'; }} />
             </div>
-            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>
-              {weekStats.streak !== null ? weekStats.streak : '—'}
-            </p>
+            <p style={{ margin: 0, fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{weekStats.streak !== null ? weekStats.streak : '—'}</p>
             <p style={{ margin: 0, fontSize: 9, color: '#6b7280', fontWeight: 700, letterSpacing: '0.05em' }}>DAY STREAK</p>
-            <p style={{ margin: 0, fontSize: 9, color: '#f97316', fontWeight: 600 }}>
-              {weekStats.streak > 0 ? 'Keep it up!' : 'Start your streak!'}
-            </p>
+            <p style={{ margin: 0, fontSize: 9, color: '#f97316', fontWeight: 600 }}>{weekStats.streak > 0 ? 'Keep it up!' : 'Start your streak!'}</p>
             <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 3, marginTop: 2 }}>
-              {streakPct !== null && (
-                <div style={{ width: `${streakPct}%`, height: '100%', borderRadius: 4, background: '#f97316' }} />
-              )}
+              {streakPct !== null && <div style={{ width: `${streakPct}%`, height: '100%', borderRadius: 4, background: '#f97316' }} />}
             </div>
           </div>
-
         </div>
       </div>
 
@@ -425,10 +384,10 @@ export default function DashboardPage() {
               <span style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 6, padding: '2px 6px', letterSpacing: '0.06em' }}>BETA</span>
             </div>
             <p style={{ margin: 0, fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>
-              {coachNote || 'Ready to optimize your performance? I\'ve got a session plan for you.'}
+              {coachNote || "Ready to optimize your performance? I've got a session plan for you."}
             </p>
           </div>
-          <button onClick={() => router.push('/coach')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+          <button onClick={() => router.push('/workout')} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 14px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
             VIEW PLAN ›
           </button>
         </div>
@@ -437,11 +396,11 @@ export default function DashboardPage() {
       {/* ── BOTTOM NAV ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d0d14', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { label: 'Home',      icon: '/images/icon_home.png',          href: '/dashboard', active: true  },
-          { label: 'Train',     icon: '/images/icon_workout.png',       href: '/workout',   active: false },
-          { label: 'Progress',  icon: '/images/Icon_progress.png',    href: '/progress',  active: false },
-          { label: 'Community', icon: '/images/icon_community.png',   href: '/community', active: false },
-          { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile',   active: false },
+          { label: 'Home',      icon: '/images/icon_home.png',        href: '/dashboard', active: true  },
+          { label: 'Train',     icon: '/images/icon_workout.png',     href: '/workout',   active: false },
+          { label: 'Progress',  icon: '/images/icon_progress.png',   href: '/progress',  active: false },
+          { label: 'Community', icon: '/images/icon_community.png',  href: '/community', active: false },
+          { label: 'Profile',   icon: '/images/icon_profile_nav.png',href: '/profile',   active: false },
         ].map((item) => (
           <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4, objectFit: 'contain' }}
