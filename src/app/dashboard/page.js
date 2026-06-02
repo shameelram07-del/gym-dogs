@@ -51,6 +51,7 @@ export default function DashboardPage() {
     const account = accounts[0];
     const uid = account.localAccountId;
     setUserId(uid);
+    console.log('ACCOUNT:', JSON.stringify(account));
     // Use MSAL name immediately, CosmosDB will overwrite if better name exists
     const msalName = account.name || account.username?.split('@')[0] || '...';
     setUserName(msalName.toUpperCase());
