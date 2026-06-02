@@ -51,8 +51,9 @@ export default function DashboardPage() {
     const account = accounts[0];
     const uid = account.localAccountId;
     setUserId(uid);
-    // Show placeholder while CosmosDB loads the real name
-    setUserName('...');
+    // Use MSAL name immediately, CosmosDB will overwrite if better name exists
+    const msalName = account.name || account.username?.split('@')[0] || '...';
+    setUserName(msalName.toUpperCase());
     loadDashboardData(uid);
   }, [accounts]);
 
