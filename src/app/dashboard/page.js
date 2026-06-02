@@ -32,17 +32,17 @@ export default function DashboardPage() {
   const { accounts } = useMsal();
   const router = useRouter();
 
-  const [userName, setUserName]   = useState('');
-  const [userId, setUserId]       = useState('');
-  const [weekStats, setWeekStats] = useState({ sessions: null, kgLifted: null, streak: null });
-  const [todayPlan, setTodayPlan] = useState(null);
-  const [coachNote, setCoachNote] = useState(null);
-  const [level, setLevel]         = useState(null);
-  const [xp, setXp]               = useState(null);
-  const [xpToNext, setXpToNext]   = useState(null);
-  const [readiness, setReadiness] = useState(null);
+  const [userName, setUserName]     = useState('');
+  const [userId, setUserId]         = useState('');
+  const [weekStats, setWeekStats]   = useState({ sessions: null, kgLifted: null, streak: null });
+  const [todayPlan, setTodayPlan]   = useState(null);
+  const [coachNote, setCoachNote]   = useState(null);
+  const [level, setLevel]           = useState(null);
+  const [xp, setXp]                 = useState(null);
+  const [xpToNext, setXpToNext]     = useState(null);
+  const [readiness, setReadiness]   = useState(null);
   const [weeklyGoal, setWeeklyGoal] = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]       = useState(true);
 
   const xpPct = xp && xpToNext ? Math.round((xp / xpToNext) * 100) : null;
 
@@ -51,11 +51,10 @@ export default function DashboardPage() {
     const account = accounts[0];
     const uid = account.localAccountId;
     setUserId(uid);
-    console.log('ACCOUNT:', JSON.stringify(account));
-    // Use MSAL name immediately, CosmosDB will overwrite if better name exists
+    // Use email username immediately — CosmosDB will overwrite with real name
     const msalName = (account.name && account.name !== 'unknown')
-  ? account.name
-  : account.username?.split('@')[0] || '...';
+      ? account.name
+      : account.username?.split('@')[0] || '...';
     setUserName(msalName.toUpperCase());
     loadDashboardData(uid);
   }, [accounts]);
@@ -111,7 +110,7 @@ export default function DashboardPage() {
         setTodayPlan(plan.schedule?.[dayNames[now.getDay()]] || plan.sessions?.[0] || plan);
       }
 
-      // Profile — fetch name from CosmosDB (MSAL doesn't return real name for Entra External ID)
+      // Profile — fetch real name from CosmosDB
       const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
       });
@@ -124,13 +123,10 @@ export default function DashboardPage() {
         if (profile.xpToNext)   setXpToNext(profile.xpToNext);
         if (profile.readiness)  setReadiness(profile.readiness);
         if (profile.weeklyGoal) setWeeklyGoal(profile.weeklyGoal);
-        // Set name from CosmosDB — only if it's a real name, not a UUID
-if (profile.name && profile.name.length < 50) {
-  setUserName(profile.name.toUpperCase());
-}
+        // Only use name if it looks like a real name (not a UUID)
+        if (profile.name && profile.name.length < 50) {
+          setUserName(profile.name.toUpperCase());
         }
-      } else {
-        setUserName('ATHLETE');
       }
 
       // AI coach note
@@ -146,7 +142,6 @@ if (profile.name && profile.name.length < 50) {
 
     } catch (err) {
       console.error('Dashboard load error:', err);
-      setUserName('ATHLETE');
     } finally {
       setLoading(false);
     }
@@ -399,11 +394,11 @@ if (profile.name && profile.name.length < 50) {
       {/* ── BOTTOM NAV ── */}
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#0d0d14', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', zIndex: 100, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {[
-          { label: 'Home',      icon: '/images/icon_home.png',        href: '/dashboard', active: true  },
-          { label: 'Train',     icon: '/images/icon_workout.png',     href: '/workout',   active: false },
-          { label: 'Progress',  icon: '/images/icon_progress.png',   href: '/progress',  active: false },
-          { label: 'Community', icon: '/images/icon_community.png',  href: '/community', active: false },
-          { label: 'Profile',   icon: '/images/icon_profile_nav.png',href: '/profile',   active: false },
+          { label: 'Home',      icon: '/images/icon_home.png',         href: '/dashboard', active: true  },
+          { label: 'Train',     icon: '/images/icon_workout.png',      href: '/workout',   active: false },
+          { label: 'Progress',  icon: '/images/icon_progress.png',    href: '/progress',  active: false },
+          { label: 'Community', icon: '/images/icon_community.png',   href: '/community', active: false },
+          { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile',   active: false },
         ].map((item) => (
           <button key={item.label} onClick={() => router.push(item.href)} style={{ flex: 1, background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <img src={item.icon} alt={item.label} style={{ width: 24, height: 24, opacity: item.active ? 1 : 0.4, objectFit: 'contain' }}
