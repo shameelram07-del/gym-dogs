@@ -396,7 +396,7 @@ export default function DashboardPage() {
         {[
           { label: 'Home',      icon: '/images/icon_home.png',         href: '/dashboard', active: true  },
           { label: 'Train',     icon: '/images/icon_workout.png',      href: '/workout',   active: false },
-          { label: 'Progress',  icon: '/images/icon_progress.png',    href: '/progress',  active: false },
+          { label: 'Progress',  icon: '/images/icon_progress2.png',    href: '/progress',  active: false },
           { label: 'Community', icon: '/images/icon_community.png',   href: '/community', active: false },
           { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile',   active: false },
         ].map((item) => (
