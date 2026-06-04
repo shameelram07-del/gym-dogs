@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
+import Image from 'next/image';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import BottomNav from '@/components/BottomNav';
 
@@ -10,33 +11,33 @@ const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.a
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 
 const clients = [
-  { id: 1, name: 'Joel', initials: 'JM', goal: 'Build Muscle', readiness: 91, streak: 7, trainedToday: true, alert: null, lastSession: 'Chest & Shoulders', sessionsThisWeek: 5, weight: 84 },
-  { id: 2, name: 'Hamish', initials: 'HT', goal: 'Lose Body Fat', readiness: 74, streak: 3, trainedToday: true, alert: null, lastSession: 'Lower Body', sessionsThisWeek: 3, weight: 91 },
-  { id: 3, name: 'Zafi', initials: 'ZK', goal: 'Get Stronger', readiness: 58, streak: 1, trainedToday: false, alert: 'Missed 2 sessions', lastSession: 'Pull Day', sessionsThisWeek: 2, weight: 78 },
-  { id: 4, name: 'Priya', initials: 'PK', goal: 'General Health', readiness: 45, streak: 0, trainedToday: false, alert: 'Deload recommended', lastSession: 'Full Body', sessionsThisWeek: 1, weight: 62 },
-  { id: 5, name: 'Marcus', initials: 'MR', goal: 'Athletic Performance', readiness: 83, streak: 5, trainedToday: true, alert: null, lastSession: 'Push Day', sessionsThisWeek: 4, weight: 88 },
+  { id: 1, name: 'JOEL',   initials: 'JM', color: '#7c3aed', goal: 'Build Muscle',        readiness: 91, streak: 7, trainedToday: true,  alert: null,                  lastSession: 'Chest & Shoulders', sessionsThisWeek: 5, weight: 84 },
+  { id: 2, name: 'HAMISH', initials: 'HT', color: '#6d28d9', goal: 'Lose Body Fat',        readiness: 74, streak: 3, trainedToday: true,  alert: null,                  lastSession: 'Lower Body',        sessionsThisWeek: 3, weight: 91 },
+  { id: 3, name: 'ZAFI',   initials: 'ZK', color: '#5b21b6', goal: 'Get Stronger',         readiness: 58, streak: 1, trainedToday: false, alert: 'Missed 2 sessions',   lastSession: 'Pull Day',          sessionsThisWeek: 2, weight: 78 },
+  { id: 4, name: 'PRIYA',  initials: 'PK', color: '#4c1d95', goal: 'General Health',       readiness: 45, streak: 0, trainedToday: false, alert: 'Deload recommended',  lastSession: 'Full Body',         sessionsThisWeek: 1, weight: 62 },
+  { id: 5, name: 'MARCUS', initials: 'MR', color: '#3b0764', goal: 'Athletic Performance', readiness: 83, streak: 5, trainedToday: true,  alert: null,                  lastSession: 'Push Day',          sessionsThisWeek: 4, weight: 88 },
 ];
 
-const getReadinessColor = (score) => {
-  if (score >= 80) return 'text-teal-400';
-  if (score >= 60) return 'text-blue-400';
-  if (score >= 40) return 'text-orange-400';
-  return 'text-red-400';
-};
+function readinessColor(score) {
+  if (score >= 80) return '#34d399';
+  if (score >= 60) return '#60a5fa';
+  if (score >= 40) return '#f97316';
+  return '#f87171';
+}
 
-const getReadinessBg = (score) => {
-  if (score >= 80) return 'bg-teal-500/15 border-teal-500/25';
-  if (score >= 60) return 'bg-blue-500/15 border-blue-500/25';
-  if (score >= 40) return 'bg-orange-500/15 border-orange-500/25';
-  return 'bg-red-500/15 border-red-500/25';
-};
+function readinessBg(score) {
+  if (score >= 80) return 'rgba(52,211,153,0.12)';
+  if (score >= 60) return 'rgba(96,165,250,0.12)';
+  if (score >= 40) return 'rgba(249,115,22,0.12)';
+  return 'rgba(248,113,113,0.12)';
+}
 
-const getReadinessLabel = (score) => {
+function readinessLabel(score) {
   if (score >= 80) return 'Ready';
   if (score >= 60) return 'Moderate';
   if (score >= 40) return 'Fatigued';
   return 'Rest Day';
-};
+}
 
 const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', sets: 3, reps: '10-12', cue: '' });
 
@@ -47,7 +48,6 @@ export default function CoachDashboard() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [filter, setFilter] = useState('all');
   const [view, setView] = useState('clients');
-
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -58,10 +58,7 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) {
-      router.push('/login');
-      return;
-    }
+    if (accounts.length === 0) { router.push('/login'); return; }
     setUserId(accounts[0].localAccountId);
   }, [accounts, inProgress, router]);
 
@@ -72,98 +69,41 @@ export default function CoachDashboard() {
 
   const fetchActivePlan = async () => {
     try {
-      const res = await fetch(PLANS_API_URL, {
-        headers: { 'x-functions-key': PLANS_API_KEY }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setActivePlan(data);
-      }
-    } catch (e) {
-      console.log('No active plan found');
-    }
+      const res = await fetch(PLANS_API_URL, { headers: { 'x-functions-key': PLANS_API_KEY } });
+      if (res.ok) setActivePlan(await res.json());
+    } catch (e) {}
   };
 
   const addExercise = () => setExercises(prev => [...prev, emptyExercise()]);
-
   const removeExercise = (idx) => setExercises(prev => prev.filter((_, i) => i !== idx));
-
-  const updateMuscleGroup = (idx, muscleGroup) => {
-    setExercises(prev => {
-      const updated = [...prev];
-      updated[idx] = { ...emptyExercise(), muscleGroup };
-      return updated;
-    });
-  };
-
+  const updateMuscleGroup = (idx, muscleGroup) => setExercises(prev => { const u = [...prev]; u[idx] = { ...emptyExercise(), muscleGroup }; return u; });
   const updateExerciseName = (idx, name) => {
-    const ex = exercises[idx];
-    const found = exerciseLibrary[ex.muscleGroup]?.find(e => e.name === name);
-    setExercises(prev => {
-      const updated = [...prev];
-      updated[idx] = {
-        ...updated[idx],
-        name,
-        sets: found?.defaultSets ?? 3,
-        reps: found?.defaultReps ?? '10-12',
-        cue: found?.cue ?? '',
-      };
-      return updated;
-    });
+    const found = exerciseLibrary[exercises[idx].muscleGroup]?.find(e => e.name === name);
+    setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], name, sets: found?.defaultSets ?? 3, reps: found?.defaultReps ?? '10-12', cue: found?.cue ?? '' }; return u; });
   };
-
-  const updateExercise = (idx, field, value) => {
-    setExercises(prev => {
-      const updated = [...prev];
-      updated[idx] = { ...updated[idx], [field]: value };
-      return updated;
-    });
-  };
+  const updateExercise = (idx, field, value) => setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: value }; return u; });
 
   const handlePublish = async (isActive) => {
     if (!planName.trim()) { setSaveMsg({ type: 'error', text: 'Please enter a session name' }); return; }
     if (exercises.some(e => !e.name.trim())) { setSaveMsg({ type: 'error', text: 'Please select all exercise names' }); return; }
-    setSaving(true);
-    setSaveMsg(null);
+    setSaving(true); setSaveMsg(null);
     try {
-      const plan = {
-        id: Date.now().toString(),
-        name: planName,
-        tag: planTag,
-        date: sessionDate,
-        exercises,
-        isActive,
-        createdAt: new Date().toISOString(),
-      };
-      const res = await fetch(PLANS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY },
-        body: JSON.stringify(plan)
-      });
+      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, exercises, isActive, createdAt: new Date().toISOString() };
+      const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify(plan) });
       if (res.ok) {
-        setSaveMsg({ type: 'success', text: isActive ? '✅ Session published and set as active!' : '✅ Session saved!' });
-        if (isActive) {
-          setActivePlan(plan);
-          setPlanName('');
-          setSessionDate(new Date().toISOString().split('T')[0]);
-          setExercises([emptyExercise()]);
-        }
-      } else {
-        setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
-      }
-    } catch (e) {
-      setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
-    } finally {
-      setSaving(false);
-    }
+        setSaveMsg({ type: 'success', text: isActive ? '✅ Session published and set as active!' : '✅ Session saved as draft!' });
+        if (isActive) { setActivePlan(plan); setPlanName(''); setSessionDate(new Date().toISOString().split('T')[0]); setExercises([emptyExercise()]); }
+      } else { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
+    } catch (e) { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
+    finally { setSaving(false); }
   };
 
   if (!userId) return null;
 
-  const trainedToday = clients.filter((c) => c.trainedToday).length;
-  const alerts = clients.filter((c) => c.alert).length;
+  const trainedToday = clients.filter(c => c.trainedToday).length;
+  const alerts = clients.filter(c => c.alert).length;
   const avgReadiness = Math.round(clients.reduce((a, c) => a + c.readiness, 0) / clients.length);
-  const filteredClients = clients.filter((c) => {
+  const filteredClients = clients.filter(c => {
     if (filter === 'trained') return c.trainedToday;
     if (filter === 'alerts') return c.alert;
     if (filter === 'rest') return !c.trainedToday;
@@ -171,230 +111,426 @@ export default function CoachDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-white relative overflow-hidden">
+    <div style={{ minHeight: '100vh', background: '#09090F', color: '#ffffff', fontFamily: 'system-ui, sans-serif', paddingBottom: '100px' }}>
 
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/3 right-0 w-64 h-64 bg-violet-500/8 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative z-10 px-5 pt-12 pb-5 bg-gradient-to-b from-blue-500/10 to-transparent">
-        <p className="text-xs tracking-[3px] text-slate-500 uppercase">Coach View</p>
-        <div className="flex items-center justify-between mt-1">
-          <h1 className="text-3xl font-black tracking-wider">
-            COACH <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">HQ</span>
+      {/* ── HEADER ── */}
+      <div style={{
+        padding: '52px 20px 20px',
+        background: 'linear-gradient(180deg, rgba(124,58,237,0.12) 0%, transparent 100%)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+      }}>
+        <div>
+          <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '2px', margin: '0 0 4px' }}>COACH VIEW</p>
+          <h1 style={{ fontSize: '32px', fontWeight: 900, margin: 0 }}>
+            COACH <span style={{ color: '#7c3aed' }}>HQ</span>
           </h1>
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold">SC</div>
         </div>
-
-        <div className="grid grid-cols-3 gap-3 mt-5">
-          {[
-            { val: `${trainedToday}/${clients.length}`, label: 'Trained Today', color: 'text-teal-400' },
-            { val: avgReadiness, label: 'Avg Readiness', color: 'text-blue-400' },
-            { val: alerts, label: 'Alerts', color: alerts > 0 ? 'text-orange-400' : 'text-slate-500' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white/4 border border-white/8 rounded-2xl p-3 text-center">
-              <p className={`text-2xl font-black ${stat.color} leading-none`}>{stat.val}</p>
-              <p className="text-xs text-slate-500 tracking-wider mt-1 uppercase">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => setView('clients')} className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'clients' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
-            👥 Clients
-          </button>
-          <button onClick={() => setView('plans')} className={`flex-1 py-2 rounded-xl text-xs font-bold tracking-wider uppercase transition-all ${view === 'plans' ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
-            💪 Plan Builder
-          </button>
-        </div>
+        <div style={{
+          width: '48px', height: '48px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '15px', fontWeight: 800,
+        }}>SC</div>
       </div>
 
-      <div className="relative z-10 px-5 pb-24 flex flex-col gap-4 overflow-y-auto">
+      {/* ── 3 STAT CARDS ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', padding: '0 20px 16px' }}>
+        {[
+          { value: `${trainedToday}/${clients.length}`, label: 'TRAINED TODAY', color: '#34d399' },
+          { value: avgReadiness,                         label: 'AVG READINESS', color: '#60a5fa' },
+          { value: alerts,                               label: 'ALERTS',        color: alerts > 0 ? '#f97316' : '#6b7280' },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            background: '#13131A', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: '16px', padding: '14px 10px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: '26px', fontWeight: 900, color: stat.color, margin: '0 0 4px', lineHeight: 1 }}>{stat.value}</p>
+            <p style={{ fontSize: '9px', color: '#6b7280', margin: 0, letterSpacing: '1px' }}>{stat.label}</p>
+          </div>
+        ))}
+      </div>
 
+      {/* ── TAB SWITCHER ── */}
+      <div style={{ padding: '0 20px 16px', display: 'flex', gap: '8px' }}>
+        {[
+          { key: 'clients', label: '👥 CLIENTS' },
+          { key: 'plans',   label: '💪 PLAN BUILDER' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            style={{
+              flex: 1, padding: '12px',
+              borderRadius: '14px', border: 'none',
+              background: view === tab.key
+                ? 'linear-gradient(135deg, #7c3aed, #6d28d9)'
+                : 'rgba(255,255,255,0.05)',
+              color: view === tab.key ? '#ffffff' : '#6b7280',
+              fontSize: '12px', fontWeight: 800, letterSpacing: '1px',
+              cursor: 'pointer',
+            }}
+          >{tab.label}</button>
+        ))}
+      </div>
+
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+        {/* ══ CLIENTS VIEW ══ */}
         {view === 'clients' && (
           <>
+            {/* Attention needed */}
             {alerts > 0 && (
-              <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4">
-                <p className="text-xs tracking-[3px] text-orange-400 uppercase mb-2">⚠️ Attention Needed</p>
-                <div className="flex flex-col gap-2">
-                  {clients.filter((c) => c.alert).map((c) => (
-                    <div key={c.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold">{c.initials}</div>
-                        <span className="text-sm text-white font-medium">{c.name}</span>
-                      </div>
-                      <span className="text-xs text-orange-300 font-semibold tracking-wider">{c.alert}</span>
+              <div style={{
+                background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(249,115,22,0.25)',
+                borderRadius: '16px', padding: '14px 16px',
+              }}>
+                <p style={{ fontSize: '11px', color: '#f97316', letterSpacing: '1.5px', margin: '0 0 12px', fontWeight: 700 }}>⚠️ ATTENTION NEEDED</p>
+                {clients.filter(c => c.alert).map(c => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        background: c.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '12px', fontWeight: 800,
+                      }}>{c.initials}</div>
+                      <span style={{ fontSize: '14px', fontWeight: 700 }}>{c.name}</span>
                     </div>
-                  ))}
-                </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 600 }}>{c.alert}</span>
+                      <span style={{ color: '#6b7280' }}>›</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
-            <p className="text-xs tracking-[3px] text-slate-500 uppercase mt-1">All Clients</p>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {/* Filter pills */}
+            <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '2px', margin: '4px 0 0', fontWeight: 700 }}>ALL CLIENTS</p>
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
               {[
-                { key: 'all', label: 'All' },
-                { key: 'trained', label: '✅ Trained' },
-                { key: 'rest', label: '😴 Rest' },
-                { key: 'alerts', label: '⚠️ Alerts' },
-              ].map((f) => (
-                <button key={f.key} onClick={() => setFilter(f.key)} className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${filter === f.key ? 'bg-gradient-to-r from-blue-500 to-violet-600 text-white' : 'bg-white/4 border border-white/8 text-slate-400'}`}>
-                  {f.label}
-                </button>
+                { key: 'all',     label: 'ALL' },
+                { key: 'trained', label: '✅ TRAINED' },
+                { key: 'rest',    label: '😴 REST' },
+                { key: 'alerts',  label: '⚠️ ALERT' },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  style={{
+                    flexShrink: 0, padding: '8px 16px',
+                    borderRadius: '99px', border: 'none',
+                    background: filter === f.key
+                      ? 'linear-gradient(135deg, #7c3aed, #6d28d9)'
+                      : 'rgba(255,255,255,0.06)',
+                    color: filter === f.key ? '#ffffff' : '#6b7280',
+                    fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px',
+                    cursor: 'pointer',
+                  }}
+                >{f.label}</button>
               ))}
             </div>
 
-            <div className="flex flex-col gap-3">
-              {filteredClients.map((client) => (
-                <button key={client.id} onClick={() => setSelectedClient(selectedClient?.id === client.id ? null : client)} className="w-full text-left">
-                  <div className={`bg-white/4 border rounded-2xl p-4 transition-all duration-200 ${selectedClient?.id === client.id ? 'border-blue-500/40 bg-blue-500/5' : 'border-white/8'}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold flex-shrink-0">{client.initials}</div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#080C14] ${client.trainedToday ? 'bg-teal-400' : 'bg-slate-600'}`} />
+            {/* Client cards */}
+            {filteredClients.map(client => (
+              <button
+                key={client.id}
+                onClick={() => setSelectedClient(selectedClient?.id === client.id ? null : client)}
+                style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{
+                  background: selectedClient?.id === client.id ? 'rgba(124,58,237,0.08)' : '#13131A',
+                  border: `1px solid ${selectedClient?.id === client.id ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                  borderRadius: '18px', padding: '16px',
+                  transition: 'all 0.15s ease',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Avatar with online dot */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div style={{
+                        width: '44px', height: '44px', borderRadius: '50%',
+                        background: client.color,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '14px', fontWeight: 800,
+                      }}>{client.initials}</div>
+                      <div style={{
+                        position: 'absolute', bottom: 0, right: 0,
+                        width: '12px', height: '12px', borderRadius: '50%',
+                        background: client.trainedToday ? '#34d399' : '#f97316',
+                        border: '2px solid #09090F',
+                      }} />
+                    </div>
+
+                    {/* Name + goal */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <p style={{ fontSize: '15px', fontWeight: 800, margin: 0, letterSpacing: '0.5px' }}>{client.name}</p>
+                        {client.alert && <span style={{ fontSize: '13px' }}>⚠️</span>}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-black tracking-wider">{client.name.toUpperCase()}</p>
-                          {client.alert && <span className="text-orange-400 text-xs">⚠️</span>}
-                        </div>
-                        <p className="text-xs text-slate-500 tracking-wider">{client.goal}</p>
+                      <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0' }}>{client.goal}</p>
+                    </div>
+
+                    {/* Readiness score */}
+                    <div style={{
+                      background: readinessBg(client.readiness),
+                      border: `1px solid ${readinessColor(client.readiness)}40`,
+                      borderRadius: '12px', padding: '8px 12px', textAlign: 'center', flexShrink: 0,
+                    }}>
+                      <p style={{ fontSize: '20px', fontWeight: 900, color: readinessColor(client.readiness), margin: 0, lineHeight: 1 }}>{client.readiness}</p>
+                      <p style={{ fontSize: '10px', color: readinessColor(client.readiness), margin: '2px 0 0', fontWeight: 600 }}>{readinessLabel(client.readiness)}</p>
+                    </div>
+                    <span style={{ fontSize: '18px', color: '#4b5563' }}>›</span>
+                  </div>
+
+                  {/* Expanded detail */}
+                  {selectedClient?.id === client.id && (
+                    <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                        {[
+                          { label: 'SESSIONS', value: `${client.sessionsThisWeek}/wk` },
+                          { label: 'STREAK',   value: `🔥${client.streak}` },
+                          { label: 'WEIGHT',   value: `${client.weight}kg` },
+                        ].map((s, i) => (
+                          <div key={i} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '10px', textAlign: 'center' }}>
+                            <p style={{ fontSize: '15px', fontWeight: 900, margin: '0 0 3px' }}>{s.value}</p>
+                            <p style={{ fontSize: '9px', color: '#6b7280', margin: 0, letterSpacing: '0.5px' }}>{s.label}</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className={`rounded-xl px-3 py-1.5 border ${getReadinessBg(client.readiness)}`}>
-                        <p className={`text-lg font-black leading-none ${getReadinessColor(client.readiness)}`}>{client.readiness}</p>
-                        <p className={`text-xs tracking-wider ${getReadinessColor(client.readiness)}`}>{getReadinessLabel(client.readiness)}</p>
+                      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px' }}>
+                        <p style={{ fontSize: '10px', color: '#6b7280', letterSpacing: '1px', margin: '0 0 4px' }}>LAST SESSION</p>
+                        <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{client.lastSession}</p>
                       </div>
                     </div>
-                    {selectedClient?.id === client.id && (
-                      <div className="mt-4 pt-4 border-t border-white/6 flex flex-col gap-3">
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { label: 'Sessions', val: `${client.sessionsThisWeek}/wk` },
-                            { label: 'Streak', val: `🔥${client.streak}` },
-                            { label: 'Weight', val: `${client.weight}kg` },
-                          ].map((s) => (
-                            <div key={s.label} className="bg-white/4 rounded-xl p-2 text-center">
-                              <p className="text-sm font-black text-white">{s.val}</p>
-                              <p className="text-xs text-slate-500 tracking-wider uppercase mt-0.5">{s.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="bg-white/4 rounded-xl p-3">
-                          <p className="text-xs text-slate-500 tracking-widest uppercase mb-1">Last Session</p>
-                          <p className="text-sm font-semibold text-white">{client.lastSession}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
+                  )}
+                </div>
+              </button>
+            ))}
           </>
         )}
 
+        {/* ══ PLAN BUILDER VIEW ══ */}
         {view === 'plans' && (
           <>
+            {/* Currently active plan */}
             {activePlan && (
-              <div className="bg-teal-500/10 border border-teal-500/20 rounded-2xl p-4">
-                <p className="text-xs tracking-[3px] text-teal-400 uppercase mb-1">Currently Active</p>
-                <p className="text-base font-black text-white">{activePlan.name}</p>
-                <p className="text-xs text-slate-400 mt-1">{activePlan.exercises?.length} exercises · {activePlan.tag} · {activePlan.date}</p>
+              <div style={{
+                background: 'rgba(52,211,153,0.08)',
+                border: '1px solid rgba(52,211,153,0.25)',
+                borderRadius: '16px', padding: '16px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div>
+                  <p style={{ fontSize: '11px', color: '#34d399', letterSpacing: '1.5px', margin: '0 0 6px', fontWeight: 700 }}>CURRENTLY ACTIVE</p>
+                  <p style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 4px' }}>{activePlan.name}</p>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>{activePlan.exercises?.length} exercises · {activePlan.tag} · {activePlan.date}</p>
+                </div>
+                <span style={{ fontSize: '20px', color: '#4b5563' }}>›</span>
               </div>
             )}
 
-            <p className="text-xs tracking-[3px] text-slate-500 uppercase mt-1">Create New Session</p>
+            {/* Create new session */}
+            <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '2px', margin: '4px 0 0', fontWeight: 700 }}>CREATE NEW SESSION</p>
 
-            <div className="bg-white/4 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
+            <div style={{ background: '#13131A', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Session name */}
               <div>
-                <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Name</p>
-                <input type="text" placeholder="e.g. Chest & Shoulders" value={planName} onChange={(e) => setPlanName(e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50" />
+                <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1.5px', margin: '0 0 8px', fontWeight: 700 }}>SESSION NAME</p>
+                <input
+                  type="text"
+                  placeholder="e.g. Chest & Shoulders"
+                  value={planName}
+                  onChange={e => setPlanName(e.target.value)}
+                  style={{
+                    width: '100%', background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                    padding: '12px 16px', color: '#ffffff', fontSize: '14px',
+                    fontWeight: 600, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
               </div>
+
+              {/* Session type */}
               <div>
-                <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Type</p>
-                <div className="flex gap-2 flex-wrap">
-                  {['STRENGTH', 'HYPERTROPHY', 'CARDIO', 'DELOAD', 'FULL BODY'].map((t) => (
-                    <button key={t} onClick={() => setPlanTag(t)} className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${planTag === t ? 'bg-blue-500/20 border border-blue-500/40 text-blue-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}>
-                      {t}
-                    </button>
+                <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1.5px', margin: '0 0 8px', fontWeight: 700 }}>SESSION TYPE</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {['STRENGTH', 'HYPERTROPHY', 'CARDIO', 'DELOAD', 'FULL BODY'].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setPlanTag(t)}
+                      style={{
+                        padding: '8px 14px', borderRadius: '99px',
+                        border: planTag === t ? '1.5px solid #7c3aed' : '1px solid rgba(255,255,255,0.1)',
+                        background: planTag === t ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: planTag === t ? '#a78bfa' : '#6b7280',
+                        fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px', cursor: 'pointer',
+                      }}
+                    >{t}</button>
                   ))}
                 </div>
               </div>
+
+              {/* Session date */}
               <div>
-                <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Session Date</p>
-                <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-white text-sm font-bold outline-none focus:border-blue-500/50" />
+                <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1.5px', margin: '0 0 8px', fontWeight: 700 }}>SESSION DATE</p>
+                <input
+                  type="date"
+                  value={sessionDate}
+                  onChange={e => setSessionDate(e.target.value)}
+                  style={{
+                    width: '100%', background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                    padding: '12px 16px', color: '#ffffff', fontSize: '14px',
+                    fontWeight: 600, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
               </div>
             </div>
 
-            <p className="text-xs tracking-[3px] text-slate-500 uppercase">Exercises</p>
-            <div className="flex flex-col gap-3">
-              {exercises.map((ex, idx) => (
-                <div key={idx} className="bg-white/4 border border-white/8 rounded-2xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-blue-400 font-bold tracking-wider">EXERCISE {idx + 1}</p>
-                    {exercises.length > 1 && (
-                      <button onClick={() => removeExercise(idx)} className="text-red-400 text-xs font-bold tracking-wider">REMOVE</button>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Muscle Group</p>
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {muscleGroups.map((mg) => (
-                        <button key={mg} onClick={() => updateMuscleGroup(idx, mg)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold tracking-wider transition-all ${ex.muscleGroup === mg ? 'bg-violet-500/20 border border-violet-500/40 text-violet-400' : 'bg-white/4 border border-white/8 text-slate-500'}`}>
-                          {mg}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 tracking-wider uppercase mb-2">Exercise</p>
-                    <select value={ex.name} onChange={(e) => updateExerciseName(idx, e.target.value)} className="w-full bg-[#0E1624] border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-blue-500/50">
-                      <option value="">— Select exercise —</option>
-                      {exerciseLibrary[ex.muscleGroup]?.map((e) => (
-                        <option key={e.name} value={e.name}>{e.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Sets</p>
-                      <input type="number" value={ex.sets} onChange={(e) => updateExercise(idx, 'sets', parseInt(e.target.value))} className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 tracking-wider uppercase mb-1">Reps</p>
-                      <input type="text" value={ex.reps} onChange={(e) => updateExercise(idx, 'reps', e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-white text-sm text-center outline-none focus:border-blue-500/50" />
-                    </div>
-                  </div>
-                  {ex.cue ? (
-                    <div className="bg-blue-500/6 border border-blue-500/15 rounded-xl p-3">
-                      <p className="text-xs text-blue-400 font-bold tracking-wider mb-1">FORM CUE</p>
-                      <textarea value={ex.cue} onChange={(e) => updateExercise(idx, 'cue', e.target.value)} rows={3} className="w-full bg-transparent text-xs text-slate-300 leading-relaxed outline-none resize-none" />
-                    </div>
-                  ) : null}
+            {/* Exercises */}
+            <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '2px', margin: '4px 0 0', fontWeight: 700 }}>EXERCISES</p>
+
+            {exercises.map((ex, idx) => (
+              <div key={idx} style={{ background: '#13131A', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <p style={{ fontSize: '12px', color: '#7c3aed', fontWeight: 800, letterSpacing: '1px', margin: 0 }}>EXERCISE {idx + 1}</p>
+                  {exercises.length > 1 && (
+                    <button onClick={() => removeExercise(idx)} style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>REMOVE</button>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            <button onClick={addExercise} className="w-full bg-white/4 border border-dashed border-white/15 rounded-2xl py-3 text-slate-400 text-sm font-bold tracking-wider">
-              + ADD EXERCISE
-            </button>
+                {/* Muscle group */}
+                <div>
+                  <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1px', margin: '0 0 8px', fontWeight: 700 }}>MUSCLE GROUP</p>
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                    {muscleGroups.map(mg => (
+                      <button
+                        key={mg}
+                        onClick={() => updateMuscleGroup(idx, mg)}
+                        style={{
+                          flexShrink: 0, padding: '7px 14px', borderRadius: '99px',
+                          border: ex.muscleGroup === mg ? '1.5px solid #7c3aed' : '1px solid rgba(255,255,255,0.1)',
+                          background: ex.muscleGroup === mg ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
+                          color: ex.muscleGroup === mg ? '#a78bfa' : '#6b7280',
+                          fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >{mg}</button>
+                    ))}
+                  </div>
+                </div>
 
-            {saveMsg && (
-              <div className={`rounded-2xl p-3 text-sm text-center font-bold ${saveMsg.type === 'success' ? 'bg-teal-500/10 border border-teal-500/20 text-teal-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
-                {saveMsg.text}
+                {/* Exercise select */}
+                <div>
+                  <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1px', margin: '0 0 8px', fontWeight: 700 }}>EXERCISE</p>
+                  <select
+                    value={ex.name}
+                    onChange={e => updateExerciseName(idx, e.target.value)}
+                    style={{
+                      width: '100%', background: '#09090F',
+                      border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                      padding: '12px 16px', color: '#ffffff', fontSize: '14px', outline: 'none',
+                    }}
+                  >
+                    <option value="">— Select exercise —</option>
+                    {exerciseLibrary[ex.muscleGroup]?.map(e => (
+                      <option key={e.name} value={e.name}>{e.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Sets + Reps */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {[
+                    { label: 'SETS', field: 'sets', type: 'number', value: ex.sets },
+                    { label: 'REPS', field: 'reps', type: 'text',   value: ex.reps },
+                  ].map(input => (
+                    <div key={input.field}>
+                      <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '1px', margin: '0 0 6px', fontWeight: 700 }}>{input.label}</p>
+                      <input
+                        type={input.type}
+                        value={input.value}
+                        onChange={e => updateExercise(idx, input.field, input.type === 'number' ? parseInt(e.target.value) : e.target.value)}
+                        style={{
+                          width: '100%', background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px',
+                          padding: '12px', color: '#ffffff', fontSize: '16px',
+                          fontWeight: 800, textAlign: 'center', outline: 'none', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form cue */}
+                {ex.cue && (
+                  <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '12px', padding: '12px' }}>
+                    <p style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 700, letterSpacing: '1px', margin: '0 0 6px' }}>FORM CUE</p>
+                    <textarea
+                      value={ex.cue}
+                      onChange={e => updateExercise(idx, 'cue', e.target.value)}
+                      rows={3}
+                      style={{ width: '100%', background: 'transparent', border: 'none', color: '#9ca3af', fontSize: '13px', lineHeight: 1.5, outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                )}
               </div>
+            ))}
+
+            {/* Add exercise */}
+            <button
+              onClick={addExercise}
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.03)',
+                border: '1.5px dashed rgba(124,58,237,0.3)', borderRadius: '16px',
+                padding: '16px', color: '#7c3aed', fontSize: '14px',
+                fontWeight: 700, letterSpacing: '1px', cursor: 'pointer',
+              }}
+            >+ ADD EXERCISE</button>
+
+            {/* Save message */}
+            {saveMsg && (
+              <div style={{
+                borderRadius: '14px', padding: '12px 16px', textAlign: 'center',
+                fontSize: '13px', fontWeight: 700,
+                background: saveMsg.type === 'success' ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+                border: `1px solid ${saveMsg.type === 'success' ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
+                color: saveMsg.type === 'success' ? '#34d399' : '#f87171',
+              }}>{saveMsg.text}</div>
             )}
 
-            <div className="flex gap-3">
-              <button onClick={() => handlePublish(false)} disabled={saving} className="flex-1 bg-white/4 border border-white/8 rounded-2xl py-4 text-sm font-bold tracking-wider text-slate-300 disabled:opacity-50">
-                Save Draft
-              </button>
-              <button onClick={() => handlePublish(true)} disabled={saving} className="flex-1 bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl py-4 text-sm font-bold tracking-widest uppercase shadow-lg shadow-blue-500/25 disabled:opacity-50">
-                {saving ? 'Publishing...' : '🚀 Publish & Activate'}
-              </button>
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => handlePublish(false)}
+                disabled={saving}
+                style={{
+                  flex: 1, padding: '16px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '14px', color: '#9ca3af',
+                  fontSize: '13px', fontWeight: 700, letterSpacing: '1px',
+                  cursor: 'pointer', opacity: saving ? 0.5 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}
+              >💾 SAVE DRAFT</button>
+              <button
+                onClick={() => handlePublish(true)}
+                disabled={saving}
+                style={{
+                  flex: 1, padding: '16px',
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  border: 'none', borderRadius: '14px', color: '#ffffff',
+                  fontSize: '13px', fontWeight: 800, letterSpacing: '1px',
+                  cursor: 'pointer', opacity: saving ? 0.5 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  boxShadow: '0 4px 20px rgba(124,58,237,0.4)',
+                }}
+              >🚀 PUBLISH & ACTIVATE</button>
             </div>
           </>
         )}
+
       </div>
 
       <BottomNav />
