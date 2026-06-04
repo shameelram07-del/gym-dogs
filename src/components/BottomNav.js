@@ -1,43 +1,79 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 export default function BottomNav() {
+  const router = useRouter();
   const pathname = usePathname();
   const { accounts } = useMsal();
 
   const isCoach = accounts[0]?.localAccountId === COACH_ID;
-  console.log('My ID:', accounts[0]?.localAccountId);
 
   const tabs = [
-    { icon: '🏠', label: 'Home', path: '/dashboard' },
-    { icon: '📋', label: 'Log', path: '/workout' },
-    { icon: '📈', label: 'Progress', path: '/progress' },
-    { icon: '🏆', label: 'Community', path: '/community' },
-    ...(isCoach ? [{ icon: '🎯', label: 'Coach', path: '/coach' }] : []),
-    { icon: '⚙️', label: 'Profile', path: '/profile' },
+    { label: 'Home',      icon: '/images/icon_home.png',        href: '/dashboard' },
+    { label: 'Train',     icon: '/images/icon_workout.png',     href: '/workout'   },
+    { label: 'Progress',  icon: '/images/icon_progress2.png',   href: '/progress'  },
+    { label: 'Community', icon: '/images/icon_community.png',   href: '/community' },
+    ...(isCoach ? [{ label: 'Coach', icon: '/images/icon_focus.png', href: '/coach' }] : []),
+    { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile'   },
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-20 bg-[#0E1624]/95 backdrop-blur border-t border-white/7 flex items-center justify-around px-2 py-2">
+    <div style={{
+      position: 'fixed',
+      bottom: 0, left: 0, right: 0,
+      background: '#0d0d14',
+      borderTop: '1px solid rgba(255,255,255,0.07)',
+      display: 'flex',
+      zIndex: 100,
+      paddingBottom: 'env(safe-area-inset-bottom)',
+    }}>
       {tabs.map((item) => {
-        const active = pathname === item.path;
+        const active = pathname === item.href;
         return (
-          <Link
-            key={item.path}
-            href={item.path}
-            className="flex flex-col items-center gap-1 flex-1 py-1"
+          <button
+            key={item.href}
+            onClick={() => router.push(item.href)}
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '10px 0 8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+            }}
           >
-            <span className={`text-xl ${active ? 'opacity-100' : 'opacity-40'}`}>{item.icon}</span>
-            {active && <div className="w-1 h-1 rounded-full bg-blue-400 shadow-lg shadow-blue-400/50" />}
-            <span className={`text-xs tracking-wider ${active ? 'text-blue-400' : 'text-slate-600'}`}>
+            <img
+              src={item.icon}
+              alt={item.label}
+              style={{
+                width: 24, height: 24,
+                opacity: active ? 1 : 0.4,
+                objectFit: 'contain',
+              }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <span style={{
+              fontSize: 10,
+              fontWeight: active ? 700 : 400,
+              color: active ? '#a78bfa' : '#6b7280',
+            }}>
               {item.label}
             </span>
-          </Link>
+            {active && (
+              <div style={{
+                width: 4, height: 4,
+                borderRadius: '50%',
+                background: '#a78bfa',
+              }} />
+            )}
+          </button>
         );
       })}
     </div>
