@@ -1,6 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMsal } from '@azure/msal-react';
+
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const STEPS = [
   {
@@ -53,10 +57,40 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { accounts } = useMsal();
+  const [userId, setUserId] = useState(null);
+  const [profileRef, setProfileRef] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [finished, setFinished] = useState(false);
   const [buildProgress, setBuildProgress] = useState(0);
+
+  useEffect(() => {
+    if (!accounts || accounts.length === 0) return;
+    const uid = accounts[0].localAccountId;
+    setUserId(uid);
+    (async () => {
+      try {
+        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
+        if (res.ok) {
+          const data = await res.json();
+          const p = Array.isArray(data) ? data[0] : data;
+          if (p && !p.error) setProfileRef(p);
+        }
+      } catch (e) {}
+    })();
+  }, [accounts]);
+
+  async function saveOnboarding() {
+    if (!userId) return;
+    try {
+      await fetch(PROFILES_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
+        body: JSON.stringify({ ...(profileRef || {}), userId, onboarding: answers, onboardingComplete: true }),
+      });
+    } catch (e) {}
+  }
 
   const step = STEPS[currentStep];
   const totalSteps = STEPS.length;
@@ -89,13 +123,13 @@ export default function OnboardingPage() {
       setCurrentStep(s => s + 1);
     } else {
       setFinished(true);
+      saveOnboarding();
       let p = 0;
       const interval = setInterval(() => {
         p += Math.random() * 8 + 3;
         if (p >= 100) {
           p = 100;
           clearInterval(interval);
-          // TODO: Save onboarding answers to CosmosDB via API, then redirect.
           setTimeout(() => router.push('/dashboard'), 800);
         }
         setBuildProgress(Math.min(p, 100));

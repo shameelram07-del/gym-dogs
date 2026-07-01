@@ -8,6 +8,8 @@ import BottomNav from '@/components/BottomNav';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
+const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
+const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
 const clients = [
   { id: 1, name: 'Joel',   initials: 'JM', goal: 'Build muscle',        readiness: 91, streak: 7, trainedToday: true,  alert: null,                 lastSession: 'Chest & Shoulders', sessionsThisWeek: 5, weight: 84 },
@@ -25,6 +27,31 @@ function readinessStyle(score) {
 }
 
 const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', sets: 3, reps: '10-12', cue: '' });
+
+// AI plan builder — deterministic fallback templates so a draft is always produced.
+const PLAN_TEMPLATES = {
+  STRENGTH:    [['CHEST', 2], ['BACK', 2], ['LEGS', 2]],
+  HYPERTROPHY: [['CHEST', 2], ['BACK', 2], ['SHOULDERS', 1], ['BICEPS', 1], ['TRICEPS', 1]],
+  CARDIO:      [['CARDIO', 3]],
+  DELOAD:      [['CHEST', 1], ['BACK', 1], ['LEGS', 1]],
+  'FULL BODY': [['CHEST', 1], ['BACK', 1], ['LEGS', 1], ['SHOULDERS', 1], ['CORE', 1]],
+};
+function buildFromTemplate(tag) {
+  const tpl = PLAN_TEMPLATES[tag] || PLAN_TEMPLATES['FULL BODY'];
+  const out = [];
+  tpl.forEach(([group, count]) => {
+    (exerciseLibrary[group] || []).slice(0, count).forEach(e => out.push({ muscleGroup: group, name: e.name, sets: e.defaultSets, reps: e.defaultReps, cue: e.cue }));
+  });
+  return out.length ? out : [emptyExercise()];
+}
+function findExercise(name) {
+  const target = String(name).toLowerCase().trim();
+  for (const group of muscleGroups) {
+    const found = exerciseLibrary[group]?.find(e => e.name.toLowerCase() === target);
+    if (found) return { muscleGroup: group, name: found.name, sets: found.defaultSets, reps: found.defaultReps, cue: found.cue };
+  }
+  return null;
+}
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const fieldLabel = { fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: '0 0 8px' };
@@ -55,6 +82,7 @@ export default function CoachDashboard() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
   const [activePlan, setActivePlan] = useState(null);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     if (inProgress !== 'none') return;
@@ -82,6 +110,44 @@ export default function CoachDashboard() {
     setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], name, sets: found?.defaultSets ?? 3, reps: found?.defaultReps ?? '10-12', cue: found?.cue ?? '' }; return u; });
   };
   const updateExercise = (idx, field, value) => setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: value }; return u; });
+
+  const generatePlan = async () => {
+    setGenerating(true); setSaveMsg(null);
+    try {
+      const catalogue = muscleGroups.map(g => `${g}: ${exerciseLibrary[g].map(e => e.name).join(', ')}`).join('\n');
+      const prompt = `You are a strength coach. Design a ${planTag} gym session of 5 exercises. Choose ONLY exercises from this catalogue. Reply with ONLY a JSON array, no prose, in the form [{"name":"exact name","sets":3,"reps":"10-12"}].\nCatalogue:\n${catalogue}`;
+      let text = '';
+      try {
+        const res = await fetch(AI_COACH_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY },
+          body: JSON.stringify({ message: prompt, prompt }),
+        });
+        if (res.ok) { const d = await res.json(); text = d.reply || d.message || (typeof d === 'string' ? d : ''); }
+      } catch (e) {}
+
+      let parsed = [];
+      const match = text && text.match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          parsed = JSON.parse(match[0]).map(item => {
+            const lib = findExercise(item.name);
+            return lib ? { ...lib, sets: item.sets || lib.sets, reps: item.reps || lib.reps } : null;
+          }).filter(Boolean);
+        } catch (e) {}
+      }
+
+      const usedAI = parsed.length >= 3;
+      setExercises(usedAI ? parsed : buildFromTemplate(planTag));
+      if (!planName.trim()) setPlanName(`${planTag.charAt(0) + planTag.slice(1).toLowerCase()} session`);
+      setSaveMsg({ type: 'success', text: usedAI ? 'AI draft ready — review and publish.' : 'Draft built from template — review and publish.' });
+    } catch (e) {
+      setExercises(buildFromTemplate(planTag));
+      setSaveMsg({ type: 'success', text: 'Draft ready — review and publish.' });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handlePublish = async (isActive) => {
     if (!planName.trim()) { setSaveMsg({ type: 'error', text: 'Please enter a session name' }); return; }
@@ -261,6 +327,14 @@ export default function CoachDashboard() {
                 <input type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
+
+            <button onClick={generatePlan} disabled={generating} style={{
+              width: '100%', background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`,
+              color: '#fff', border: 'none', borderRadius: 16, padding: 15, fontSize: 14, fontWeight: 700,
+              cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.7 : 1,
+            }}>
+              {generating ? 'Generating…' : `✨ Generate ${planTag.toLowerCase()} plan with AI`}
+            </button>
 
             <p style={{ ...eyebrow, marginLeft: 4 }}>Exercises</p>
 

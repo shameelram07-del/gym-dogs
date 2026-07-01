@@ -173,7 +173,7 @@ export default function ProgressPage() {
       await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({ ...(profileRef || {}), userId, soreness: updated }),
+        body: JSON.stringify({ ...(profileRef || {}), userId, soreness: updated, readiness: calcRecoveryScore(updated) }),
       });
       setSorenessSaved(true);
       setTimeout(() => setSorenessSaved(false), 1500);
