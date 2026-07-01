@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
+const TODAY = new Date().toISOString().split('T')[0];
+
 // Goals default here; wire to the user's profile later.
 const GOALS = { calories: 2200, protein: 160, carbs: 220, fat: 70 };
 const WATER_GOAL = 8; // glasses
@@ -39,6 +43,7 @@ export default function NutritionPage() {
   const router = useRouter();
   const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
+  const [profileRef, setProfileRef] = useState(null);
   const [meals, setMeals] = useState({ breakfast: [], lunch: [], dinner: [], snacks: [] });
   const [water, setWater] = useState(0);
   const [adding, setAdding] = useState(null); // meal key being added to
@@ -47,8 +52,36 @@ export default function NutritionPage() {
   useEffect(() => {
     if (inProgress !== 'none') return;
     if (accounts.length === 0) { router.push('/login'); return; }
-    setUserId(accounts[0].localAccountId);
+    const uid = accounts[0].localAccountId;
+    setUserId(uid);
+    (async () => {
+      try {
+        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
+        if (res.ok) {
+          const data = await res.json();
+          const p = Array.isArray(data) ? data[0] : data;
+          if (p && !p.error) {
+            setProfileRef(p);
+            if (p.nutrition && p.nutrition.date === TODAY) {
+              if (p.nutrition.meals) setMeals(p.nutrition.meals);
+              if (typeof p.nutrition.water === 'number') setWater(p.nutrition.water);
+            }
+          }
+        }
+      } catch (e) {}
+    })();
   }, [accounts, inProgress, router]);
+
+  async function saveNutrition(mealsArg, waterArg) {
+    if (!userId) return;
+    try {
+      await fetch(PROFILES_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
+        body: JSON.stringify({ ...(profileRef || {}), userId, nutrition: { date: TODAY, meals: mealsArg, water: waterArg } }),
+      });
+    } catch (e) {}
+  }
 
   if (!userId) return null;
 
@@ -74,10 +107,16 @@ export default function NutritionPage() {
       carbs: parseInt(form.carbs) || 0,
       fat: parseInt(form.fat) || 0,
     };
-    setMeals(prev => ({ ...prev, [adding]: [...prev[adding], item] }));
+    const next = { ...meals, [adding]: [...meals[adding], item] };
+    setMeals(next);
+    saveNutrition(next, water);
     setAdding(null);
   };
-  const removeItem = (mealKey, id) => setMeals(prev => ({ ...prev, [mealKey]: prev[mealKey].filter(i => i.id !== id) }));
+  const removeItem = (mealKey, id) => {
+    const next = { ...meals, [mealKey]: meals[mealKey].filter(i => i.id !== id) };
+    setMeals(next);
+    saveNutrition(next, water);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
@@ -125,7 +164,7 @@ export default function NutritionPage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {Array.from({ length: WATER_GOAL }).map((_, i) => (
-              <button key={i} onClick={() => setWater(i + 1 === water ? i : i + 1)} aria-label={`${i + 1} glasses`} style={{
+              <button key={i} onClick={() => { const nw = i + 1 === water ? i : i + 1; setWater(nw); saveNutrition(meals, nw); }} aria-label={`${i + 1} glasses`} style={{
                 flex: 1, height: 40, borderRadius: 10, cursor: 'pointer', border: 'none',
                 background: i < water ? 'var(--blue-tint)' : 'var(--soft)',
                 color: i < water ? 'var(--blue-ink)' : 'var(--ink-3)', fontSize: 16,
