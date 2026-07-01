@@ -5,6 +5,15 @@ import { useMsal } from '@azure/msal-react';
 
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
+const ICONS = {
+  home:     <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
+  train:    <><path d="M6 7v10M18 7v10M4 9v6M20 9v6M6 12h12" /></>,
+  progress: <><path d="M4 19V5M4 19h16M8 16l4-5 3 3 5-7" /></>,
+  community:<><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 20c0-2 1-3 3-3s3 1 3 3" /></>,
+  coach:    <><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.4-4.9-2.6-4.9 2.6.9-5.4-4-3.9 5.5-.8z" /></>,
+  profile:  <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-4 3-6 7-6s7 2 7 6" /></>,
+};
+
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
@@ -13,23 +22,26 @@ export default function BottomNav() {
   const isCoach = accounts[0]?.localAccountId === COACH_ID;
 
   const tabs = [
-    { label: 'Home',      icon: '/images/icon_home.png',        href: '/dashboard' },
-    { label: 'Train',     icon: '/images/icon_workout.png',     href: '/workout'   },
-    { label: 'Progress',  icon: '/images/icon_progress2.png',   href: '/progress'  },
-    { label: 'Community', icon: '/images/icon_community.png',   href: '/community' },
-    ...(isCoach ? [{ label: 'Coach', icon: '/images/icon_focus.png', href: '/coach' }] : []),
-    { label: 'Profile',   icon: '/images/icon_profile_nav.png', href: '/profile'   },
+    { label: 'Home',      key: 'home',      href: '/dashboard' },
+    { label: 'Train',     key: 'train',     href: '/workout'   },
+    { label: 'Progress',  key: 'progress',  href: '/progress'  },
+    { label: 'Community', key: 'community', href: '/community' },
+    ...(isCoach ? [{ label: 'Coach', key: 'coach', href: '/coach' }] : []),
+    { label: 'Profile',   key: 'profile',   href: '/profile'   },
   ];
 
   return (
     <div style={{
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
-      background: '#0d0d14',
-      borderTop: '1px solid rgba(255,255,255,0.07)',
+      background: 'var(--nav-bg)',
+      backdropFilter: 'blur(18px)',
+      WebkitBackdropFilter: 'blur(18px)',
+      borderTop: '1px solid var(--line-2)',
       display: 'flex',
       zIndex: 100,
-      paddingBottom: 'env(safe-area-inset-bottom)',
+      paddingTop: 10,
+      paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
     }}>
       {tabs.map((item) => {
         const active = pathname === item.href;
@@ -42,37 +54,21 @@ export default function BottomNav() {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: '10px 0 8px',
+              padding: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               gap: 4,
+              color: active ? 'var(--accent)' : 'var(--ink-3)',
             }}
           >
-            <img
-              src={item.icon}
-              alt={item.label}
-              style={{
-                width: 24, height: 24,
-                opacity: active ? 1 : 0.4,
-                objectFit: 'contain',
-              }}
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <span style={{
-              fontSize: 10,
-              fontWeight: active ? 700 : 400,
-              color: active ? '#a78bfa' : '#6b7280',
-            }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {ICONS[item.key]}
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>
               {item.label}
             </span>
-            {active && (
-              <div style={{
-                width: 4, height: 4,
-                borderRadius: '50%',
-                background: '#a78bfa',
-              }} />
-            )}
           </button>
         );
       })}

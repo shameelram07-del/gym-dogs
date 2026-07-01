@@ -2,381 +2,134 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import BottomNav from '@/components/BottomNav';
 
-// ─── DUMMY DATA (replace with real CosmosDB data later) ───────────────────────
-
+// Placeholder data — swap for real CosmosDB data once the social feed is built.
 const LEADERBOARD = [
-  { name: 'Joel',    initial: 'J', sessions: 5, color: '#7c3aed', me: false },
-  { name: 'Shameel', initial: 'S', sessions: 4, color: '#6d28d9', me: true  },
-  { name: 'Hamish',  initial: 'H', sessions: 3, color: '#5b21b6', me: false },
+  { name: 'Joel',    initial: 'J', kg: '12.1k', me: false },
+  { name: 'Shameel', initial: 'S', kg: '9.8k',  me: true  },
+  { name: 'Hamish',  initial: 'H', kg: '8.4k',  me: false },
+  { name: 'Zafi',    initial: 'Z', kg: '6.2k',  me: false },
 ];
+
+const MEDAL = ['#F7B500', '#B0B7C3', '#CD7F32'];
 
 const FEED = [
-  {
-    id: 1,
-    name: 'Joel',
-    initial: 'J',
-    color: '#7c3aed',
-    isPro: true,
-    time: '2h ago',
-    tag: 'Bench Press PR',
-    text: 'Hit a new PR today! 122.5kg for 5 reps 💪 Consistency is everything.',
-    fires: 24,
-    comments: 12,
-  },
-  {
-    id: 2,
-    name: 'Hamish',
-    initial: 'H',
-    color: '#5b21b6',
-    isPro: false,
-    time: '1h ago',
-    tag: 'Leg Day',
-    text: 'Nothing beats a heavy leg day. Quads are on fire! 🔥',
-    fires: 18,
-    comments: 8,
-  },
-  {
-    id: 3,
-    name: 'Zafi',
-    initial: 'Z',
-    color: '#4c1d95',
-    isPro: false,
-    time: '3h ago',
-    tag: 'Morning Session',
-    text: '6am session done. No excuses, no skipping. Who else trains early?',
-    fires: 31,
-    comments: 5,
-  },
+  { id: 1, name: 'Joel',   initial: 'J', time: '2h ago', tag: 'Bench PR', text: 'Hit a new PR today — 122.5kg for 5 reps. Consistency is everything.', fires: 24, comments: 12 },
+  { id: 2, name: 'Hamish', initial: 'H', time: '1h ago', tag: 'Leg day', text: 'Nothing beats a heavy leg day. Quads are on fire.', fires: 18, comments: 8 },
+  { id: 3, name: 'Zafi',   initial: 'Z', time: '3h ago', tag: 'Early session', text: '6am session done. No excuses, no skipping. Who else trains early?', fires: 31, comments: 5 },
 ];
 
-const MEDAL_ICONS = [
-  '/images/icon_medal_gold.png',
-  '/images/icon_medal_silver.png',
-  '/images/icon_medal_bronze.png',
-];
+const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+function Avatar({ initial, size = 38 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'linear-gradient(135deg, var(--violet), var(--blue))',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.4, fontWeight: 700, color: '#fff', flexShrink: 0,
+    }}>{initial}</div>
+  );
+}
+
 export default function CommunityPage() {
   const router = useRouter();
   const [joined, setJoined] = useState(false);
   const [firedPosts, setFiredPosts] = useState({});
+  const [notice, setNotice] = useState('');
 
-  function toggleFire(id) {
-    setFiredPosts(prev => ({ ...prev, [id]: !prev[id] }));
-  }
+  const toggleFire = (id) => setFiredPosts(prev => ({ ...prev, [id]: !prev[id] }));
+  const showNotice = (msg) => { setNotice(msg); setTimeout(() => setNotice(''), 1800); };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#09090F',
-      color: '#ffffff',
-      paddingBottom: '100px',
-      fontFamily: 'system-ui, sans-serif',
-    }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER ── */}
-      <div style={{
-        padding: '52px 20px 16px',
-        background: 'linear-gradient(180deg, rgba(124,58,237,0.12) 0%, transparent 100%)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-      }}>
+      <div style={{ padding: '52px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '2px', margin: '0 0 4px' }}>GOOD MORNING</p>
-          <h1 style={{ fontSize: '30px', fontWeight: 900, margin: 0, lineHeight: 1.1 }}>
-            SHAMEEL <span style={{ fontSize: '26px' }}>💪</span>
-          </h1>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Community</h1>
+          <p style={{ margin: '2px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>Gym Dogs · 5 members</p>
         </div>
-        <button
-          onClick={() => router.push('/profile')}
-          style={{
-            width: '44px', height: '44px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-            border: 'none',
-            color: '#ffffff',
-            fontSize: '14px',
-            fontWeight: 800,
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >ST</button>
+        <button onClick={() => router.push('/profile')} aria-label="Profile" style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}>
+          <Avatar initial="ST" size={42} />
+        </button>
       </div>
 
-      {/* ── READINESS BANNER ── */}
-      <div style={{ padding: '0 20px 16px' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
-          background: '#13131A',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: '16px',
-          padding: '14px 16px',
-        }}>
-          <p style={{ fontSize: '32px', fontWeight: 900, color: '#34d399', margin: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>87</p>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px' }}>Ready to Train</p>
-            <p style={{ fontSize: '10px', color: '#6b7280', letterSpacing: '1.5px', margin: 0 }}>READINESS SCORE</p>
-          </div>
-          <span style={{ fontSize: '28px' }}>🏃</span>
-          <span style={{ color: '#6b7280', fontSize: '18px' }}>›</span>
-        </div>
-      </div>
+      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-        {/* ── COMMUNITY HEADING ── */}
-        <div>
-          <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 4px', letterSpacing: '1px' }}>COMMUNITY</h2>
-          <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Compete. Connect. Get Stronger.</p>
-        </div>
-
-        {/* ── WEEKLY CHALLENGE CARD ── */}
-        <div style={{
-          background: 'linear-gradient(135deg, #1a0a3a, #2d1060)',
-          border: '1px solid rgba(124,58,237,0.4)',
-          borderRadius: '20px',
-          padding: '20px',
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
-          {/* Top row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 700, letterSpacing: '1.5px', margin: 0 }}>WEEKLY CHALLENGE</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Image src="/images/icon_timer.png" alt="timer" width={14} height={14} style={{ objectFit: 'contain' }} />
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>5 DAYS LEFT</p>
-            </div>
-          </div>
-
-          {/* Content row — text left, mascot right */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '30px', fontWeight: 900, margin: '0 0 10px', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
-                PUSH THE<br />BENCH
-              </h3>
-              <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 14px', lineHeight: 1.5 }}>
-                Add 2.5kg to your best bench press this week.
-              </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
-                <span style={{ fontSize: '16px' }}>👥</span>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>1,245</span>
-                <span style={{ fontSize: '12px', color: '#6b7280' }}>JOINING</span>
-              </div>
-              <button
-                onClick={() => setJoined(j => !j)}
-                style={{
-                  background: joined ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                  border: joined ? '1.5px solid #7c3aed' : 'none',
-                  borderRadius: '99px',
-                  padding: '12px 22px',
-                  color: '#ffffff',
-                  fontSize: '13px',
-                  fontWeight: 800,
-                  letterSpacing: '1px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                {joined ? '✓ JOINED' : 'JOIN CHALLENGE ›'}
-              </button>
-            </div>
-
-            {/* Mascot */}
-            <div style={{ flexShrink: 0 }}>
-              <Image
-                src="/images/gymdogs_logo.png"
-                alt="GymDogs"
-                width={120}
-                height={140}
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-          </div>
+        {/* ── CHALLENGE ── */}
+        <div style={{ background: 'linear-gradient(135deg, var(--violet), var(--blue))', borderRadius: 22, padding: 18, color: '#fff' }}>
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', opacity: 0.85 }}>WEEKLY CHALLENGE</p>
+          <p style={{ margin: '6px 0 4px', fontSize: 20, fontWeight: 800 }}>10,000 kg club</p>
+          <p style={{ margin: '0 0 14px', fontSize: 13, opacity: 0.9 }}>Lift 10 tonnes this week · 1,245 joining · 5 days left</p>
+          <button onClick={() => setJoined(j => !j)} style={{
+            background: joined ? 'rgba(255,255,255,0.18)' : '#fff',
+            color: joined ? '#fff' : '#3A1D9E', border: 'none', borderRadius: 14,
+            padding: '12px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          }}>
+            {joined ? '✓ Joined' : 'Join challenge'}
+          </button>
         </div>
 
         {/* ── LEADERBOARD ── */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '1px', margin: 0 }}>THIS WEEK'S LEADERBOARD</p>
-            <button style={{ fontSize: '12px', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
-              VIEW ALL ›
-            </button>
-          </div>
-
-          <div style={{
-            background: '#13131A',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: '20px',
-            overflow: 'hidden',
-          }}>
-            {LEADERBOARD.map((user, i) => (
-              <div key={user.name} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '14px 16px',
-                background: user.me ? 'rgba(124,58,237,0.08)' : 'transparent',
-                borderBottom: i < LEADERBOARD.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-              }}>
-                {/* Medal */}
-                <Image src={MEDAL_ICONS[i]} alt={`rank ${i+1}`} width={32} height={32} style={{ objectFit: 'contain', flexShrink: 0 }} />
-
-                {/* Avatar */}
-                <div style={{
-                  width: '38px', height: '38px',
-                  borderRadius: '50%',
-                  background: user.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '15px', fontWeight: 800,
-                  flexShrink: 0,
-                }}>
-                  {user.initial}
-                </div>
-
-                {/* Name */}
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: '15px', fontWeight: 700 }}>{user.name}</span>
-                  {user.me && (
-                    <span style={{ fontSize: '12px', color: '#a78bfa', marginLeft: '6px' }}>(you)</span>
-                  )}
-                </div>
-
-                {/* Sessions */}
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '22px', fontWeight: 900, color: '#ffffff' }}>{user.sessions}</span>
-                  <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px', letterSpacing: '0.5px' }}>SESSIONS</span>
-                </div>
-              </div>
-            ))}
-
-            {/* Motivational note */}
-            <div style={{
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              borderTop: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              <Image src="/images/icon_trophy.png" alt="trophy" width={18} height={18} style={{ objectFit: 'contain' }} />
-              <p style={{ fontSize: '12px', color: '#a78bfa', margin: 0, fontWeight: 600 }}>Keep it up! You're killing it.</p>
+        <div style={cardStyle}>
+          <p style={{ ...eyebrow, marginBottom: 6 }}>Leaderboard</p>
+          {LEADERBOARD.map((u, i) => (
+            <div key={u.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: i === 0 ? 'none' : '1px solid var(--line-2)' }}>
+              {i < 3 ? (
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{i + 1}</div>
+              ) : (
+                <div style={{ width: 26, textAlign: 'center', fontWeight: 800, color: 'var(--ink-3)', fontSize: 14 }}>{i + 1}</div>
+              )}
+              <Avatar initial={u.initial} size={34} />
+              <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: u.me ? 'var(--accent-strong)' : 'var(--ink)' }}>
+                {u.name}{u.me ? ' (you)' : ''}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-2)' }}>{u.kg} kg</span>
             </div>
-          </div>
+          ))}
         </div>
 
-        {/* ── COMMUNITY FEED ── */}
+        {/* ── FEED ── */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <p style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '1px', margin: 0 }}>COMMUNITY FEED</p>
-            <button style={{ fontSize: '12px', color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 700 }}>
-              SEE ALL ›
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {FEED.map(post => (
-              <div key={post.id} style={{
-                background: '#13131A',
-                border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: '20px',
-                padding: '16px',
-              }}>
-                {/* Top row — avatar, name, photo placeholder */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  {/* Avatar */}
-                  <div style={{
-                    width: '40px', height: '40px',
-                    borderRadius: '50%',
-                    background: post.color,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '16px', fontWeight: 800,
-                    flexShrink: 0,
-                  }}>
-                    {post.initial}
-                  </div>
-
-                  {/* Name + meta */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700 }}>{post.name}</span>
-                      {post.isPro && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Image src="/images/icon_pro_badge.png" alt="PRO" width={40} height={20} style={{ objectFit: 'contain' }} />
-                        </div>
-                      )}
+          <p style={{ ...eyebrow, marginLeft: 4, marginBottom: 10 }}>Feed</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {FEED.map(post => {
+              const fired = firedPosts[post.id];
+              return (
+                <div key={post.id} style={cardStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 10 }}>
+                    <Avatar initial={post.initial} size={38} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>{post.name}</p>
+                      <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>{post.time} · {post.tag}</p>
                     </div>
-                    <p style={{ fontSize: '11px', color: '#6b7280', margin: '3px 0 0' }}>
-                      {post.time} · {post.tag}
-                    </p>
                   </div>
-
-                  {/* Photo placeholder */}
-                  <div style={{
-                    width: '64px', height: '64px',
-                    borderRadius: '12px',
-                    background: 'rgba(124,58,237,0.15)',
-                    border: '1px solid rgba(124,58,237,0.2)',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '22px',
-                  }}>
-                    🏋️
+                  <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--ink)', lineHeight: 1.5 }}>{post.text}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                    <button onClick={() => toggleFire(post.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: fired ? 'var(--orange)' : 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
+                      🔥 {fired ? post.fires + 1 : post.fires}
+                    </button>
+                    <button onClick={() => showNotice('Comments — coming soon')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
+                      💬 {post.comments}
+                    </button>
+                    <button onClick={() => showNotice('More — coming soon')} aria-label="More" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-3)', fontSize: 18, letterSpacing: 2 }}>···</button>
                   </div>
                 </div>
-
-                {/* Post text */}
-                <p style={{ fontSize: '14px', color: '#e5e7eb', lineHeight: 1.5, margin: '12px 0' }}>
-                  {post.text}
-                </p>
-
-                {/* Reactions row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {/* Fire reaction */}
-                  <button
-                    onClick={() => toggleFire(post.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    }}
-                  >
-                    <Image src="/images/icon_fire.png" alt="fire" width={20} height={20} style={{ objectFit: 'contain', opacity: firedPosts[post.id] ? 1 : 0.6 }} />
-                    <span style={{ fontSize: '13px', color: firedPosts[post.id] ? '#f97316' : '#6b7280', fontWeight: 600 }}>
-                      {firedPosts[post.id] ? post.fires + 1 : post.fires}
-                    </span>
-                  </button>
-
-                  {/* Comment */}
-                  <button style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  }}>
-                    <Image src="/images/icon_comment.png" alt="comment" width={20} height={20} style={{ objectFit: 'contain', opacity: 0.6 }} />
-                    <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>{post.comments}</span>
-                  </button>
-
-                  {/* More */}
-                  <button style={{
-                    marginLeft: 'auto',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    color: '#6b7280', fontSize: '18px', letterSpacing: '2px',
-                  }}>···</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
       </div>
+
+      {notice && (
+        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 150, background: 'var(--ai-card-1)', color: '#fff', fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 999 }}>
+          {notice}
+        </div>
+      )}
 
       <BottomNav />
     </div>
