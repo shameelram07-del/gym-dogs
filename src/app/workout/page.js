@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
+import BottomNav from '@/components/BottomNav';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -298,7 +299,7 @@ export default function WorkoutPage() {
   const lastData = formatLast(activeExIdx);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 140 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}>
 
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -455,10 +456,10 @@ export default function WorkoutPage() {
 
       {/* ── BOTTOM ACTION BAR ── */}
       <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+        position: 'fixed', bottom: 'calc(60px + env(safe-area-inset-bottom))', left: 0, right: 0, zIndex: 101,
         background: 'var(--nav-bg)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
         borderTop: '1px solid var(--line-2)',
-        padding: '12px 16px', paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)',
+        padding: '12px 16px',
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 12, alignItems: 'center' }}>
           <RestTimer />
@@ -472,6 +473,8 @@ export default function WorkoutPage() {
           </button>
         </div>
       </div>
+
+      <BottomNav />
 
     </div>
   );
