@@ -289,6 +289,15 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        <button onClick={() => router.push('/nutrition')} style={{ ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
+          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🥗</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Nutrition</p>
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>Log meals and macros</p>
+          </div>
+          <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
+        </button>
+
       </div>
 
       <BottomNav />
