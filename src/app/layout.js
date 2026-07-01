@@ -31,7 +31,7 @@ export default function RootLayout({ children }) {
           }}
         />
         <AuthProvider>
-          {children}
+          <div className="app-shell">{children}</div>
         </AuthProvider>
       </body>
     </html>

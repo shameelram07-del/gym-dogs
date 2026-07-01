@@ -110,3 +110,12 @@ body {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Cap the app to a phone-width column and centre it on larger screens,
+   so it reads as a mobile app on desktop instead of stretching edge to edge. */
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+}

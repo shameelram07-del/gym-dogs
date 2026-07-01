@@ -46,17 +46,9 @@ export default function LoginPage() {
 
       {/* ── HERO ── */}
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{
-          width: 88, height: 88, borderRadius: 26,
-          background: 'linear-gradient(135deg, var(--accent), #27D17F)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 46, marginBottom: 22,
-          boxShadow: '0 12px 30px -8px rgba(18,183,106,0.5)',
-        }}>
-          <img src="/images/gymdogs_logo.png" alt="Gym Dogs"
-            style={{ width: 64, height: 64, objectFit: 'contain' }}
-            onError={(e) => { e.target.replaceWith(document.createTextNode('🐕')); }} />
-        </div>
+        <img src="/images/gymdogs_logo.png" alt="Gym Dogs"
+          style={{ width: 150, height: 150, objectFit: 'contain', marginBottom: 18 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: '-0.03em' }}>
           Gym Dogs
         </h1>

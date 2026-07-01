@@ -33,7 +33,7 @@ export default function BottomNav() {
   return (
     <div style={{
       position: 'fixed',
-      bottom: 0, left: 0, right: 0,
+      bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480,
       background: 'var(--nav-bg)',
       backdropFilter: 'blur(18px)',
       WebkitBackdropFilter: 'blur(18px)',

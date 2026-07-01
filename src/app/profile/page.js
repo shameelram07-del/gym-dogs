@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -293,6 +294,11 @@ export default function ProfilePage() {
         {/* ── ACCOUNT ── */}
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <p style={{ ...eyebrow, padding: '16px 18px 10px' }}>Account</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🌙</div>
+            <span style={{ fontSize: 14, color: 'var(--ink)', flex: 1, fontWeight: 500 }}>Dark mode</span>
+            <ThemeToggle size={34} />
+          </div>
           {[
             { emoji: '👤', label: 'Edit display name', action: () => { setTempName(userName); setEditingName(true); } },
             { emoji: '🔔', label: 'Notification preferences', action: () => showNotice('Notifications — coming soon') },
