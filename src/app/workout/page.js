@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import { randomQuote } from '@/lib/quotes';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -61,10 +62,17 @@ function DurationTimer() {
   return <span>{m}:{s}</span>;
 }
 
-function RestTimer({ onDone }) {
+function RestTimer({ onDone, trigger }) {
   const [seconds, setSeconds] = useState(90);
   const [running, setRunning] = useState(false);
   const ref = useRef(null);
+
+  // Auto-start (or restart) the timer whenever a set is marked done.
+  useEffect(() => {
+    if (!trigger) return;
+    setSeconds(90);
+    setRunning(true);
+  }, [trigger]);
 
   useEffect(() => {
     if (running && seconds > 0) {
@@ -129,6 +137,16 @@ export default function WorkoutPage() {
   const [coachNote, setCoachNote] = useState(null);
   const [coachNoteLoading, setCoachNoteLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [finishQuote, setFinishQuote] = useState('');
+  const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
+  const [toast, setToast] = useState('');
+  const toastRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    clearTimeout(toastRef.current);
+    toastRef.current = setTimeout(() => setToast(''), 2400);
+  };
 
   useEffect(() => {
     if (inProgress !== 'none') return;
@@ -203,11 +221,32 @@ export default function WorkoutPage() {
   };
 
   const toggleDone = (exIdx, setIdx) => {
-    setLogs(prev => {
-      const updated = [...prev[exIdx]];
-      updated[setIdx] = { ...updated[setIdx], done: !updated[setIdx].done };
-      return { ...prev, [exIdx]: updated };
-    });
+    // Compute the next state first so side effects (timer, toast, advance)
+    // run exactly once, outside the React updater.
+    const updated = [...(logs[exIdx] || [])];
+    if (!updated[setIdx]) return;
+    const nowDone = !updated[setIdx].done;
+    updated[setIdx] = { ...updated[setIdx], done: nowDone };
+    const next = { ...logs, [exIdx]: updated };
+    setLogs(next);
+
+    if (!nowDone) return;
+
+    // Auto-start the rest timer on every completed set.
+    setRestTrigger(Date.now());
+
+    // If the whole exercise is now done, advance to the next unfinished one.
+    if (activePlan && updated.every(s => s.done)) {
+      const nextIdx = activePlan.exercises.findIndex((_, i) =>
+        i !== exIdx && !((next[i] || []).length > 0 && (next[i] || []).every(s => s.done))
+      );
+      if (nextIdx !== -1) {
+        showToast(`✅ ${activePlan.exercises[exIdx].name} done — next: ${activePlan.exercises[nextIdx].name}`);
+        setTimeout(() => setActiveExIdx(nextIdx), 700);
+      } else {
+        showToast('🎉 All exercises done — hit Finish workout!');
+      }
+    }
   };
 
   const addSet = (exIdx) => {
@@ -226,18 +265,20 @@ export default function WorkoutPage() {
   const getAICoachNote = async (summary) => {
     setCoachNoteLoading(true);
     try {
+      const p = `${userName} just finished a ${activePlan.name} session. ${summary}. Write a short motivating post-session note. 2-3 sentences.`;
       const res = await fetch(AI_COACH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY },
-        body: JSON.stringify({ message: `${userName} just finished a ${activePlan.name} session. ${summary}. Write a short motivating post-session note. 2-3 sentences.` })
+        // Send both keys / accept either shape — the function contract varies.
+        body: JSON.stringify({ message: p, prompt: p })
       });
-      if (res.ok) { const data = await res.json(); setCoachNote(data.reply); }
+      if (res.ok) { const data = await res.json(); setCoachNote(data.reply || data.message); }
     } catch {} finally { setCoachNoteLoading(false); }
   };
 
   const handleSave = async () => {
     if (!userId || !activePlan) return;
-    if (userId === 'demo') { setSaved(true); setTimeout(() => setSaved(false), 3000); return; }
+    if (userId === 'demo') { setSaved(true); setFinishQuote(randomQuote()); setTimeout(() => setSaved(false), 3000); return; }
     setSaving(true); setError(null);
     try {
       await Promise.all(activePlan.exercises.map((ex, idx) =>
@@ -248,6 +289,7 @@ export default function WorkoutPage() {
         })
       ));
       setSaved(true);
+      setFinishQuote(randomQuote());
       const summary = activePlan.exercises.map((ex, idx) => {
         const sets = (logs[idx] || []).filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
         return sets ? `${ex.name}: ${sets}` : null;
@@ -317,6 +359,20 @@ export default function WorkoutPage() {
       </div>
 
       <div style={{ padding: '0 20px' }}>
+
+        {/* ── EXERCISE PAGER ── */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          {activePlan.exercises.map((_, i) => {
+            const exDone = (logs[i] || []).length > 0 && (logs[i] || []).every(s => s.done);
+            return (
+              <div key={i} style={{
+                flex: 1, height: 4, borderRadius: 999,
+                background: i === activeExIdx ? 'var(--accent)' : exDone ? 'var(--accent)' : 'var(--soft)',
+                opacity: i === activeExIdx ? 1 : exDone ? 0.4 : 1,
+              }} />
+            );
+          })}
+        </div>
 
         {/* ── PROGRESS STATS ── */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
@@ -462,7 +518,7 @@ export default function WorkoutPage() {
         padding: '12px 16px',
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 12, alignItems: 'center' }}>
-          <RestTimer />
+          <RestTimer trigger={restTrigger} onDone={() => showToast('⏱ Rest over — go!')} />
           <button onClick={handleSave} disabled={saving} style={{
             background: saved ? 'var(--accent-strong)' : 'var(--accent)',
             border: 'none', borderRadius: 14, padding: '15px 0',
@@ -473,6 +529,17 @@ export default function WorkoutPage() {
           </button>
         </div>
       </div>
+
+      {/* ── TOAST ── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(130px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 150, background: 'var(--ai-card-1)', color: '#fff', fontSize: 13, fontWeight: 600,
+          padding: '10px 18px', borderRadius: 999, maxWidth: 'calc(100% - 40px)', textAlign: 'center',
+        }}>
+          {toast}
+        </div>
+      )}
 
       <BottomNav />
 

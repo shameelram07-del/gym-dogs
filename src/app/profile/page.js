@@ -12,7 +12,27 @@ const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const emptyStats = { weight: '', height: '', age: '', bodyFat: '' };
-const mockGoals = ['Build muscle', 'Get stronger', 'Lose body fat'];
+
+// Labels for the ids saved by the onboarding flow.
+const GOAL_LABELS = {
+  build_muscle: 'Build muscle', lose_fat: 'Lose body fat', get_stronger: 'Get stronger',
+  improve_fitness: 'Improve fitness', athletic: 'Athletic performance', general_health: 'General health',
+};
+const EQUIP_LABELS = {
+  full_gym: 'Full gym', home_gym: 'Home gym', dumbbells: 'Dumbbells only',
+  resistance: 'Resistance bands', bodyweight: 'Bodyweight only', outdoor: 'Outdoor / park',
+};
+
+// Build the goal chips from real onboarding answers; fall back to a nudge if none.
+function goalChips(onboarding) {
+  if (!onboarding) return null;
+  const chips = [];
+  (onboarding.goals || []).forEach(g => { if (GOAL_LABELS[g]) chips.push({ text: GOAL_LABELS[g], hot: true }); });
+  if (onboarding.days) chips.push({ text: `${onboarding.days} days/wk`, hot: false });
+  if (onboarding.duration) chips.push({ text: `${onboarding.duration} min`, hot: false });
+  (onboarding.equipment || []).slice(0, 1).forEach(e => { if (EQUIP_LABELS[e]) chips.push({ text: EQUIP_LABELS[e], hot: false }); });
+  return chips.length > 0 ? chips : null;
+}
 
 function calcStreak(logs) {
   if (!logs || logs.length === 0) return 0;
@@ -50,8 +70,23 @@ function calcPRCount(logs) {
 function calcTotalSessions(logs) {
   return new Set(logs.map(l => l.date).filter(Boolean)).size;
 }
-function getJoinDate() {
-  return new Date().toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+
+// "Member since" = the month of your first logged session (was always the current month).
+function getJoinDate(logs) {
+  const dates = (logs || []).map(l => l.date).filter(Boolean).sort();
+  const first = dates.length > 0 ? new Date(dates[0]) : new Date();
+  return first.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+}
+
+function calcTotalVolume(logs) {
+  let total = 0;
+  (logs || []).forEach(log => {
+    try {
+      const sets = JSON.parse(log.sets_data || '[]');
+      sets.forEach(s => { if (s.kg && s.reps) total += parseFloat(s.kg) * parseFloat(s.reps); });
+    } catch (e) {}
+  });
+  return total;
 }
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
@@ -87,7 +122,7 @@ export default function ProfilePage() {
     const uid = user.localAccountId;
     setUserId(uid);
     setUserEmail(user.username || '');
-    setJoinDate(getJoinDate());
+    setJoinDate(getJoinDate([])); // fallback; replaced by first-log date once logs load
 
     const entraName = user.name && user.name !== 'unknown'
       ? user.name
@@ -125,7 +160,11 @@ export default function ProfilePage() {
     const fetchLogs = async () => {
       try {
         const res = await fetch(`${API_URL}?userId=${userId}`, { headers: { 'x-functions-key': API_KEY } });
-        if (res.ok) setLogs(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setLogs(data);
+          setJoinDate(getJoinDate(data));
+        }
       } catch (e) {}
       finally { setStatsLoading(false); }
     };
@@ -180,11 +219,14 @@ export default function ProfilePage() {
   const totalSessions = calcTotalSessions(logs);
   const streak = calcStreak(logs);
   const prCount = calcPRCount(logs);
+  const totalVolume = calcTotalVolume(logs);
+  const myGoals = goalChips(profileRef?.onboarding);
 
   const ACHIEVEMENTS = [
-    { emoji: '🔥', label: '14-day streak', earned: streak >= 14 },
     { emoji: '🥇', label: 'First PR',      earned: prCount >= 1 },
     { emoji: '🏆', label: '5 PRs set',     earned: prCount >= 5 },
+    { emoji: '💪', label: '10 tonnes',     earned: totalVolume >= 10000 },
+    { emoji: '🔥', label: '14-day streak', earned: streak >= 14 },
   ];
   const BODY_STATS = [
     { key: 'weight',  label: 'Weight',   unit: 'kg' },
@@ -231,14 +273,27 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* ── MY GOALS ── */}
+        {/* ── MY GOALS (from onboarding answers) ── */}
         <div>
           <p style={{ ...eyebrow, marginLeft: 4, marginBottom: 9 }}>My goals</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {mockGoals.map((g, i) => (
-              <span key={i} style={{ fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 999, background: 'var(--accent-tint)', color: 'var(--accent-strong)' }}>{g}</span>
-            ))}
-          </div>
+          {myGoals ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {myGoals.map((g, i) => (
+                <span key={i} style={{
+                  fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 999,
+                  background: g.hot ? 'var(--accent-tint)' : 'var(--soft)',
+                  color: g.hot ? 'var(--accent-strong)' : 'var(--ink-2)',
+                }}>{g.text}</span>
+              ))}
+            </div>
+          ) : (
+            <button onClick={() => router.push('/onboarding')} style={{
+              width: '100%', background: 'var(--soft)', border: '1px dashed var(--line)', borderRadius: 14,
+              padding: 14, color: 'var(--ink-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}>
+              Answer a few questions to set your goals →
+            </button>
+          )}
         </div>
 
         {/* ── BODY STATS ── */}
@@ -278,7 +333,7 @@ export default function ProfilePage() {
         {/* ── ACHIEVEMENTS ── */}
         <div style={cardStyle}>
           <p style={{ ...eyebrow, marginBottom: 12 }}>Achievements</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 9 }}>
             {ACHIEVEMENTS.map((a, i) => (
               <div key={i} style={{
                 background: a.earned ? 'var(--accent-tint)' : 'var(--soft)',

@@ -130,6 +130,14 @@ export default function ProgressPage() {
   );
   const [savingSoreness, setSavingSoreness] = useState(false);
   const [sorenessSaved, setSorenessSaved] = useState(false);
+  const [chartOn, setChartOn] = useState(false); // bars grow in after load
+
+  useEffect(() => {
+    if (!loading) {
+      const t = setTimeout(() => setChartOn(true), 120);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
 
   useEffect(() => {
     if (inProgress === 'startup') return;
@@ -238,7 +246,7 @@ export default function ProgressPage() {
                   <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>
                     {d.rawVolume >= 1000 ? `${(d.rawVolume/1000).toFixed(1)}k` : Math.round(d.rawVolume)}
                   </span>
-                  <div style={{ width: '100%', height: `${Math.max(d.volume, 5)}%`, background: d.isCurrent ? 'var(--accent)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.4s' }} />
+                  <div style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--accent)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{d.week}</span>
                 </div>
               ))}

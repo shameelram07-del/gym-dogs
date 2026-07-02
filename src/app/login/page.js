@@ -4,15 +4,34 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
+import QuoteCard from '@/components/QuoteCard';
+
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 export default function LoginPage() {
   const { instance, accounts } = useMsal();
   const router = useRouter();
 
   useEffect(() => {
-    if (accounts && accounts.length > 0) {
+    if (!accounts || accounts.length === 0) return;
+    // New users (no profile / onboarding not finished) go to onboarding first.
+    // If the profile check fails for any reason, fail open to the dashboard.
+    (async () => {
+      try {
+        const uid = accounts[0].localAccountId;
+        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY || '' } });
+        if (res.ok) {
+          const data = await res.json();
+          const profile = Array.isArray(data) ? data[0] : data;
+          if (!profile || profile.error || !profile.onboardingComplete) {
+            router.push('/onboarding');
+            return;
+          }
+        }
+      } catch (e) {}
       router.push('/dashboard');
-    }
+    })();
   }, [accounts, router]);
 
   const handleLogin = () => {
@@ -55,6 +74,7 @@ export default function LoginPage() {
         <p style={{ margin: '10px 0 0', fontSize: 16, color: 'var(--ink-2)', fontWeight: 500 }}>
           Train smart. Recover smarter.
         </p>
+        <div style={{ marginTop: 20, maxWidth: 300 }}><QuoteCard plain /></div>
       </div>
 
       {/* ── ACTIONS ── */}

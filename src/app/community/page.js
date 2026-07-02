@@ -39,9 +39,21 @@ export default function CommunityPage() {
   const [joined, setJoined] = useState(false);
   const [firedPosts, setFiredPosts] = useState({});
   const [notice, setNotice] = useState('');
+  const [commentOn, setCommentOn] = useState(null); // post id with comment box open
+  const [commentText, setCommentText] = useState('');
 
   const toggleFire = (id) => setFiredPosts(prev => ({ ...prev, [id]: !prev[id] }));
   const showNotice = (msg) => { setNotice(msg); setTimeout(() => setNotice(''), 1800); };
+  const sendComment = () => {
+    if (!commentText.trim()) return;
+    showNotice('💬 Comment posted (local only — needs the posts API)');
+    setCommentText('');
+    setCommentOn(null);
+  };
+
+  // Mock challenge progress until a posts/challenges API exists.
+  const CHALLENGE = { done: 9800, goal: 10000 };
+  const chalPct = Math.min((CHALLENGE.done / CHALLENGE.goal) * 100, 100);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
@@ -63,7 +75,12 @@ export default function CommunityPage() {
         <div style={{ background: 'linear-gradient(135deg, var(--violet), var(--blue))', borderRadius: 22, padding: 18, color: '#fff' }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', opacity: 0.85 }}>WEEKLY CHALLENGE</p>
           <p style={{ margin: '6px 0 4px', fontSize: 20, fontWeight: 800 }}>10,000 kg club</p>
-          <p style={{ margin: '0 0 14px', fontSize: 13, opacity: 0.9 }}>Lift 10 tonnes this week · 1,245 joining · 5 days left</p>
+          <div style={{ background: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 8, margin: '12px 0 6px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${chalPct}%`, background: '#fff', borderRadius: 999, transition: 'width 1s ease' }} />
+          </div>
+          <p style={{ margin: '0 0 14px', fontSize: 12, opacity: 0.9 }}>
+            <b>{CHALLENGE.done.toLocaleString()} / {CHALLENGE.goal.toLocaleString()} kg</b> · {(CHALLENGE.goal - CHALLENGE.done).toLocaleString()} kg to go · 5 days left
+          </p>
           <button onClick={() => setJoined(j => !j)} style={{
             background: joined ? 'rgba(255,255,255,0.18)' : '#fff',
             color: joined ? '#fff' : '#3A1D9E', border: 'none', borderRadius: 14,
@@ -112,11 +129,24 @@ export default function CommunityPage() {
                     <button onClick={() => toggleFire(post.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: fired ? 'var(--orange)' : 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
                       🔥 {fired ? post.fires + 1 : post.fires}
                     </button>
-                    <button onClick={() => showNotice('Comments — coming soon')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
+                    <button onClick={() => { setCommentOn(commentOn === post.id ? null : post.id); setCommentText(''); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
                       💬 {post.comments}
                     </button>
                     <button onClick={() => showNotice('More — coming soon')} aria-label="More" style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-3)', fontSize: 18, letterSpacing: 2 }}>···</button>
                   </div>
+                  {commentOn === post.id && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <input
+                        autoFocus
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') sendComment(); }}
+                        placeholder={`Reply to ${post.name}…`}
+                        style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 999, padding: '9px 14px', color: 'var(--ink)', fontSize: 13, outline: 'none' }}
+                      />
+                      <button onClick={sendComment} style={{ border: 'none', background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: 999, padding: '0 16px', fontWeight: 800, cursor: 'pointer' }}>↑</button>
+                    </div>
+                  )}
                 </div>
               );
             })}

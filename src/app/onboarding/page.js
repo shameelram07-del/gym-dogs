@@ -205,8 +205,15 @@ export default function OnboardingPage() {
         <div style={{ height: 4, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${((currentStep + 1) / totalSteps) * 100}%`, background: 'var(--accent)', borderRadius: 999, transition: 'width 0.4s ease' }} />
         </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8, letterSpacing: '0.09em', fontWeight: 600 }}>
-          STEP {currentStep + 1} OF {totalSteps}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.09em', fontWeight: 600 }}>
+            STEP {currentStep + 1} OF {totalSteps}
+          </div>
+          <button onClick={async () => { await saveOnboarding(); router.push('/dashboard'); }} style={{
+            background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
+          }}>
+            Skip for now
+          </button>
         </div>
       </div>
 
