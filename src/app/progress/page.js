@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import QuoteCard from '@/components/QuoteCard';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -324,6 +325,9 @@ export default function ProgressPage() {
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3' }}>{aiNote}</p>
         </div>
+
+        {/* ── GYM DADDY ── */}
+        <QuoteCard mode="random" plain />
 
       </div>
 

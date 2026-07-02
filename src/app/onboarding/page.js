@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
+import QuoteCard from '@/components/QuoteCard';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
@@ -186,6 +187,10 @@ export default function OnboardingPage() {
               <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>{b.sub}</div>
             </div>
           ))}
+        </div>
+
+        <div style={{ marginTop: 28, maxWidth: 320 }}>
+          <QuoteCard mode="random" plain />
         </div>
       </div>
     );

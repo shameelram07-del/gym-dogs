@@ -157,7 +157,8 @@ export default function WorkoutPage() {
     }
     const user = accounts[0];
     setUserId(user.localAccountId);
-    const name = user.name && user.name !== 'unknown'
+    const isGuid = (s) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.trim());
+    const name = user.name && user.name !== 'unknown' && !isGuid(user.name)
       ? user.name.split(' ')[0]
       : user.username?.split('@')[0] || 'Athlete';
     setUserName(name);
@@ -401,6 +402,14 @@ export default function WorkoutPage() {
               ? <div style={{ display: 'flex', gap: 4 }}>{[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#9B82FF' }} />)}</div>
               : <p style={{ margin: 0, fontSize: 13, color: '#D9D9E3', lineHeight: 1.5 }}>{coachNote}</p>
             }
+          </div>
+        )}
+
+        {/* ── GYM DADDY QUOTE (after saving) ── */}
+        {finishQuote && (
+          <div style={{ background: 'var(--accent-tint)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
+            <p style={{ margin: '0 0 4px', fontSize: 10, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>🐕 GYM DADDY</p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.5 }}>&ldquo;{finishQuote}&rdquo;</p>
           </div>
         )}
 

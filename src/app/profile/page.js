@@ -124,7 +124,8 @@ export default function ProfilePage() {
     setUserEmail(user.username || '');
     setJoinDate(getJoinDate([])); // fallback; replaced by first-log date once logs load
 
-    const entraName = user.name && user.name !== 'unknown'
+    const isGuid = (s) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s.trim());
+    const entraName = user.name && user.name !== 'unknown' && !isGuid(user.name)
       ? user.name
       : user.username?.split('@')[0] || 'Athlete';
     setUserName(entraName);

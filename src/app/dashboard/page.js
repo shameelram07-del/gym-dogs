@@ -21,6 +21,13 @@ function titleCase(s) {
   return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Some Entra accounts have their display name set to the account GUID —
+// don't greet people with "Good morning, 6d765ac9-…".
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function looksLikeGuid(s) {
+  return !!s && GUID_RE.test(s.trim());
+}
+
 // Pull the sets out of a gymLogs doc. Workout saves them as a JSON string in
 // `sets_data`, but older docs may have an `exercises` array — handle both.
 function logSets(log) {
@@ -131,9 +138,9 @@ export default function DashboardPage() {
     const account = accounts[0];
     const uid = account.localAccountId;
     setUserId(uid);
-    const msalName = (account.name && account.name !== 'unknown')
+    const msalName = (account.name && account.name !== 'unknown' && !looksLikeGuid(account.name))
       ? account.name
-      : account.username?.split('@')[0] || '...';
+      : account.username?.split('@')[0] || '';
     setUserName(titleCase(msalName));
     loadDashboardData(uid);
   }, [accounts]);
@@ -229,7 +236,7 @@ export default function DashboardPage() {
           setReadiness(profile.readiness);
           setTimeout(() => setRingOn(true), 150);
         }
-        if (profile.name && profile.name.length < 50) {
+        if (profile.name && profile.name.length < 50 && !looksLikeGuid(profile.name)) {
           setUserName(titleCase(profile.name));
         }
       }
