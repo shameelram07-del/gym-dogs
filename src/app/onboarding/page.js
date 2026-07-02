@@ -75,7 +75,8 @@ export default function OnboardingPage() {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
         if (res.ok) {
           const data = await res.json();
-          const p = Array.isArray(data) ? data[0] : data;
+          // Find THIS user's profile — data[0] could be someone else's document.
+          const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
           if (p && !p.error) setProfileRef(p);
         }
       } catch (e) {}
@@ -91,6 +92,9 @@ export default function OnboardingPage() {
         body: JSON.stringify({ ...(profileRef || {}), userId, onboarding: answers, onboardingComplete: true }),
       });
     } catch (e) {}
+    // Remember on this device so login never loops back to onboarding,
+    // even if the profile read is flaky.
+    try { localStorage.setItem('gd-onboarded', userId); } catch (e) {}
   }
 
   const step = STEPS[currentStep];

@@ -59,7 +59,8 @@ export default function NutritionPage() {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
         if (res.ok) {
           const data = await res.json();
-          const p = Array.isArray(data) ? data[0] : data;
+          // Find THIS user's profile — [0] could be someone else's once more users exist.
+          const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
           if (p && !p.error) {
             setProfileRef(p);
             if (p.nutrition && p.nutrition.date === TODAY) {

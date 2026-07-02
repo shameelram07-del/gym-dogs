@@ -136,7 +136,8 @@ export default function ProfilePage() {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
         if (res.ok) {
           const data = await res.json();
-          const profile = Array.isArray(data) ? data[0] : null;
+          // Find THIS user's profile — [0] could be someone else's once more users exist.
+          const profile = Array.isArray(data) ? data.find((p) => p.userId === uid) : null;
           if (profile) {
             setProfileRef(profile);
             if (profile.name && profile.name !== uid) {

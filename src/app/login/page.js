@@ -18,16 +18,31 @@ export default function LoginPage() {
     // New users (no profile / onboarding not finished) go to onboarding first.
     // If the profile check fails for any reason, fail open to the dashboard.
     (async () => {
+      const uid = accounts[0].localAccountId;
+
+      // Fast path: this device already completed onboarding for this account.
       try {
-        const uid = accounts[0].localAccountId;
+        if (localStorage.getItem('gd-onboarded') === uid) {
+          router.push('/dashboard');
+          return;
+        }
+      } catch (e) {}
+
+      try {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY || '' } });
         if (res.ok) {
           const data = await res.json();
-          const profile = Array.isArray(data) ? data[0] : data;
-          if (!profile || profile.error || !profile.onboardingComplete) {
-            router.push('/onboarding');
+          // The API may return a list — find THIS user's profile, don't grab the first one.
+          const profile = Array.isArray(data)
+            ? data.find((p) => p.userId === uid)
+            : data;
+          if (profile && !profile.error && profile.onboardingComplete) {
+            try { localStorage.setItem('gd-onboarded', uid); } catch (e) {}
+            router.push('/dashboard');
             return;
           }
+          router.push('/onboarding');
+          return;
         }
       } catch (e) {}
       router.push('/dashboard');

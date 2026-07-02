@@ -229,7 +229,10 @@ export default function DashboardPage() {
         headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
       });
       const profileData = await profileRes.json();
-      const profile = Array.isArray(profileData) ? profileData[0] : profileData;
+      // Find THIS user's profile — [0] could be someone else's once more users exist.
+      const profile = Array.isArray(profileData)
+        ? profileData.find((p) => p.userId === uid)
+        : profileData;
 
       if (profile && !profile.error) {
         if (profile.readiness) {
