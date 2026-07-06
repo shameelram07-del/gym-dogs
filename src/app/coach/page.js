@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import BottomNav from '@/components/BottomNav';
+import Reveal from '@/components/Reveal';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
@@ -191,6 +192,7 @@ export default function CoachDashboard() {
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── STATS ── */}
+        <Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {[
             { value: `${trainedToday}/${clients.length}`, label: 'trained today', color: 'var(--accent-strong)' },
@@ -203,8 +205,10 @@ export default function CoachDashboard() {
             </div>
           ))}
         </div>
+        </Reveal>
 
         {/* ── TAB SWITCHER ── */}
+        <Reveal delay={60}>
         <div style={{ display: 'flex', background: 'var(--soft)', borderRadius: 14, padding: 4, gap: 4 }}>
           {[{ key: 'clients', label: 'Clients' }, { key: 'plans', label: 'Plan builder' }].map(tab => (
             <button key={tab.key} onClick={() => setView(tab.key)} style={{
@@ -214,6 +218,7 @@ export default function CoachDashboard() {
             }}>{tab.label}</button>
           ))}
         </div>
+        </Reveal>
 
         {/* ══ CLIENTS ══ */}
         {view === 'clients' && (
@@ -243,11 +248,12 @@ export default function CoachDashboard() {
               ))}
             </div>
 
-            {filteredClients.map(client => {
+            {filteredClients.map((client, ci) => {
               const rs = readinessStyle(client.readiness);
               const open = selectedClient?.id === client.id;
               return (
-                <button key={client.id} onClick={() => setSelectedClient(open ? null : client)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                <Reveal key={client.id} delay={120 + ci * 50}>
+                <button onClick={() => setSelectedClient(open ? null : client)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ background: 'var(--card)', border: `1px solid ${open ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 18, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <Avatar initials={client.initials} size={44} online={client.trainedToday} />
@@ -286,6 +292,7 @@ export default function CoachDashboard() {
                     )}
                   </div>
                 </button>
+                </Reveal>
               );
             })}
           </>
@@ -304,6 +311,7 @@ export default function CoachDashboard() {
 
             <p style={{ ...eyebrow, marginLeft: 4 }}>Create new session</p>
 
+            <Reveal delay={100}>
             <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <p style={fieldLabel}>Session name</p>
@@ -327,7 +335,9 @@ export default function CoachDashboard() {
                 <input type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
+            </Reveal>
 
+            <Reveal delay={140}>
             <button onClick={generatePlan} disabled={generating} style={{
               width: '100%', background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`,
               color: '#fff', border: 'none', borderRadius: 16, padding: 15, fontSize: 14, fontWeight: 700,
@@ -335,6 +345,7 @@ export default function CoachDashboard() {
             }}>
               {generating ? 'Generating…' : `✨ Generate ${planTag.toLowerCase()} plan with AI`}
             </button>
+            </Reveal>
 
             <p style={{ ...eyebrow, marginLeft: 4 }}>Exercises</p>
 

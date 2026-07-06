@@ -6,6 +6,7 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import QuoteCard from '@/components/QuoteCard';
+import Reveal from '@/components/Reveal';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 
@@ -131,7 +132,13 @@ export default function DashboardPage() {
   const [askedWhy, setAskedWhy]     = useState(false);
   const [readiness, setReadiness]   = useState(null);
   const [ringOn, setRingOn]         = useState(false);
+  const [showSetup, setShowSetup]   = useState(false); // gentle onboarding nudge
   const [loading, setLoading]       = useState(true);
+
+  const dismissSetup = () => {
+    setShowSetup(false);
+    try { localStorage.setItem('gd-setup-dismissed', userId); } catch (e) {}
+  };
 
   useEffect(() => {
     if (!accounts || accounts.length === 0) return;
@@ -244,6 +251,15 @@ export default function DashboardPage() {
         }
       }
 
+      // Nudge (not force) onboarding if it has never been completed —
+      // skipped if done on this device or previously dismissed.
+      try {
+        const done = (profile && !profile.error && profile.onboardingComplete)
+          || localStorage.getItem('gd-onboarded') === uid;
+        const dismissed = localStorage.getItem('gd-setup-dismissed') === uid;
+        if (!done && !dismissed) setShowSetup(true);
+      } catch (e) {}
+
       askCoach(`Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${weekSessions} sessions this week.`);
 
     } catch (err) {
@@ -299,8 +315,26 @@ export default function DashboardPage() {
 
       <div style={{ padding: '0 20px' }}>
 
+        {/* ── SETUP NUDGE ── */}
+        {showSetup && (
+          <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--accent)', padding: '14px 16px' }}>
+            <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎯</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Set up your training profile</p>
+              <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>2 minutes — personalises your plan and coach</p>
+            </div>
+            <button onClick={() => router.push('/onboarding')} style={{ flexShrink: 0, background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '9px 14px', color: 'var(--on-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Start
+            </button>
+            <button onClick={dismissSetup} aria-label="Dismiss" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px' }}>
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* ── WEEK STRIP ── */}
         {weekDays.length > 0 && (
+          <Reveal>
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
             {weekDays.map((d, i) => (
               <div key={i} style={{
@@ -317,10 +351,12 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+          </Reveal>
         )}
 
         {/* ── LEVEL / XP ── */}
         {levelInfo && (
+          <Reveal delay={60}>
           <div style={{ ...card, padding: '14px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -341,9 +377,11 @@ export default function DashboardPage() {
               }} />
             </div>
           </div>
+          </Reveal>
         )}
 
         {/* ── READINESS ── */}
+        <Reveal delay={100}>
         <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 18 }}>
           <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
             <svg width="100" height="100" viewBox="0 0 120 120">
@@ -367,8 +405,10 @@ export default function DashboardPage() {
             <p style={{ margin: '7px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)' }}>{readinessSub}</p>
           </div>
         </div>
+        </Reveal>
 
         {/* ── TODAY'S SESSION ── */}
+        <Reveal delay={140}>
         <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '18px 18px 14px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -405,8 +445,10 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        </Reveal>
 
         {/* ── THIS WEEK ── */}
+        <Reveal delay={180}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px 9px' }}>
           <p style={eyebrow}>This week</p>
           <button onClick={() => router.push('/progress')} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
@@ -418,8 +460,10 @@ export default function DashboardPage() {
           <Stat value={weekStats.kgLifted !== null ? <CountUp value={weekStats.kgLifted} format="k" /> : '—'} label="kg lifted" />
           <Stat value={weekStats.streak !== null ? <CountUp value={weekStats.streak} /> : '—'} label="day streak" color="var(--orange)" suffix="🔥" />
         </div>
+        </Reveal>
 
         {/* ── AI COACH ── */}
+        <Reveal delay={220}>
         <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 22, padding: 18, marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>✨</span>
@@ -440,9 +484,13 @@ export default function DashboardPage() {
             </button>
           )}
         </div>
+        </Reveal>
 
+        <Reveal delay={260}>
         <div style={{ marginBottom: 14 }}><QuoteCard /></div>
+        </Reveal>
 
+        <Reveal delay={300}>
         <button onClick={() => router.push('/nutrition')} style={{ ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
           <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🥗</div>
           <div style={{ flex: 1 }}>
@@ -451,6 +499,7 @@ export default function DashboardPage() {
           </div>
           <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
         </button>
+        </Reveal>
 
       </div>
 

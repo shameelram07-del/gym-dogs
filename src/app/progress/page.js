@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import QuoteCard from '@/components/QuoteCard';
+import Reveal from '@/components/Reveal';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -217,6 +218,7 @@ export default function ProgressPage() {
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* ── STATS ── */}
+        <Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {[
             { value: loading ? '—' : totalSessions, label: 'sessions', color: 'var(--ink)' },
@@ -229,8 +231,10 @@ export default function ProgressPage() {
             </div>
           ))}
         </div>
+        </Reveal>
 
         {/* ── WEEKLY VOLUME ── */}
+        <Reveal delay={60}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <p style={eyebrow}>Weekly volume</p>
@@ -254,8 +258,10 @@ export default function ProgressPage() {
             </div>
           )}
         </div>
+        </Reveal>
 
         {/* ── SORENESS ── */}
+        <Reveal delay={110}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div>
@@ -295,8 +301,10 @@ export default function ProgressPage() {
             </div>
           </div>
         </div>
+        </Reveal>
 
         {/* ── PERSONAL RECORDS ── */}
+        <Reveal delay={150}>
         <div style={cardStyle}>
           <p style={{ ...eyebrow, marginBottom: 6 }}>Personal records</p>
           {loading ? (
@@ -316,8 +324,10 @@ export default function ProgressPage() {
             ))
           )}
         </div>
+        </Reveal>
 
         {/* ── AI RECOVERY NOTE ── */}
+        <Reveal delay={190}>
         <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 22, padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>✨</span>
@@ -325,9 +335,12 @@ export default function ProgressPage() {
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3' }}>{aiNote}</p>
         </div>
+        </Reveal>
 
         {/* ── GYM DADDY ── */}
+        <Reveal delay={230}>
         <QuoteCard mode="random" plain />
+        </Reveal>
 
       </div>
 

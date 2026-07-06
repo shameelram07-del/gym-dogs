@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import Reveal from '@/components/Reveal';
 
 // Placeholder data — swap for real CosmosDB data once the social feed is built.
 const LEADERBOARD = [
@@ -72,6 +73,7 @@ export default function CommunityPage() {
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── CHALLENGE ── */}
+        <Reveal>
         <div style={{ background: 'linear-gradient(135deg, var(--violet), var(--blue))', borderRadius: 22, padding: 18, color: '#fff' }}>
           <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', opacity: 0.85 }}>WEEKLY CHALLENGE</p>
           <p style={{ margin: '6px 0 4px', fontSize: 20, fontWeight: 800 }}>10,000 kg club</p>
@@ -89,12 +91,18 @@ export default function CommunityPage() {
             {joined ? '✓ Joined' : 'Join challenge'}
           </button>
         </div>
+        </Reveal>
 
         {/* ── LEADERBOARD ── */}
+        <Reveal delay={60}>
         <div style={cardStyle}>
           <p style={{ ...eyebrow, marginBottom: 6 }}>Leaderboard</p>
           {LEADERBOARD.map((u, i) => (
-            <div key={u.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderTop: i === 0 ? 'none' : '1px solid var(--line-2)' }}>
+            <div key={u.name} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0',
+              borderTop: i === 0 || u.me ? 'none' : '1px solid var(--line-2)',
+              ...(u.me ? { background: 'var(--accent-tint)', margin: '0 -10px', padding: '11px 10px', borderRadius: 12 } : {}),
+            }}>
               {i < 3 ? (
                 <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{i + 1}</div>
               ) : (
@@ -108,15 +116,17 @@ export default function CommunityPage() {
             </div>
           ))}
         </div>
+        </Reveal>
 
         {/* ── FEED ── */}
         <div>
           <p style={{ ...eyebrow, marginLeft: 4, marginBottom: 10 }}>Feed</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {FEED.map(post => {
+            {FEED.map((post, pi) => {
               const fired = firedPosts[post.id];
               return (
-                <div key={post.id} style={cardStyle}>
+                <Reveal key={post.id} delay={120 + pi * 60}>
+                <div style={cardStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 10 }}>
                     <Avatar initial={post.initial} size={38} />
                     <div>
@@ -148,6 +158,7 @@ export default function CommunityPage() {
                     </div>
                   )}
                 </div>
+                </Reveal>
               );
             })}
           </div>
