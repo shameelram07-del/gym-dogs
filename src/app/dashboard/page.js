@@ -133,6 +133,7 @@ export default function DashboardPage() {
   const [readiness, setReadiness]   = useState(null);
   const [ringOn, setRingOn]         = useState(false);
   const [showSetup, setShowSetup]   = useState(false); // gentle onboarding nudge
+  const [sessionOpen, setSessionOpen] = useState(false); // expandable exercise list
   const [loading, setLoading]       = useState(true);
 
   const dismissSetup = () => {
@@ -410,12 +411,22 @@ export default function DashboardPage() {
         {/* ── TODAY'S SESSION ── */}
         <Reveal delay={140}>
         <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '18px 18px 14px' }}>
+          <div
+            onClick={() => todayPlan?.exercises?.length && setSessionOpen(o => !o)}
+            style={{ padding: '18px 18px 14px', cursor: todayPlan?.exercises?.length ? 'pointer' : 'default' }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p style={eyebrow}>Today&rsquo;s session</p>
                 <p style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>
                   {sessionName || 'Rest day'}
+                  {todayPlan?.exercises?.length ? (
+                    <span style={{
+                      display: 'inline-block', marginLeft: 8, fontSize: 13, color: 'var(--ink-3)',
+                      transform: sessionOpen ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }}>›</span>
+                  ) : null}
                 </p>
               </div>
               <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
@@ -430,6 +441,27 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* smooth unfold: the exercise list opens like Apple's product cards */}
+          {todayPlan?.exercises?.length > 0 && (
+            <div style={{
+              display: 'grid',
+              gridTemplateRows: sessionOpen ? '1fr' : '0fr',
+              transition: 'grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
+            }}>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '2px 18px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {todayPlan.exercises.map((ex, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', flexShrink: 0 }}>{i + 1}</div>
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{ex.name}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)', flexShrink: 0 }}>{ex.sets} × {ex.reps}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {todayPlan ? (
             <button onClick={() => router.push('/workout')} style={{
               width: '100%', border: 'none', background: 'var(--accent)', color: 'var(--on-accent)',

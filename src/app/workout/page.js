@@ -138,6 +138,8 @@ export default function WorkoutPage() {
   const [coachNoteLoading, setCoachNoteLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [finishQuote, setFinishQuote] = useState('');
+  const [shared, setShared] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
   const [toast, setToast] = useState('');
   const toastRef = useRef(null);
@@ -178,7 +180,7 @@ export default function WorkoutPage() {
     }
     (async () => {
       try {
-        const res = await fetch(PLANS_API_URL, { headers: { 'x-functions-key': PLANS_API_KEY } });
+        const res = await fetch(`${PLANS_API_URL}?userId=${userId}`, { headers: { 'x-functions-key': PLANS_API_KEY } });
         if (res.ok) {
           const data = await res.json();
           setActivePlan(data);
@@ -301,6 +303,29 @@ export default function WorkoutPage() {
     finally { setSaving(false); }
   };
 
+  const shareToFeed = async () => {
+    if (!userId || !activePlan || shared || sharing) return;
+    setSharing(true);
+    try {
+      const vol = Object.values(logs).flat().reduce((a, s) => a + (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0), 0);
+      const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k` : `${Math.round(vol)}`;
+      const nSets = Object.values(logs).flat().filter(s => s.done || s.kg || s.reps).length;
+      const res = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY || '' },
+        body: JSON.stringify({
+          userId,
+          name: userName,
+          text: `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume 💪`,
+          tag: '🏋️ Session done',
+        }),
+      });
+      if (res.ok) { setShared(true); showToast('🔥 Posted to the community feed'); }
+      else showToast('Could not share — try again');
+    } catch (e) { showToast('Could not share — try again'); }
+    finally { setSharing(false); }
+  };
+
   const formatLast = (exIdx) => {
     const sets = lastSession[exIdx];
     if (!sets || sets.length === 0) return null;
@@ -405,11 +430,20 @@ export default function WorkoutPage() {
           </div>
         )}
 
-        {/* ── GYM DADDY QUOTE (after saving) ── */}
+        {/* ── GYM DADDY QUOTE + SHARE (after saving) ── */}
         {finishQuote && (
           <div style={{ background: 'var(--accent-tint)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
             <p style={{ margin: '0 0 4px', fontSize: 10, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>🐕 GYM DADDY</p>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.5 }}>&ldquo;{finishQuote}&rdquo;</p>
+            <button onClick={shareToFeed} disabled={shared || sharing} style={{
+              marginTop: 12, width: '100%', border: 'none', borderRadius: 12, padding: '11px 0',
+              background: shared ? 'var(--soft)' : 'var(--accent)',
+              color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
+              fontSize: 13, fontWeight: 700, cursor: shared ? 'default' : 'pointer',
+              opacity: sharing ? 0.7 : 1,
+            }}>
+              {shared ? '✓ Shared with the pack' : sharing ? 'Sharing…' : '🔥 Share to the pack'}
+            </button>
           </div>
         )}
 

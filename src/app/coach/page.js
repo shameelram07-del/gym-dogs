@@ -12,15 +12,11 @@ const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
-const clients = [
-  { id: 1, name: 'Joel',   initials: 'JM', goal: 'Build muscle',        readiness: 91, streak: 7, trainedToday: true,  alert: null,                 lastSession: 'Chest & Shoulders', sessionsThisWeek: 5, weight: 84 },
-  { id: 2, name: 'Hamish', initials: 'HT', goal: 'Lose body fat',       readiness: 74, streak: 3, trainedToday: true,  alert: null,                 lastSession: 'Lower Body',        sessionsThisWeek: 3, weight: 91 },
-  { id: 3, name: 'Zafi',   initials: 'ZK', goal: 'Get stronger',        readiness: 58, streak: 1, trainedToday: false, alert: 'Missed 2 sessions',  lastSession: 'Pull Day',          sessionsThisWeek: 2, weight: 78 },
-  { id: 4, name: 'Priya',  initials: 'PK', goal: 'General health',      readiness: 45, streak: 0, trainedToday: false, alert: 'Deload recommended', lastSession: 'Full Body',         sessionsThisWeek: 1, weight: 62 },
-  { id: 5, name: 'Marcus', initials: 'MR', goal: 'Athletic performance',readiness: 83, streak: 5, trainedToday: true,  alert: null,                 lastSession: 'Push Day',          sessionsThisWeek: 4, weight: 88 },
-];
+const CLIENTS_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/clients';
+const CLIENTS_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 function readinessStyle(score) {
+  if (!score) return { ink: 'var(--ink-3)', bg: 'var(--soft)', label: 'No data' };
   if (score >= 80) return { ink: 'var(--accent-strong)', bg: 'var(--accent-tint)', label: 'Ready' };
   if (score >= 60) return { ink: 'var(--blue-ink)', bg: 'var(--blue-tint)', label: 'Moderate' };
   if (score >= 40) return { ink: 'var(--orange-ink)', bg: 'var(--orange-tint)', label: 'Fatigued' };
@@ -84,12 +80,30 @@ export default function CoachDashboard() {
   const [saveMsg, setSaveMsg] = useState(null);
   const [activePlan, setActivePlan] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [assignedTo, setAssignedTo] = useState([]); // empty = everyone
 
   useEffect(() => {
     if (inProgress !== 'none') return;
     if (accounts.length === 0) { router.push('/login'); return; }
     setUserId(accounts[0].localAccountId);
   }, [accounts, inProgress, router]);
+
+  // Real client list — every signed-up user with live stats
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const res = await fetch(CLIENTS_URL, { headers: { 'x-functions-key': CLIENTS_KEY || '' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setClients(data);
+        }
+      } catch (e) {}
+      finally { setClientsLoading(false); }
+    })();
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -155,7 +169,7 @@ export default function CoachDashboard() {
     if (exercises.some(e => !e.name.trim())) { setSaveMsg({ type: 'error', text: 'Please select all exercise names' }); return; }
     setSaving(true); setSaveMsg(null);
     try {
-      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, exercises, isActive, createdAt: new Date().toISOString() };
+      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, exercises, isActive, assignedTo, createdAt: new Date().toISOString() };
       const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify(plan) });
       if (res.ok) {
         setSaveMsg({ type: 'success', text: isActive ? 'Session published and set as active.' : 'Session saved as draft.' });
@@ -169,7 +183,10 @@ export default function CoachDashboard() {
 
   const trainedToday = clients.filter(c => c.trainedToday).length;
   const alerts = clients.filter(c => c.alert).length;
-  const avgReadiness = Math.round(clients.reduce((a, c) => a + c.readiness, 0) / clients.length);
+  const withReadiness = clients.filter(c => c.readiness);
+  const avgReadiness = withReadiness.length > 0
+    ? Math.round(withReadiness.reduce((a, c) => a + c.readiness, 0) / withReadiness.length)
+    : '—';
   const filteredClients = clients.filter(c => {
     if (filter === 'trained') return c.trainedToday;
     if (filter === 'alerts') return c.alert;
@@ -223,11 +240,21 @@ export default function CoachDashboard() {
         {/* ══ CLIENTS ══ */}
         {view === 'clients' && (
           <>
+            {clientsLoading && (
+              <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '10px 0', margin: 0 }}>Loading clients…</p>
+            )}
+            {!clientsLoading && clients.length === 0 && (
+              <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 30, marginBottom: 8 }}>🐕</div>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>No clients yet</p>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--ink-3)' }}>They appear here as soon as your friends sign up.</p>
+              </div>
+            )}
             {alerts > 0 && (
               <div style={{ background: 'var(--orange-tint)', borderRadius: 18, padding: '14px 16px' }}>
                 <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--orange-ink)' }}>⚠️ ATTENTION NEEDED</p>
                 {clients.filter(c => c.alert).map(c => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                  <div key={c.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Avatar initials={c.initials} size={30} />
                       <span style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</span>
@@ -250,9 +277,9 @@ export default function CoachDashboard() {
 
             {filteredClients.map((client, ci) => {
               const rs = readinessStyle(client.readiness);
-              const open = selectedClient?.id === client.id;
+              const open = selectedClient?.userId === client.userId;
               return (
-                <Reveal key={client.id} delay={120 + ci * 50}>
+                <Reveal key={client.userId} delay={120 + ci * 50}>
                 <button onClick={() => setSelectedClient(open ? null : client)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ background: 'var(--card)', border: `1px solid ${open ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 18, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -265,18 +292,23 @@ export default function CoachDashboard() {
                         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{client.goal}</p>
                       </div>
                       <div style={{ background: rs.bg, borderRadius: 12, padding: '8px 12px', textAlign: 'center', flexShrink: 0 }}>
-                        <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: rs.ink, lineHeight: 1 }}>{client.readiness}</p>
+                        <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: rs.ink, lineHeight: 1 }}>{client.readiness || '—'}</p>
                         <p style={{ margin: '2px 0 0', fontSize: 10, color: rs.ink, fontWeight: 600 }}>{rs.label}</p>
                       </div>
                     </div>
 
-                    {open && (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateRows: open ? '1fr' : '0fr',
+                      transition: 'grid-template-rows 0.45s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }}>
+                    <div style={{ overflow: 'hidden' }}>
                       <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line-2)' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
                           {[
-                            { label: 'sessions', value: `${client.sessionsThisWeek}/wk` },
-                            { label: 'streak', value: `🔥${client.streak}` },
-                            { label: 'weight', value: `${client.weight}kg` },
+                            { label: 'sessions', value: `${client.sessionsThisWeek || 0}/wk` },
+                            { label: 'streak', value: `🔥${client.streak || 0}` },
+                            { label: 'weight', value: client.weight ? `${client.weight}kg` : '—' },
                           ].map((s, i) => (
                             <div key={i} style={{ background: 'var(--soft)', borderRadius: 12, padding: 10, textAlign: 'center' }}>
                               <p style={{ margin: '0 0 3px', fontSize: 15, fontWeight: 800 }}>{s.value}</p>
@@ -286,10 +318,14 @@ export default function CoachDashboard() {
                         </div>
                         <div style={{ background: 'var(--soft)', borderRadius: 12, padding: 12 }}>
                           <p style={{ margin: '0 0 4px', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Last session</p>
-                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{client.lastSession}</p>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
+                            {client.lastSession || 'No sessions logged yet'}
+                            {client.lastSessionDate ? <span style={{ color: 'var(--ink-3)', fontWeight: 500 }}> · {client.lastSessionDate}</span> : null}
+                          </p>
                         </div>
                       </div>
-                    )}
+                    </div>
+                    </div>
                   </div>
                 </button>
                 </Reveal>
@@ -333,6 +369,31 @@ export default function CoachDashboard() {
               <div>
                 <p style={fieldLabel}>Session date</p>
                 <input type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <p style={fieldLabel}>Assign to</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button onClick={() => setAssignedTo([])} style={{
+                    padding: '8px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: 'none',
+                    background: assignedTo.length === 0 ? 'var(--accent-tint)' : 'var(--soft)',
+                    color: assignedTo.length === 0 ? 'var(--accent-strong)' : 'var(--ink-2)',
+                  }}>Everyone</button>
+                  {clients.map(c => {
+                    const on = assignedTo.includes(c.userId);
+                    return (
+                      <button key={c.userId} onClick={() => setAssignedTo(prev => on ? prev.filter(u => u !== c.userId) : [...prev, c.userId])} style={{
+                        padding: '8px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: 'none',
+                        background: on ? 'var(--accent-tint)' : 'var(--soft)',
+                        color: on ? 'var(--accent-strong)' : 'var(--ink-2)',
+                      }}>{c.name.split(' ')[0]}</button>
+                    );
+                  })}
+                </div>
+                {assignedTo.length > 0 && (
+                  <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--ink-3)' }}>
+                    Only the selected {assignedTo.length === 1 ? 'client sees' : 'clients see'} this session.
+                  </p>
+                )}
               </div>
             </div>
             </Reveal>
