@@ -519,7 +519,7 @@ export default function DashboardPage() {
         </Reveal>
 
         <Reveal delay={260}>
-        <div style={{ marginBottom: 14 }}><QuoteCard /></div>
+        <div style={{ marginBottom: 14 }}><QuoteCard mode="random" /></div>
         </Reveal>
 
         <Reveal delay={300}>
