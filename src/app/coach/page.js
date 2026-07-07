@@ -173,7 +173,33 @@ export default function CoachDashboard() {
       const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify(plan) });
       if (res.ok) {
         setSaveMsg({ type: 'success', text: isActive ? 'Session published and set as active.' : 'Session saved as draft.' });
-        if (isActive) { setActivePlan(plan); setPlanName(''); setSessionDate(new Date().toISOString().split('T')[0]); setExercises([emptyExercise()]); }
+        if (isActive) {
+          setActivePlan(plan);
+          setPlanName('');
+          setSessionDate(new Date().toISOString().split('T')[0]);
+          setExercises([emptyExercise()]);
+          setAssignedTo([]);
+
+          // Announce the new session on the community feed
+          try {
+            const who = plan.assignedTo.length === 0
+              ? 'the whole pack'
+              : plan.assignedTo
+                  .map(uid => clients.find(c => c.userId === uid)?.name?.split(' ')[0])
+                  .filter(Boolean).join(', ');
+            await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-functions-key': CLIENTS_KEY || '' },
+              body: JSON.stringify({
+                userId,
+                name: 'Coach Shameel',
+                initials: 'CS',
+                text: `📋 New session published: ${plan.name} (${plan.exercises.length} exercises) — assigned to ${who}. Get after it.`,
+                tag: '📋 New session',
+              }),
+            });
+          } catch (e) {}
+        }
       } else { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
     } catch (e) { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
     finally { setSaving(false); }
