@@ -211,36 +211,70 @@ export default function CommunityPage() {
         {/* ── CHALLENGE (real) ── */}
         {challenge && (
           <Reveal>
-          <div style={{ background: 'linear-gradient(135deg, var(--violet), var(--blue))', borderRadius: 22, padding: 18, color: '#fff' }}>
+          <div className="gd-shine" style={{
+            background: 'linear-gradient(180deg, var(--card-2), var(--card))',
+            border: '1px solid var(--gold-tint)', borderRadius: 22, padding: 18,
+            boxShadow: 'var(--shadow-card)',
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', opacity: 0.85 }}>COMMUNITY CHALLENGE</p>
-              <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.2)', borderRadius: 999, padding: '3px 10px' }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--gold)', textTransform: 'uppercase' }}>
+                Challenge · prize: {challenge.prize}
+              </p>
+              <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--gold-tint)', color: 'var(--gold)', borderRadius: 999, padding: '3px 10px' }}>
                 {chDaysLeft} day{chDaysLeft === 1 ? '' : 's'} left
               </span>
             </div>
-            <p style={{ margin: '6px 0 2px', fontSize: 20, fontWeight: 800 }}>{challenge.name}</p>
-            <p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>
-              First to {challenge.targetKg.toLocaleString()} kg wins: <b>{challenge.prize}</b>
+            <p style={{ margin: '6px 0 2px', fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em' }}>{challenge.name}</p>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>
+              First to {challenge.targetKg.toLocaleString()} kg takes it home
             </p>
 
             {challenge.winnerName ? (
-              <div style={{ marginTop: 14, background: 'rgba(255,255,255,0.16)', borderRadius: 14, padding: '12px 14px', textAlign: 'center' }}>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>🏆 {challenge.winnerName} takes the creatine!</p>
+              <div style={{ marginTop: 14, background: 'var(--gold-tint)', border: '1px solid var(--gold)', borderRadius: 14, padding: '12px 14px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /></svg>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{challenge.winnerName} takes the creatine!</p>
               </div>
             ) : chJoined ? (
               <>
-                <div style={{ background: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 8, margin: '14px 0 6px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${chPct}%`, background: '#fff', borderRadius: 999, transition: 'width 1s ease' }} />
+                <div style={{ position: 'relative', margin: '20px 0 6px' }}>
+                  <div style={{ background: 'var(--soft)', borderRadius: 999, height: 9, overflow: 'hidden' }}>
+                    <div className="gd-shimbar" style={{
+                      height: '100%', width: `${chPct}%`, borderRadius: 999,
+                      background: 'linear-gradient(90deg, #B8860B, var(--gold))',
+                      transition: 'width 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }} />
+                  </div>
+                  {(challenge.progress || []).slice(0, 3).map((p, ri) => {
+                    const left = Math.min(Math.max((p.kg / challenge.targetKg) * 100, 3), 97);
+                    const mine = p.userId === userId;
+                    return (
+                      <div key={p.userId || ri} style={{
+                        position: 'absolute', top: -7, left: `${left}%`, transform: 'translateX(-50%)',
+                        width: 22, height: 22, borderRadius: 999,
+                        background: 'linear-gradient(135deg, var(--soft), var(--card))',
+                        border: `1.5px solid ${mine ? 'var(--gold)' : 'var(--line)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, fontWeight: 800, color: 'var(--ink)',
+                        zIndex: mine ? 2 : 1,
+                        boxShadow: mine ? '0 0 14px var(--gold-tint)' : '0 4px 12px rgba(0,0,0,0.3)',
+                        transition: 'left 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
+                      }}>
+                        {(p.initials || p.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                    );
+                  })}
                 </div>
-                <p style={{ margin: 0, fontSize: 12, opacity: 0.92 }}>
-                  <b>{fmtKg(chMyKg)} / {challenge.targetKg.toLocaleString()} kg</b>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)' }}>
+                  <b style={{ color: 'var(--ink)' }}>{fmtKg(chMyKg)} / {challenge.targetKg.toLocaleString()} kg</b>
                   {chLeader && chLeader.userId !== userId ? ` · ${chLeader.name} leads with ${fmtKg(chLeader.kg)} kg` : chMyKg > 0 ? ' · you lead the pack 🐕' : ' — log a session to get on the board'}
                 </p>
               </>
             ) : (
               <button onClick={joinChallenge} disabled={joining} style={{
-                marginTop: 14, background: '#fff', color: '#3A1D9E', border: 'none', borderRadius: 14,
-                padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer', opacity: joining ? 0.6 : 1,
+                marginTop: 14, border: 'none', borderRadius: 14,
+                background: 'linear-gradient(180deg, #FFD97A, var(--gold))', color: '#2A1D00',
+                padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                opacity: joining ? 0.6 : 1, boxShadow: '0 8px 24px var(--gold-tint)',
               }}>
                 {joining ? 'Joining…' : `Join challenge · ${challenge.joinedBy?.length || 0} in`}
               </button>
@@ -263,27 +297,65 @@ export default function CommunityPage() {
               No sessions logged this week yet. First to lift leads the pack.
             </p>
           ) : (
-            leaderboard.map((u, i) => {
-              const me = u.userId === userId;
-              return (
-                <div key={u.userId} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0',
-                  borderTop: i === 0 || me ? 'none' : '1px solid var(--line-2)',
-                  ...(me ? { background: 'var(--accent-tint)', margin: '0 -10px', padding: '11px 10px', borderRadius: 12 } : {}),
-                }}>
-                  {i < 3 ? (
-                    <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[i], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{i + 1}</div>
-                  ) : (
-                    <div style={{ width: 26, textAlign: 'center', fontWeight: 800, color: 'var(--ink-3)', fontSize: 14 }}>{i + 1}</div>
-                  )}
-                  <Avatar initial={(u.initials || u.name || 'A').charAt(0)} size={34} />
-                  <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: me ? 'var(--accent-strong)' : 'var(--ink)' }}>
-                    {u.name}{me ? ' (you)' : ''}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: me ? 'var(--accent-strong)' : 'var(--ink-2)' }}>{fmtKg(u.kg)} kg</span>
+            <>
+              {/* Podium for the top 3 — mockup port */}
+              {leaderboard.length >= 3 && (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '12px 4px 0' }}>
+                  {[leaderboard[1], leaderboard[0], leaderboard[2]].map((u, col) => {
+                    const first = col === 1;
+                    const maxKg = leaderboard[0].kg || 1;
+                    const h = first ? 64 : Math.max(26, Math.round(60 * ((u.kg || 0) / maxKg)));
+                    const me = u.userId === userId;
+                    return (
+                      <div key={u.userId} style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+                        {first && (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--gold)" style={{ marginBottom: 4 }}><path d="M3 8l4.5 3L12 4l4.5 7L21 8l-1.8 10H4.8L3 8z" /></svg>
+                        )}
+                        <div style={{
+                          width: 44, height: 44, borderRadius: '50%', margin: '0 auto',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 800, fontSize: 14, color: '#fff',
+                          background: 'linear-gradient(135deg, var(--violet), var(--blue))',
+                          border: first ? '2px solid var(--gold)' : '2px solid transparent',
+                          boxShadow: first ? '0 0 20px var(--gold-tint)' : 'none',
+                        }}>
+                          {(u.initials || u.name || 'A').charAt(0)}
+                        </div>
+                        <p style={{ margin: '7px 0 0', fontSize: 13, fontWeight: 800, color: first ? 'var(--gold)' : 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{fmtKg(u.kg)}</p>
+                        <p style={{ margin: '1px 0 0', fontSize: 10.5, color: 'var(--ink-3)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}{me ? ' (you)' : ''}</p>
+                        <div style={{
+                          height: h, marginTop: 8, borderRadius: '12px 12px 0 0',
+                          background: first ? 'linear-gradient(180deg, var(--gold-tint), transparent)' : 'linear-gradient(180deg, var(--soft), transparent)',
+                          border: '1px solid var(--line)', borderBottom: 'none',
+                        }} />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              )}
+              {(leaderboard.length >= 3 ? leaderboard.slice(3) : leaderboard).map((u, i) => {
+                const rank = leaderboard.length >= 3 ? i + 4 : i + 1;
+                const me = u.userId === userId;
+                return (
+                  <div key={u.userId} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0',
+                    borderTop: me ? 'none' : '1px solid var(--line-2)',
+                    ...(me ? { background: 'var(--accent-tint)', margin: '0 -10px', padding: '11px 10px', borderRadius: 12 } : {}),
+                  }}>
+                    {rank <= 3 ? (
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[rank - 1], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{rank}</div>
+                    ) : (
+                      <div style={{ width: 26, textAlign: 'center', fontWeight: 800, color: 'var(--ink-3)', fontSize: 14 }}>{rank}</div>
+                    )}
+                    <Avatar initial={(u.initials || u.name || 'A').charAt(0)} size={34} />
+                    <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: me ? 'var(--accent-strong)' : 'var(--ink)' }}>
+                      {u.name}{me ? ' (you)' : ''}
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: me ? 'var(--accent-strong)' : 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtKg(u.kg)} kg</span>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
         </Reveal>
@@ -336,12 +408,24 @@ export default function CommunityPage() {
                       </div>
                     </div>
                     <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--ink)', lineHeight: 1.5 }}>{post.text}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                      <button onClick={() => toggleFire(post)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: fired ? 'var(--orange)' : 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
-                        🔥 {fires > 0 ? fires : ''}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button onClick={() => toggleFire(post)} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, borderRadius: 999, padding: '7px 13px',
+                        background: fired ? 'var(--orange-tint)' : 'var(--soft)',
+                        border: `1px solid ${fired ? 'var(--orange)' : 'transparent'}`,
+                        cursor: 'pointer', color: fired ? 'var(--orange-ink)' : 'var(--ink-2)',
+                        fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ animation: fired ? 'gdPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none' }}><path d="M12 2c1 4-4 6-4 10a4 4 0 0 0 8 0c0-1.5-.6-2.6-1.2-3.6C16.4 9.6 19 11.5 19 15a7 7 0 0 1-14 0C5 8 11 7 12 2z" /></svg>
+                        {fires > 0 ? fires : ''}
                       </button>
-                      <button onClick={() => { setCommentOn(commentOn === post.id ? null : post.id); setCommentText(''); }} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--ink-2)', fontSize: 13, fontWeight: 600 }}>
-                        💬 {comments.length > 0 ? comments.length : ''}
+                      <button onClick={() => { setCommentOn(commentOn === post.id ? null : post.id); setCommentText(''); }} style={{
+                        display: 'flex', alignItems: 'center', gap: 6, borderRadius: 999, padding: '7px 13px',
+                        background: 'var(--soft)', border: '1px solid transparent',
+                        cursor: 'pointer', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.5A8 8 0 1 1 21 12z" /></svg>
+                        {comments.length > 0 ? comments.length : ''}
                       </button>
                     </div>
 

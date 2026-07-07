@@ -1,0 +1,17 @@
+{
+  "name": "Gym Dogs",
+  "short_name": "Gym Dogs",
+  "description": "Train smart. Recover smarter.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0B0B10",
+  "theme_color": "#12B76A",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

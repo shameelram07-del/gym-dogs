@@ -85,6 +85,34 @@ function CountUp({ value, format }) {
   return <>{display}</>;
 }
 
+// Types text out character by character with a blinking caret — mockup port.
+function TypeText({ text }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(0);
+    if (!text) return;
+    const iv = setInterval(() => {
+      setN((v) => {
+        if (v >= text.length) { clearInterval(iv); return v; }
+        return v + 2;
+      });
+    }, 18);
+    return () => clearInterval(iv);
+  }, [text]);
+  const doneTyping = n >= (text?.length || 0);
+  return (
+    <>
+      {text?.slice(0, n)}
+      {!doneTyping && (
+        <span style={{
+          display: 'inline-block', width: 2, height: 14, background: '#C9C5FF',
+          marginLeft: 2, verticalAlign: '-2px', animation: 'gdBlink 1s steps(1) infinite',
+        }} />
+      )}
+    </>
+  );
+}
+
 function Avatar({ name, size = 42, fontSize = 15, onClick }) {
   const initial = (name || 'S').charAt(0).toUpperCase();
   return (
@@ -109,6 +137,26 @@ const card = {
   borderRadius: 22,
   padding: 18,
   marginBottom: 14,
+  boxShadow: 'var(--shadow-card)',
+};
+
+// Premium stroke icons — replace the emoji look
+const Icon = {
+  bolt: (c = 'var(--accent)') => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 12.5h6L11 22l8.5-10.5h-6L13 2z" /></svg>
+  ),
+  dumbbell: (c = 'var(--accent-strong)') => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" /></svg>
+  ),
+  bowl: (c = 'var(--accent-strong)') => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11h16a8 8 0 0 1-16 0z" /><path d="M9 11c0-4 2-6 6-8" /></svg>
+  ),
+  flame: (c = 'var(--orange)') => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px' }}><path d="M12 22c4 0 7-2.7 7-7 0-3-2-5.5-3.5-7C15 10 14 11 13 11c0-3-1-6-4-8 .5 3-1 5-2.5 7C5 11.7 5 13 5 15c0 4.3 3 7 7 7z" /></svg>
+  ),
+  sparkle: (c = '#C9C5FF') => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" /><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" /></svg>
+  ),
 };
 
 const eyebrow = {
@@ -161,7 +209,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '' },
         // The function contract is inconsistent between screens — send both
         // keys and accept either response shape.
-        body: JSON.stringify({ message: promptText, prompt: promptText }),
+        body: JSON.stringify({ message: promptText, prompt: promptText, userId }),
       });
       const data = await res.json();
       const text = data.reply || data.message || (typeof data === 'string' ? data : null);
@@ -310,7 +358,21 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <ThemeToggle />
-          <Avatar name={userName} onClick={() => router.push('/profile')} />
+          <div style={{ position: 'relative' }}>
+            <Avatar name={userName} onClick={() => router.push('/profile')} />
+            {weekStats.streak > 0 && (
+              <span style={{
+                position: 'absolute', bottom: -4, right: -6,
+                background: 'linear-gradient(180deg, #FFA35C, var(--orange))',
+                borderRadius: 99, padding: '2px 7px', fontSize: 10, fontWeight: 800,
+                color: '#2A1200', border: '2px solid var(--bg)',
+                boxShadow: '0 4px 14px rgba(255,138,61,0.45)',
+                animation: 'gdFlick 2.2s ease-in-out infinite',
+              }}>
+                {weekStats.streak}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -340,14 +402,16 @@ export default function DashboardPage() {
             {weekDays.map((d, i) => (
               <div key={i} style={{
                 flex: 1, textAlign: 'center', padding: '9px 0 8px', borderRadius: 14,
-                background: d.isToday ? 'var(--accent)' : 'var(--card)',
-                border: `1px solid ${d.isToday ? 'var(--accent)' : 'var(--line)'}`,
+                background: d.isToday ? 'linear-gradient(180deg, var(--accent-strong), var(--accent))' : 'var(--card)',
+                border: `1px solid ${d.isToday ? 'transparent' : 'var(--line)'}`,
+                boxShadow: d.isToday ? '0 6px 20px var(--accent-glow)' : 'none',
               }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: d.isToday ? 'var(--on-accent)' : 'var(--ink-3)' }}>{d.label}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: d.isToday ? 'var(--on-accent)' : 'var(--ink)' }}>{d.dayNum}</div>
                 <div style={{
                   width: 5, height: 5, borderRadius: 999, margin: '5px auto 0',
                   background: d.trained ? (d.isToday ? 'var(--on-accent)' : 'var(--accent)') : 'transparent',
+                  boxShadow: d.trained && !d.isToday ? '0 0 6px var(--accent-glow)' : 'none',
                 }} />
               </div>
             ))}
@@ -361,20 +425,20 @@ export default function DashboardPage() {
           <div style={{ ...card, padding: '14px 18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 11, background: 'linear-gradient(135deg, var(--violet), var(--blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>⚡</div>
+                <div style={{ width: 34, height: 34, borderRadius: 11, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bolt()}</div>
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Level {levelInfo.level} · {levelInfo.title}</p>
                   <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)' }}>{levelInfo.xpToNext} XP to Level {levelInfo.level + 1}</p>
                 </div>
               </div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--violet)' }}>{levelInfo.totalXp.toLocaleString()} XP</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--accent-strong)' }}>{levelInfo.totalXp.toLocaleString()} XP</p>
             </div>
-            <div style={{ height: 8, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
-              <div style={{
+            <div style={{ height: 9, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
+              <div className="gd-shimbar" style={{
                 height: '100%', borderRadius: 999,
-                background: 'linear-gradient(90deg, var(--violet), var(--blue))',
+                background: 'linear-gradient(90deg, #0E9A66, var(--accent-strong))',
                 width: xpAnimated ? `${levelInfo.pct}%` : 0,
-                transition: 'width 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'width 1.4s cubic-bezier(0.22, 1, 0.36, 1)',
               }} />
             </div>
           </div>
@@ -386,11 +450,20 @@ export default function DashboardPage() {
         <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 18 }}>
           <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
             <svg width="100" height="100" viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="gdReadyGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#2BE8A4" />
+                  <stop offset="1" stopColor="#0E9A66" />
+                </linearGradient>
+              </defs>
               <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
               {readiness && (
-                <circle cx="60" cy="60" r={R} fill="none" stroke="var(--accent)" strokeWidth="11"
+                <circle cx="60" cy="60" r={R} fill="none" stroke="url(#gdReadyGrad)" strokeWidth="11"
                   strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={ringOffset}
-                  style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1)' }}
+                  style={{
+                    transition: 'stroke-dashoffset 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
+                    filter: 'drop-shadow(0 0 10px var(--accent-glow))',
+                  }}
                   transform="rotate(-90 60 60)" />
               )}
             </svg>
@@ -429,8 +502,8 @@ export default function DashboardPage() {
                   ) : null}
                 </p>
               </div>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
-                🏋️
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {Icon.dumbbell()}
               </div>
             </div>
             {sessionName && (
@@ -463,12 +536,17 @@ export default function DashboardPage() {
             </div>
           )}
           {todayPlan ? (
-            <button onClick={() => router.push('/workout')} style={{
-              width: '100%', border: 'none', background: 'var(--accent)', color: 'var(--on-accent)',
-              padding: 16, fontSize: 15, fontWeight: 700, cursor: 'pointer',
-            }}>
-              Start session →
-            </button>
+            <div style={{ padding: '0 18px 18px' }}>
+              <button onClick={() => router.push('/workout')} style={{
+                width: '100%', border: 'none', borderRadius: 16,
+                background: 'linear-gradient(180deg, var(--accent-strong), var(--accent))',
+                color: 'var(--on-accent)', padding: 16, fontSize: 15, fontWeight: 800,
+                cursor: 'pointer', letterSpacing: '-0.01em',
+                boxShadow: '0 10px 32px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3)',
+              }}>
+                Start session
+              </button>
+            </div>
           ) : (
             <div style={{ padding: '0 18px 18px' }}>
               <div style={{ background: 'var(--soft)', borderRadius: 14, padding: 14, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, fontWeight: 600 }}>
@@ -490,7 +568,7 @@ export default function DashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
           <Stat value={weekStats.sessions !== null ? <CountUp value={weekStats.sessions} /> : '—'} label="sessions" />
           <Stat value={weekStats.kgLifted !== null ? <CountUp value={weekStats.kgLifted} format="k" /> : '—'} label="kg lifted" />
-          <Stat value={weekStats.streak !== null ? <CountUp value={weekStats.streak} /> : '—'} label="day streak" color="var(--orange)" suffix="🔥" />
+          <Stat value={weekStats.streak !== null ? <CountUp value={weekStats.streak} /> : '—'} label="day streak" color="var(--orange)" suffix={Icon.flame()} />
         </div>
         </Reveal>
 
@@ -498,14 +576,14 @@ export default function DashboardPage() {
         <Reveal delay={220}>
         <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 22, padding: 18, marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span style={{ fontSize: 18 }}>✨</span>
+            {Icon.sparkle()}
             <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Coach</span>
             <span style={{ fontSize: 9, fontWeight: 700, color: '#C9C5FF', background: 'rgba(122,90,248,0.25)', borderRadius: 6, padding: '2px 7px', letterSpacing: '0.06em' }}>BETA</span>
           </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3' }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3', minHeight: 22 }}>
             {coachLoading
               ? 'Thinking…'
-              : coachNote || 'Ready to optimise your performance? Start a session and I will track your progress.'}
+              : <TypeText text={coachNote || 'Ready to optimise your performance? Start a session and I will track your progress.'} />}
           </p>
           {coachNote && !askedWhy && (
             <button onClick={handleAskWhy} style={{
@@ -518,13 +596,30 @@ export default function DashboardPage() {
         </div>
         </Reveal>
 
+        {/* ── CHALLENGE TEASER ── */}
+        <Reveal delay={240}>
+        <button onClick={() => router.push('/community')} className="gd-shine" style={{
+          ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+          cursor: 'pointer', textAlign: 'left', border: '1px solid var(--gold-tint)',
+        }}>
+          <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--gold-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>10,000 kg club</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>July challenge · prize: creatine — see the pack&rsquo;s progress</p>
+          </div>
+          <span style={{ color: 'var(--gold)', fontSize: 18 }}>›</span>
+        </button>
+        </Reveal>
+
         <Reveal delay={260}>
         <div style={{ marginBottom: 14 }}><QuoteCard mode="random" /></div>
         </Reveal>
 
         <Reveal delay={300}>
         <button onClick={() => router.push('/nutrition')} style={{ ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🥗</div>
+          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bowl()}</div>
           <div style={{ flex: 1 }}>
             <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Nutrition</p>
             <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>Log meals and macros</p>
@@ -547,11 +642,14 @@ const chip = {
 
 function Stat({ value, label, color, suffix }) {
   return (
-    <div style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
-      <p style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: color || 'var(--ink)' }}>
+    <div style={{
+      background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18,
+      padding: '16px 8px', textAlign: 'center', boxShadow: 'var(--shadow-card)',
+    }}>
+      <p style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', color: color || 'var(--ink)' }}>
         {value}{suffix && <span style={{ fontSize: 16 }}>{suffix}</span>}
       </p>
-      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{label}</p>
+      <p style={{ margin: '5px 0 0', fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>{label}</p>
     </div>
   );
 }

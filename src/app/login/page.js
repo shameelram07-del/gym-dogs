@@ -110,10 +110,14 @@ export default function LoginPage() {
 
       {/* ── HERO ── */}
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div className="gd-rise-1" style={{ marginBottom: 22, filter: 'drop-shadow(0 18px 34px rgba(18,183,106,0.28))' }}>
+        <div className="gd-rise-1" style={{ marginBottom: 22, filter: 'drop-shadow(0 18px 34px rgba(18,183,106,0.28))', animation: 'gdFloat 5s ease-in-out infinite' }}>
           <LogoMark />
         </div>
-        <h1 className="gd-rise-2" style={{ margin: 0, fontSize: 38, fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1 }}>
+        <h1 className="gd-rise-2" style={{
+          margin: 0, fontSize: 40, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1,
+          background: 'linear-gradient(90deg, var(--ink), var(--accent-strong) 70%, var(--accent))',
+          WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+        }}>
           Gym Dogs
         </h1>
         <p className="gd-rise-2" style={{
@@ -130,10 +134,11 @@ export default function LoginPage() {
       {/* ── ACTIONS ── */}
       <div className="gd-rise-4" style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <button onClick={handleLogin} className="gd-btn gd-btn-primary" style={{
-          width: '100%', border: 'none', borderRadius: 16, padding: '17px',
-          background: 'var(--accent)', color: 'var(--on-accent)',
-          fontSize: 16, fontWeight: 700, cursor: 'pointer',
-          boxShadow: '0 6px 22px rgba(18,183,106,0.28)',
+          width: '100%', border: 'none', borderRadius: 18, padding: '17px',
+          background: 'linear-gradient(180deg, var(--accent-strong), var(--accent))',
+          color: 'var(--on-accent)',
+          fontSize: 16, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.01em',
+          boxShadow: '0 10px 32px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3)',
         }}>
           Sign in
         </button>

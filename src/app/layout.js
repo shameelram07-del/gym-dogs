@@ -14,7 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Gym Dogs",
-  description: "Built with vision. Powered by AI.",
+  description: "Train smart. Recover smarter.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Gym Dogs",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0B0B10",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {
@@ -27,7 +39,7 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col">
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('gd-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}`,
+            __html: `try{if(!localStorage.getItem('gd-theme-v2')){localStorage.setItem('gd-theme','dark');localStorage.setItem('gd-theme-v2','1');}var t=localStorage.getItem('gd-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}`,
           }}
         />
         <AuthProvider>

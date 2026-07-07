@@ -51,6 +51,27 @@ function ExercisePhoto({ name, size = 80 }) {
   );
 }
 
+// Count-up number for the celebration screen — mockup port.
+function CountNum({ value, decimals = 0, suffix = '' }) {
+  const [display, setDisplay] = useState(0);
+  const raf = useRef(null);
+  useEffect(() => {
+    const target = typeof value === 'number' ? value : parseFloat(value) || 0;
+    const t0 = performance.now();
+    const ms = 1200;
+    cancelAnimationFrame(raf.current);
+    const step = (t) => {
+      const p = Math.min((t - t0) / ms, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(target * eased);
+      if (p < 1) raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [value]);
+  return <>{display.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}{suffix}</>;
+}
+
 function DurationTimer() {
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
@@ -140,6 +161,9 @@ export default function WorkoutPage() {
   const [finishQuote, setFinishQuote] = useState('');
   const [shared, setShared] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
+  const [prs, setPrs] = useState([]); // [{name, kg, prevKg}]
+  const startRef = useRef(Date.now());
   const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
   const [toast, setToast] = useState('');
   const toastRef = useRef(null);
@@ -212,6 +236,21 @@ export default function WorkoutPage() {
         } catch {}
       }));
       setLastSession(results);
+
+      // Progressive overload: pre-fill each set's kg with last session's weight
+      // so logging starts from where you left off (reps left blank on purpose).
+      setLogs(prev => {
+        const next = { ...prev };
+        Object.entries(results).forEach(([idx, lastSets]) => {
+          if (!next[idx] || !Array.isArray(lastSets)) return;
+          next[idx] = next[idx].map((s, i) => {
+            if (s.kg) return s;
+            const src = lastSets[i] || lastSets[lastSets.length - 1];
+            return src && src.kg ? { ...s, kg: String(src.kg) } : s;
+          });
+        });
+        return next;
+      });
     })();
   }, [userId, activePlan]);
 
@@ -273,7 +312,7 @@ export default function WorkoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY },
         // Send both keys / accept either shape — the function contract varies.
-        body: JSON.stringify({ message: p, prompt: p })
+        body: JSON.stringify({ message: p, prompt: p, userId })
       });
       if (res.ok) { const data = await res.json(); setCoachNote(data.reply || data.message); }
     } catch {} finally { setCoachNoteLoading(false); }
@@ -293,6 +332,17 @@ export default function WorkoutPage() {
       ));
       setSaved(true);
       setFinishQuote(randomQuote());
+
+      // PR detection: today's heaviest set vs last session's, per exercise
+      const newPrs = [];
+      activePlan.exercises.forEach((ex, idx) => {
+        const todayMax = Math.max(0, ...(logs[idx] || []).map(s => parseFloat(s.kg) || 0));
+        const prevMax = Math.max(0, ...(lastSession[idx] || []).map(s => parseFloat(s.kg) || 0));
+        if (prevMax > 0 && todayMax > prevMax) newPrs.push({ name: ex.name, kg: todayMax, prevKg: prevMax });
+      });
+      setPrs(newPrs);
+      setShowComplete(true);
+
       const summary = activePlan.exercises.map((ex, idx) => {
         const sets = (logs[idx] || []).filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
         return sets ? `${ex.name}: ${sets}` : null;
@@ -316,8 +366,10 @@ export default function WorkoutPage() {
         body: JSON.stringify({
           userId,
           name: userName,
-          text: `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume 💪`,
-          tag: '🏋️ Session done',
+          text: prs.length > 0
+            ? `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume. NEW PR: ${prs[0].name} ${prs[0].kg}kg 🏆`
+            : `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume 💪`,
+          tag: prs.length > 0 ? '🏆 New PR' : '🏋️ Session done',
         }),
       });
       if (res.ok) { setShared(true); showToast('🔥 Posted to the community feed'); }
@@ -343,7 +395,7 @@ export default function WorkoutPage() {
   if (!userId || planLoading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)' }}>
-        <div style={{ fontSize: 48 }}>💪</div>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" style={{ animation: 'gdFloat 2s ease-in-out infinite' }}><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" /></svg>
         <p style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', fontSize: 13 }}>Loading your session...</p>
       </div>
     );
@@ -507,6 +559,8 @@ export default function WorkoutPage() {
                   background: set.done ? 'var(--accent)' : 'transparent',
                   color: set.done ? 'var(--on-accent)' : 'transparent', fontSize: 15, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto',
+                  boxShadow: set.done ? '0 0 12px var(--accent-glow)' : 'none',
+                  animation: set.done ? 'gdPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
                 }}>✓</button>
               </div>
             ))}
@@ -563,15 +617,95 @@ export default function WorkoutPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 12, alignItems: 'center' }}>
           <RestTimer trigger={restTrigger} onDone={() => showToast('⏱ Rest over — go!')} />
           <button onClick={handleSave} disabled={saving} style={{
-            background: saved ? 'var(--accent-strong)' : 'var(--accent)',
-            border: 'none', borderRadius: 14, padding: '15px 0',
-            color: 'var(--on-accent)', fontSize: 14, fontWeight: 700,
+            background: 'linear-gradient(180deg, var(--accent-strong), var(--accent))',
+            border: 'none', borderRadius: 16, padding: '15px 0',
+            color: 'var(--on-accent)', fontSize: 14, fontWeight: 800,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
+            boxShadow: '0 10px 32px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3)',
           }}>
             {saved ? 'Saved!' : saving ? 'Saving…' : 'Finish workout'}
           </button>
         </div>
       </div>
+
+      {/* ── SESSION COMPLETE ── */}
+      {showComplete && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', overflowY: 'auto', padding: '76px 26px 44px', textAlign: 'center' }}>
+          <style>{`@keyframes gdfall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(440px) rotate(540deg);opacity:0}}
+          @keyframes gdrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+          .gdc{animation:gdrise .6s cubic-bezier(0.22,1,0.36,1) both}
+          `}</style>
+          {[...Array(26)].map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: `${28 + ((i * 7) % 44)}%`, top: `${8 + ((i * 5) % 12)}%`,
+              width: 6 + (i % 3) * 3, height: 6 + (i % 3) * 3, borderRadius: 2,
+              background: ['var(--accent)', '#2BE8A4', 'var(--violet)', 'var(--gold)', 'var(--ink)'][i % 5],
+              animation: `gdfall 1.7s cubic-bezier(0.22,1,0.36,1) ${(i % 7) * 0.08}s forwards`,
+              pointerEvents: 'none',
+            }} />
+          ))}
+
+          <div className="gdc" style={{
+            width: 74, height: 74, borderRadius: 999, background: 'var(--accent-tint)',
+            border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px', boxShadow: '0 0 36px rgba(18,183,106,0.35)',
+          }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
+          </div>
+
+          <p className="gdc" style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>Session complete</p>
+          <p className="gdc" style={{ margin: '10px 0 2px', fontSize: 56, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            {totalVolume >= 1000
+              ? <CountNum value={totalVolume / 1000} decimals={1} suffix="k" />
+              : <CountNum value={Math.round(totalVolume)} />}
+          </p>
+          <p className="gdc" style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: 'var(--accent-strong)', textTransform: 'uppercase' }}>kg total volume</p>
+
+          <div className="gdc" style={{ display: 'flex', gap: 10, justifyContent: 'center', margin: '26px 0' }}>
+            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '12px 18px', boxShadow: 'var(--shadow-card)' }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{doneSets}</p>
+              <p style={{ margin: '3px 0 0', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)' }}>SETS</p>
+            </div>
+            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '12px 18px', boxShadow: 'var(--shadow-card)' }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{Math.max(1, Math.round((Date.now() - startRef.current) / 60000))} min</p>
+              <p style={{ margin: '3px 0 0', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)' }}>DURATION</p>
+            </div>
+            <div style={{ background: 'var(--card)', border: `1px solid ${prs.length ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 16, padding: '12px 18px', boxShadow: 'var(--shadow-card)' }}>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: prs.length ? 'var(--gold)' : 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{prs.length > 0 ? `+${prs.length}` : '0'}</p>
+              <p style={{ margin: '3px 0 0', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)' }}>NEW PR</p>
+            </div>
+          </div>
+
+          {prs.map((pr, i) => (
+            <div key={i} className="gdc gd-shine" style={{ background: 'var(--gold-tint)', border: '1px solid var(--gold)', borderRadius: 18, padding: '14px 16px', marginBottom: 10, textAlign: 'left', display: 'flex', gap: 12, alignItems: 'center' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg>
+              <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'var(--ink-2)' }}>
+                <b style={{ color: 'var(--ink)' }}>{pr.name} — {pr.kg}kg.</b> Lifetime best, up from {pr.prevKg}kg.
+              </p>
+            </div>
+          ))}
+
+          {finishQuote && (
+            <p className="gdc" style={{ margin: '16px auto 24px', maxWidth: 300, fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic', lineHeight: 1.55 }}>&ldquo;{finishQuote}&rdquo;</p>
+          )}
+
+          <button className="gdc" onClick={shareToFeed} disabled={shared || sharing} style={{
+            width: '100%', border: 'none', borderRadius: 16, padding: 16,
+            background: shared ? 'var(--soft)' : 'var(--accent)',
+            color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
+            fontSize: 15, fontWeight: 800, cursor: shared ? 'default' : 'pointer',
+            boxShadow: shared ? 'none' : '0 8px 26px rgba(18,183,106,0.3)',
+          }}>
+            {shared ? '✓ Shared with the pack' : sharing ? 'Sharing…' : 'Share to the pack'}
+          </button>
+          <button className="gdc" onClick={() => { setShowComplete(false); router.push('/dashboard'); }} style={{
+            width: '100%', marginTop: 10, border: '1px solid var(--line)', borderRadius: 16, padding: 15,
+            background: 'transparent', color: 'var(--ink-2)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}>
+            Back home
+          </button>
+        </div>
+      )}
 
       {/* ── TOAST ── */}
       {toast && (
