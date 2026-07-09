@@ -1,15 +1,18 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/MsalProvider";
 
-const geistSans = Geist({
+// Inter keeps the old --font-geist-sans variable name so every existing
+// style that references it picks up the new body face automatically.
+const interSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata = {
@@ -24,7 +27,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0B0B10",
+  themeColor: "#0A0714",
   width: "device-width",
   initialScale: 1,
 };
@@ -34,7 +37,7 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${interSans.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <script

@@ -92,6 +92,15 @@ function calcTotalVolume(logs) {
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
 
+// Same XP math as the dashboard so the level shown here always matches.
+const LEVEL_TITLES = ['Pup', 'Young Dog', 'Trainee', 'Working Dog', 'Strong Dog', 'Beast', 'Big Dog', 'Alpha', 'Top Dog', 'Legend'];
+function computeLevel(sessions, volume) {
+  const totalXp = sessions * 50 + Math.round(volume / 100);
+  let level = 1, into = totalXp, need = 200;
+  while (into >= need) { into -= need; level++; need = 200 * level; }
+  return { level, title: LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)] };
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { instance, accounts, inProgress } = useMsal();
@@ -222,14 +231,22 @@ export default function ProfilePage() {
   const streak = calcStreak(logs);
   const prCount = calcPRCount(logs);
   const totalVolume = calcTotalVolume(logs);
+  const levelInfo = computeLevel(totalSessions, totalVolume);
   const myGoals = goalChips(profileRef?.onboarding);
 
+  // IGNITE trophy coins — SVG icons on gradient coins, shine when earned
   const ACHIEVEMENTS = [
-    { emoji: '🥇', label: 'First PR',      earned: prCount >= 1 },
-    { emoji: '🏆', label: '5 PRs set',     earned: prCount >= 5 },
-    { emoji: '💪', label: '10 tonnes',     earned: totalVolume >= 10000 },
-    { emoji: '🔥', label: '14-day streak', earned: streak >= 14 },
+    { icon: 'medal',    label: 'First PR',      earned: prCount >= 1,       coin: 'var(--grad)',                              glow: 'rgba(255,46,147,0.4)' },
+    { icon: 'trophy',   label: '5 PRs set',     earned: prCount >= 5,       coin: 'linear-gradient(135deg, #8A6A14, #FFD166)', glow: 'rgba(255,209,102,0.35)' },
+    { icon: 'dumbbell', label: '10 tonnes',     earned: totalVolume >= 10000, coin: 'linear-gradient(135deg, #164B5E, #2AA8C9)', glow: 'rgba(110,231,249,0.3)' },
+    { icon: 'flame',    label: '14-day streak', earned: streak >= 14,       coin: 'linear-gradient(135deg, #7A2E1B, #FF5C39)', glow: 'rgba(255,92,57,0.35)' },
   ];
+  const COIN_ICONS = {
+    medal:    <><circle cx="12" cy="8" r="6" /><path d="M8.2 13.9 7 22l5-3 5 3-1.2-8.1" /></>,
+    trophy:   <><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></>,
+    dumbbell: <><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" /></>,
+    flame:    <><path d="M12 22c4 0 7-2.7 7-7 0-3-2-5.5-3.5-7C15 10 14 11 13 11c0-3-1-6-4-8 .5 3-1 5-2.5 7C5 11.7 5 13 5 15c0 4.3 3 7 7 7z" /></>,
+  };
   const BODY_STATS = [
     { key: 'weight',  label: 'Weight',   unit: 'kg' },
     { key: 'height',  label: 'Height',   unit: 'cm' },
@@ -240,18 +257,33 @@ export default function ProfilePage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
-      {/* ── HEADER ── */}
+      {/* ── HEADER — IGNITE conic XP ring ── */}
       <div style={{ textAlign: 'center', padding: '52px 20px 8px' }}>
         <div style={{
-          width: 84, height: 84, borderRadius: '50%', margin: '0 auto 12px',
-          background: 'linear-gradient(135deg, var(--violet), var(--blue))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 30, fontWeight: 700, color: '#fff',
-        }}>{userInitials}</div>
-        <p style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>{userName}</p>
-        <p style={{ margin: '3px 0 14px', fontSize: 14, color: 'var(--ink-2)' }}>
-          {streak > 0 ? `${streak} day streak 🔥` : `Member since ${joinDate}`}
+          width: 96, height: 96, borderRadius: '50%', margin: '0 auto 12px', padding: 3.5,
+          background: 'conic-gradient(from 210deg, var(--ember), var(--mag), var(--vio), var(--ember))',
+          animation: 'gdSpin 10s linear infinite',
+        }}>
+          <div className="gd-disp" style={{
+            width: '100%', height: '100%', borderRadius: '50%', background: 'var(--soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, fontWeight: 700, color: 'var(--ink)',
+            animation: 'gdSpin 10s linear infinite reverse',
+          }}>{userInitials}</div>
+        </div>
+        <p className="gd-disp" style={{ margin: 0, fontSize: 23, fontWeight: 700 }}>{userName}</p>
+        <p style={{ margin: '3px 0 10px', fontSize: 13, color: 'var(--ink-2)' }}>
+          {streak > 0 ? `${streak}-day streak · Member since ${joinDate}` : `Member since ${joinDate}`}
         </p>
+        <div className="gd-disp" style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 14,
+          padding: '7px 15px', borderRadius: 999, background: 'var(--grad)', color: '#fff',
+          fontWeight: 700, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase',
+          boxShadow: 'var(--glow-grad)',
+        }}>
+          LV {levelInfo.level} · {levelInfo.title}
+        </div>
+        <br />
         <button onClick={() => { setTempName(userName); setEditingName(true); }} style={{
           display: 'inline-flex', padding: '10px 22px', borderRadius: 14,
           background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)',
@@ -269,7 +301,7 @@ export default function ProfilePage() {
             { value: statsLoading ? '—' : prCount, label: 'PRs set', color: 'var(--accent-strong)' },
           ].map((s, i) => (
             <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: s.color }}>{s.value}</p>
+              <p className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</p>
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
           ))}
@@ -337,12 +369,19 @@ export default function ProfilePage() {
           <p style={{ ...eyebrow, marginBottom: 12 }}>Achievements</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 9 }}>
             {ACHIEVEMENTS.map((a, i) => (
-              <div key={i} style={{
-                background: a.earned ? 'var(--accent-tint)' : 'var(--soft)',
-                borderRadius: 16, padding: '16px 10px', textAlign: 'center', opacity: a.earned ? 1 : 0.5,
-              }}>
-                <div style={{ fontSize: 26, marginBottom: 6, filter: a.earned ? 'none' : 'grayscale(1)' }}>{a.emoji}</div>
-                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: a.earned ? 'var(--accent-strong)' : 'var(--ink-3)', lineHeight: 1.3 }}>{a.label}</p>
+              <div key={i} style={{ textAlign: 'center', opacity: a.earned ? 1 : 0.45 }}>
+                <div className={a.earned ? 'gd-shine' : undefined} style={{
+                  width: 54, height: 54, borderRadius: '50%', margin: '0 auto 8px',
+                  background: a.earned ? a.coin : 'var(--soft)',
+                  border: '1px solid var(--line)',
+                  boxShadow: a.earned ? `0 8px 22px ${a.glow}` : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a.earned ? '#fff' : 'var(--ink-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    {COIN_ICONS[a.icon]}
+                  </svg>
+                </div>
+                <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, color: a.earned ? 'var(--ink)' : 'var(--ink-3)', lineHeight: 1.3 }}>{a.label}</p>
               </div>
             ))}
           </div>
@@ -352,20 +391,24 @@ export default function ProfilePage() {
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <p style={{ ...eyebrow, padding: '16px 18px 10px' }}>Account</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🌙</div>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+            </div>
             <span style={{ fontSize: 14, color: 'var(--ink)', flex: 1, fontWeight: 500 }}>Dark mode</span>
             <ThemeToggle size={34} />
           </div>
           {[
-            { emoji: '👤', label: 'Edit display name', action: () => { setTempName(userName); setEditingName(true); } },
-            { emoji: '🔔', label: 'Notification preferences', action: () => showNotice('Notifications — coming soon') },
-            { emoji: '🔒', label: 'Privacy settings', action: () => showNotice('Privacy settings — coming soon') },
+            { icon: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20c0-4 3-6 7-6s7 2 7 6" /></>, label: 'Edit display name', action: () => { setTempName(userName); setEditingName(true); } },
+            { icon: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></>, label: 'Notification preferences', action: () => showNotice('Notifications — coming soon') },
+            { icon: <><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>, label: 'Privacy settings', action: () => showNotice('Privacy settings — coming soon') },
           ].map((item) => (
             <button key={item.label} onClick={item.action} style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '15px 18px',
               background: 'none', border: 'none', borderTop: '1px solid var(--line-2)', cursor: 'pointer', textAlign: 'left',
             }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{item.emoji}</div>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{item.icon}</svg>
+              </div>
               <span style={{ fontSize: 14, color: 'var(--ink)', flex: 1, fontWeight: 500 }}>{item.label}</span>
               <span style={{ fontSize: 18, color: 'var(--ink-3)' }}>›</span>
             </button>

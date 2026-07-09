@@ -26,24 +26,24 @@
   --line:      rgba(17,17,20,0.08);
   --line-2:    rgba(17,17,20,0.05);
 
-  /* brand + semantic */
-  --accent:        #12B76A;   /* primary green */
-  --accent-strong: #0E9355;   /* readable green text on light tint */
-  --accent-tint:   rgba(18,183,106,0.12);
-  --accent-glow:   rgba(18,183,106,0.22);
+  /* brand + semantic — IGNITE magenta */
+  --accent:        #E11D82;   /* primary magenta */
+  --accent-strong: #B41368;   /* readable magenta text on light tint */
+  --accent-tint:   rgba(225,29,130,0.10);
+  --accent-glow:   rgba(225,29,130,0.22);
   --on-accent:     #FFFFFF;
 
   --gold:      #D9A514;
   --gold-tint: rgba(217,165,20,0.14);
   --card-2:    #FFFFFF;
 
-  --orange:      #F79009;
-  --orange-ink:  #B54708;
-  --orange-tint: rgba(247,144,9,0.13);
+  --orange:      #F2542D;
+  --orange-ink:  #B23A1A;
+  --orange-tint: rgba(242,84,45,0.12);
 
-  --blue:      #2E90FA;
-  --blue-ink:  #1D6FD0;
-  --blue-tint: rgba(46,144,250,0.12);
+  --blue:      #0EA5C9;
+  --blue-ink:  #0A7FA0;
+  --blue-tint: rgba(14,165,201,0.10);
 
   --violet:    #7A5AF8;
   --red:       #F04438;
@@ -61,56 +61,77 @@
 }
 
 [data-theme="dark"] {
-  /* WOW premium palette — matches gymdogs-wow-mockup.html */
-  --bg:        #08090C;
-  --card:      #12141A;
-  --soft:      #1E222C;
-  --shell-1:   #171A22;
-  --shell-2:   #0C0D11;
+  /* IGNITE palette — matches gymdogs-ignite-mockup.html */
+  --bg:        #0A0714;
+  --card:      #140F23;
+  --soft:      #1E1734;
+  --shell-1:   #171129;
+  --shell-2:   #0D0918;
 
-  --ink:       #F6F7F9;
-  --ink-2:     #A8AEBC;
-  --ink-3:     #5C6372;
+  --ink:       #F5F2FC;
+  --ink-2:     #968FAD;
+  --ink-3:     #6B6484;
 
-  --line:      rgba(255,255,255,0.07);
+  --line:      rgba(255,255,255,0.09);
   --line-2:    rgba(255,255,255,0.05);
 
-  --accent:        #16C784;
-  --accent-strong: #2BE8A4;
-  --accent-tint:   rgba(22,199,132,0.12);
-  --accent-glow:   rgba(22,199,132,0.35);
-  --on-accent:     #04170E;
+  --accent:        #FF2E93;
+  --accent-strong: #FF6FB3;
+  --accent-tint:   rgba(255,46,147,0.13);
+  --accent-glow:   rgba(255,46,147,0.38);
+  --on-accent:     #FFFFFF;
 
-  --gold:      #F6C445;
-  --gold-tint: rgba(246,196,69,0.12);
-  --card-2:    #171A22;
+  --gold:      #FFD166;
+  --gold-tint: rgba(255,209,102,0.12);
+  --card-2:    #171129;
 
-  --orange:      #FF8A3D;
-  --orange-ink:  #FFC36B;
-  --orange-tint: rgba(255,138,61,0.18);
+  --orange:      #FF5C39;
+  --orange-ink:  #FFB49E;
+  --orange-tint: rgba(255,92,57,0.16);
 
-  --blue:      #2E90FA;
-  --blue-ink:  #7FB7FF;
-  --blue-tint: rgba(46,144,250,0.16);
+  --blue:      #6EE7F9;
+  --blue-ink:  #9FF0FF;
+  --blue-tint: rgba(110,231,249,0.12);
 
-  --violet:    #8B7CF6;
+  --violet:    #8B5CF6;
   --red:       #F04438;
   --red-ink:   #FF9F93;
   --red-tint:  rgba(240,68,56,0.18);
 
-  --nav-bg:    rgba(8,9,12,0.78);
-  --ai-card-1: #191632;
-  --ai-card-2: #221D45;
+  --nav-bg:    rgba(10,7,20,0.78);
+  --ai-card-1: #191233;
+  --ai-card-2: #241A4D;
 
   --shadow-card:  0 1px 2px rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.50);
   --shadow-float: 0 18px 52px rgba(0,0,0,0.65);
+}
+
+/* IGNITE brand gradient + helpers — available in BOTH themes */
+:root, [data-theme="light"], [data-theme="dark"] {
+  --ember: #FF5C39;
+  --mag:   #FF2E93;
+  --vio:   #8B5CF6;
+  --ice:   #6EE7F9;
+  --grad:      linear-gradient(135deg, #FF5C39 0%, #FF2E93 52%, #8B5CF6 100%);
+  --grad-soft: linear-gradient(135deg, rgba(255,92,57,0.16), rgba(255,46,147,0.14) 52%, rgba(139,92,246,0.16));
+  --glow-grad: 0 8px 32px rgba(255,46,147,0.35);
+}
+
+/* display face for headings + hero numbers */
+.gd-disp { font-family: var(--font-display), 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+
+/* gradient text — headline accents, PR numbers */
+.gd-grad-text {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--ink);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
 html, body {
@@ -208,12 +229,13 @@ input[type="number"] {
 }
 [data-theme="dark"] body::before {
   width: 380px; height: 380px; top: -140px; left: calc(50% - 320px);
-  background: radial-gradient(circle, rgba(22,199,132,0.20), transparent 70%);
+  background: radial-gradient(circle, rgba(139,92,246,0.26), transparent 70%);
   animation: gdDrift 16s ease-in-out infinite alternate;
 }
 [data-theme="dark"] body::after {
-  width: 320px; height: 320px; bottom: -120px; left: calc(50% + 20px);
-  background: radial-gradient(circle, rgba(139,124,246,0.16), transparent 70%);
+  width: 340px; height: 340px; bottom: -130px; left: calc(50% + 10px);
+  background: radial-gradient(circle, rgba(255,46,147,0.17), transparent 70%),
+              radial-gradient(circle at 30% 70%, rgba(255,92,57,0.14), transparent 60%);
   animation: gdDrift 20s ease-in-out infinite alternate-reverse;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -231,6 +253,8 @@ input[type="number"] {
                      100% { transform: translateY(440px) rotate(560deg); opacity: 0; } }
 @keyframes gdFlick { 0%,100% { transform: rotate(0) scale(1); } 30% { transform: rotate(-4deg) scale(1.07); } 60% { transform: rotate(3deg) scale(0.96); } }
 @keyframes gdBlink { 50% { opacity: 0; } }
+@keyframes gdGrow  { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes gdCellIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
 
 /* trophy shine sweep — add className="gd-shine" to a card */
 @keyframes gdSweep { 0%,55% { left: -40%; } 85%,100% { left: 130%; } }

@@ -115,18 +115,25 @@ function TypeText({ text }) {
 
 function Avatar({ name, size = 42, fontSize = 15, onClick }) {
   const initial = (name || 'S').charAt(0).toUpperCase();
+  // IGNITE: slowly-rotating conic gradient ring around the avatar
   return (
     <div
       onClick={onClick}
       style={{
-        width: size, height: size, borderRadius: '50%',
-        background: 'linear-gradient(135deg, var(--violet), var(--blue))',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize, fontWeight: 700, color: '#fff', flexShrink: 0,
-        cursor: onClick ? 'pointer' : 'default',
+        width: size + 6, height: size + 6, borderRadius: '50%', padding: 3,
+        background: 'conic-gradient(from 210deg, var(--ember), var(--mag), var(--vio), var(--ember))',
+        animation: 'gdSpin 9s linear infinite',
+        flexShrink: 0, cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      {initial}
+      <div style={{
+        width: '100%', height: '100%', borderRadius: '50%', background: 'var(--soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize, fontWeight: 700, color: 'var(--ink)',
+        animation: 'gdSpin 9s linear infinite reverse',
+      }}>
+        {initial}
+      </div>
     </div>
   );
 }
@@ -352,8 +359,9 @@ export default function DashboardPage() {
       <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>{dateStr}</p>
-          <h1 style={{ margin: '2px 0 0', fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em' }}>
+          <h1 className="gd-disp" style={{ margin: '2px 0 0', fontSize: 27, fontWeight: 700 }}>
             {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}
+            <span className="gd-grad-text">.</span>
           </h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -363,10 +371,10 @@ export default function DashboardPage() {
             {weekStats.streak > 0 && (
               <span style={{
                 position: 'absolute', bottom: -4, right: -6,
-                background: 'linear-gradient(180deg, #FFA35C, var(--orange))',
+                background: 'linear-gradient(135deg, var(--ember), var(--mag))',
                 borderRadius: 99, padding: '2px 7px', fontSize: 10, fontWeight: 800,
-                color: '#2A1200', border: '2px solid var(--bg)',
-                boxShadow: '0 4px 14px rgba(255,138,61,0.45)',
+                color: '#fff', border: '2px solid var(--bg)',
+                boxShadow: '0 4px 14px rgba(255,92,57,0.5)',
                 animation: 'gdFlick 2.2s ease-in-out infinite',
               }}>
                 {weekStats.streak}
@@ -381,7 +389,9 @@ export default function DashboardPage() {
         {/* ── SETUP NUDGE ── */}
         {showSetup && (
           <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--accent)', padding: '14px 16px' }}>
-            <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎯</div>
+            <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" fill="var(--accent)" /></svg>
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Set up your training profile</p>
               <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>2 minutes — personalises your plan and coach</p>
@@ -402,7 +412,7 @@ export default function DashboardPage() {
             {weekDays.map((d, i) => (
               <div key={i} style={{
                 flex: 1, textAlign: 'center', padding: '9px 0 8px', borderRadius: 14,
-                background: d.isToday ? 'linear-gradient(180deg, var(--accent-strong), var(--accent))' : 'var(--card)',
+                background: d.isToday ? 'var(--grad)' : 'var(--card)',
                 border: `1px solid ${d.isToday ? 'transparent' : 'var(--line)'}`,
                 boxShadow: d.isToday ? '0 6px 20px var(--accent-glow)' : 'none',
               }}>
@@ -436,7 +446,7 @@ export default function DashboardPage() {
             <div style={{ height: 9, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
               <div className="gd-shimbar" style={{
                 height: '100%', borderRadius: 999,
-                background: 'linear-gradient(90deg, #0E9A66, var(--accent-strong))',
+                background: 'var(--grad)',
                 width: xpAnimated ? `${levelInfo.pct}%` : 0,
                 transition: 'width 1.4s cubic-bezier(0.22, 1, 0.36, 1)',
               }} />
@@ -452,8 +462,8 @@ export default function DashboardPage() {
             <svg width="100" height="100" viewBox="0 0 120 120">
               <defs>
                 <linearGradient id="gdReadyGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#2BE8A4" />
-                  <stop offset="1" stopColor="#0E9A66" />
+                  <stop offset="0" stopColor="#6EE7F9" />
+                  <stop offset="1" stopColor="#8B5CF6" />
                 </linearGradient>
               </defs>
               <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
@@ -462,7 +472,7 @@ export default function DashboardPage() {
                   strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={ringOffset}
                   style={{
                     transition: 'stroke-dashoffset 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
-                    filter: 'drop-shadow(0 0 10px var(--accent-glow))',
+                    filter: 'drop-shadow(0 0 10px rgba(110,231,249,0.4))',
                   }}
                   transform="rotate(-90 60 60)" />
               )}
@@ -481,36 +491,45 @@ export default function DashboardPage() {
         </div>
         </Reveal>
 
-        {/* ── TODAY'S SESSION ── */}
+        {/* ── TODAY'S SESSION — IGNITE mesh hero ── */}
         <Reveal delay={140}>
-        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <div style={{
+          borderRadius: 26, padding: 0, overflow: 'hidden', marginBottom: 14,
+          background: `radial-gradient(120% 160% at 10% 0%, rgba(255,92,57,0.5), transparent 52%),
+                       radial-gradient(130% 150% at 95% 20%, rgba(139,92,246,0.55), transparent 58%),
+                       radial-gradient(120% 180% at 60% 110%, rgba(255,46,147,0.5), transparent 55%),
+                       #17102B`,
+          border: '1px solid rgba(255,255,255,0.14)',
+          boxShadow: '0 24px 60px rgba(139,46,147,0.25)',
+          color: '#fff',
+        }}>
           <div
             onClick={() => todayPlan?.exercises?.length && setSessionOpen(o => !o)}
-            style={{ padding: '18px 18px 14px', cursor: todayPlan?.exercises?.length ? 'pointer' : 'default' }}
+            style={{ padding: '20px 20px 14px', cursor: todayPlan?.exercises?.length ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={eyebrow}>Today&rsquo;s session</p>
-                <p style={{ margin: '5px 0 0', fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                <p style={{ ...eyebrow, color: 'rgba(255,255,255,0.75)' }}>Today&rsquo;s session</p>
+                <p className="gd-disp" style={{ margin: '6px 0 0', fontSize: 32, fontWeight: 700, lineHeight: 1.05, textTransform: 'uppercase' }}>
                   {sessionName || 'Rest day'}
                   {todayPlan?.exercises?.length ? (
                     <span style={{
-                      display: 'inline-block', marginLeft: 8, fontSize: 13, color: 'var(--ink-3)',
+                      display: 'inline-block', marginLeft: 8, fontSize: 15, color: 'rgba(255,255,255,0.7)',
                       transform: sessionOpen ? 'rotate(90deg)' : 'none',
                       transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
                     }}>›</span>
                   ) : null}
                 </p>
               </div>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {Icon.dumbbell()}
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {Icon.dumbbell('#fff')}
               </div>
             </div>
             {sessionName && (
               <div style={{ display: 'flex', gap: 8, marginTop: 13, flexWrap: 'wrap' }}>
-                {exerciseCount && <span style={chip}>{exerciseCount} exercises</span>}
-                {sessionMins && <span style={chip}>~{sessionMins} min</span>}
-                {sessionFocus && <span style={chip}>{sessionFocus}</span>}
+                {exerciseCount && <span style={heroChip}>{exerciseCount} exercises</span>}
+                {sessionMins && <span style={heroChip}>~{sessionMins} min</span>}
+                {sessionFocus && <span style={heroChip}>{sessionFocus}</span>}
               </div>
             )}
           </div>
@@ -523,12 +542,12 @@ export default function DashboardPage() {
               transition: 'grid-template-rows 0.5s cubic-bezier(0.22, 1, 0.36, 1)',
             }}>
               <div style={{ overflow: 'hidden' }}>
-                <div style={{ padding: '2px 18px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ padding: '2px 20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {todayPlan.exercises.map((ex, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 999, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', flexShrink: 0 }}>{i + 1}</div>
+                      <div style={{ width: 26, height: 26, borderRadius: 999, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', flexShrink: 0 }}>{i + 1}</div>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{ex.name}</span>
-                      <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-3)', flexShrink: 0 }}>{ex.sets} × {ex.reps}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>{ex.sets} × {ex.reps}</span>
                     </div>
                   ))}
                 </div>
@@ -536,20 +555,21 @@ export default function DashboardPage() {
             </div>
           )}
           {todayPlan ? (
-            <div style={{ padding: '0 18px 18px' }}>
-              <button onClick={() => router.push('/workout')} style={{
-                width: '100%', border: 'none', borderRadius: 16,
-                background: 'linear-gradient(180deg, var(--accent-strong), var(--accent))',
-                color: 'var(--on-accent)', padding: 16, fontSize: 15, fontWeight: 800,
-                cursor: 'pointer', letterSpacing: '-0.01em',
-                boxShadow: '0 10px 32px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3)',
+            <div style={{ padding: '0 20px 20px' }}>
+              {/* mockup: white pill button on the mesh card */}
+              <button onClick={() => router.push('/workout')} className="gd-disp" style={{
+                width: '100%', border: 'none', borderRadius: 17,
+                background: '#fff', color: '#140E24', padding: 15, fontSize: 16, fontWeight: 700,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
               }}>
-                Start session
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E24"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                START WORKOUT
               </button>
             </div>
           ) : (
-            <div style={{ padding: '0 18px 18px' }}>
-              <div style={{ background: 'var(--soft)', borderRadius: 14, padding: 14, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, fontWeight: 600 }}>
+            <div style={{ padding: '0 20px 20px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 14, textAlign: 'center', color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 600 }}>
                 No session assigned yet
               </div>
             </div>
@@ -640,13 +660,19 @@ const chip = {
   background: 'var(--soft)', color: 'var(--ink-2)',
 };
 
+// light-on-mesh chips for the IGNITE hero card
+const heroChip = {
+  fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 999,
+  background: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.88)',
+};
+
 function Stat({ value, label, color, suffix }) {
   return (
     <div style={{
       background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18,
       padding: '16px 8px', textAlign: 'center', boxShadow: 'var(--shadow-card)',
     }}>
-      <p style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', color: color || 'var(--ink)' }}>
+      <p className="gd-disp" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: color || 'var(--ink)' }}>
         {value}{suffix && <span style={{ fontSize: 16 }}>{suffix}</span>}
       </p>
       <p style={{ margin: '5px 0 0', fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>{label}</p>

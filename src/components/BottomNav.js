@@ -67,7 +67,7 @@ export default function BottomNav() {
               <span style={{
                 position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)',
                 width: 34, height: 3, borderRadius: 99,
-                background: 'var(--accent)', boxShadow: '0 0 12px var(--accent-glow)',
+                background: 'var(--grad)', boxShadow: '0 0 12px var(--accent-glow)',
               }} />
             )}
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"

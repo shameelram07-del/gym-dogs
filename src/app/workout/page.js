@@ -427,11 +427,11 @@ export default function WorkoutPage() {
           <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <div>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Active session</p>
-            <p style={{ margin: '1px 0 0', fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{activePlan.name}</p>
+            <p className="gd-disp" style={{ margin: '1px 0 0', fontSize: 18, fontWeight: 700 }}>{activePlan.name}</p>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--accent-strong)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
+          <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
           <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', fontWeight: 600 }}>DURATION</p>
         </div>
       </div>
@@ -445,7 +445,7 @@ export default function WorkoutPage() {
             return (
               <div key={i} style={{
                 flex: 1, height: 4, borderRadius: 999,
-                background: i === activeExIdx ? 'var(--accent)' : exDone ? 'var(--accent)' : 'var(--soft)',
+                background: (i === activeExIdx || exDone) ? 'var(--grad)' : 'var(--soft)',
                 opacity: i === activeExIdx ? 1 : exDone ? 0.4 : 1,
               }} />
             );
@@ -461,13 +461,13 @@ export default function WorkoutPage() {
               { label: 'Volume', val: `${totalVolume > 0 ? totalVolume.toLocaleString() : '0'} kg` },
             ].map((s, i) => (
               <div key={i}>
-                <p style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{s.val}</p>
+                <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{s.val}</p>
                 <p style={{ margin: '1px 0 0', fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
               </div>
             ))}
           </div>
           <div style={{ background: 'var(--soft)', borderRadius: 4, height: 5 }}>
-            <div style={{ width: `${progressPct}%`, height: '100%', borderRadius: 4, background: 'var(--accent)', transition: 'width 0.3s' }} />
+            <div className="gd-shimbar" style={{ width: `${progressPct}%`, height: '100%', borderRadius: 4, background: 'var(--grad)', transition: 'width 0.3s' }} />
           </div>
         </div>
 
@@ -509,7 +509,7 @@ export default function WorkoutPage() {
           <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {activeExIdx + 1} OF {activePlan.exercises.length}</p>
-              <h2 style={{ margin: '5px 0 0', fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{activeEx.name}</h2>
+              <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 23, fontWeight: 700, lineHeight: 1.1 }}>{activeEx.name}</h2>
               {lastData && (
                 <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {lastData}</p>
               )}
@@ -616,12 +616,12 @@ export default function WorkoutPage() {
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 12, alignItems: 'center' }}>
           <RestTimer trigger={restTrigger} onDone={() => showToast('⏱ Rest over — go!')} />
-          <button onClick={handleSave} disabled={saving} style={{
-            background: 'linear-gradient(180deg, var(--accent-strong), var(--accent))',
+          <button onClick={handleSave} disabled={saving} className="gd-disp" style={{
+            background: 'var(--grad)',
             border: 'none', borderRadius: 16, padding: '15px 0',
-            color: 'var(--on-accent)', fontSize: 14, fontWeight: 800,
+            color: '#fff', fontSize: 14, fontWeight: 700,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-            boxShadow: '0 10px 32px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3)',
+            boxShadow: 'var(--glow-grad), inset 0 1px 0 rgba(255,255,255,0.3)',
           }}>
             {saved ? 'Saved!' : saving ? 'Saving…' : 'Finish workout'}
           </button>
@@ -639,7 +639,7 @@ export default function WorkoutPage() {
             <div key={i} style={{
               position: 'absolute', left: `${28 + ((i * 7) % 44)}%`, top: `${8 + ((i * 5) % 12)}%`,
               width: 6 + (i % 3) * 3, height: 6 + (i % 3) * 3, borderRadius: 2,
-              background: ['var(--accent)', '#2BE8A4', 'var(--violet)', 'var(--gold)', 'var(--ink)'][i % 5],
+              background: ['var(--ember)', 'var(--mag)', 'var(--vio)', 'var(--ice)', 'var(--gold)'][i % 5],
               animation: `gdfall 1.7s cubic-bezier(0.22,1,0.36,1) ${(i % 7) * 0.08}s forwards`,
               pointerEvents: 'none',
             }} />
@@ -648,13 +648,13 @@ export default function WorkoutPage() {
           <div className="gdc" style={{
             width: 74, height: 74, borderRadius: 999, background: 'var(--accent-tint)',
             border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', boxShadow: '0 0 36px rgba(18,183,106,0.35)',
+            margin: '0 auto 20px', boxShadow: '0 0 36px rgba(255,46,147,0.35)',
           }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
           </div>
 
           <p className="gdc" style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>Session complete</p>
-          <p className="gdc" style={{ margin: '10px 0 2px', fontSize: 56, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+          <p className="gdc gd-disp gd-grad-text" style={{ margin: '10px 0 2px', fontSize: 56, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {totalVolume >= 1000
               ? <CountNum value={totalVolume / 1000} decimals={1} suffix="k" />
               : <CountNum value={Math.round(totalVolume)} />}
@@ -691,10 +691,10 @@ export default function WorkoutPage() {
 
           <button className="gdc" onClick={shareToFeed} disabled={shared || sharing} style={{
             width: '100%', border: 'none', borderRadius: 16, padding: 16,
-            background: shared ? 'var(--soft)' : 'var(--accent)',
-            color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
+            background: shared ? 'var(--soft)' : 'var(--grad)',
+            color: shared ? 'var(--accent-strong)' : '#fff',
             fontSize: 15, fontWeight: 800, cursor: shared ? 'default' : 'pointer',
-            boxShadow: shared ? 'none' : '0 8px 26px rgba(18,183,106,0.3)',
+            boxShadow: shared ? 'none' : 'var(--glow-grad)',
           }}>
             {shared ? '✓ Shared with the pack' : sharing ? 'Sharing…' : 'Share to the pack'}
           </button>

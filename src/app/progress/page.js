@@ -91,6 +91,36 @@ function calcPRs(logs) {
     .slice(0, 5);
 }
 
+// IGNITE consistency heatmap — last 5 weeks (Mon→Sun), intensity from daily volume
+function calcHeatmap(logs) {
+  const volByDay = {};
+  logs.forEach(log => {
+    if (!log.date) return;
+    const day = log.date.split('T')[0];
+    try {
+      const sets = JSON.parse(log.sets_data || '[]');
+      sets.forEach(s => { if (s.kg && s.reps) volByDay[day] = (volByDay[day] || 0) + parseFloat(s.kg) * parseFloat(s.reps); });
+    } catch (e) {}
+  });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const end = new Date(today);
+  const dow = (today.getDay() + 6) % 7; // 0 = Monday
+  end.setDate(today.getDate() + (6 - dow)); // grid ends on the coming Sunday
+  const max = Math.max(...Object.values(volByDay), 1);
+  const days = [];
+  for (let i = 34; i >= 0; i--) {
+    const d = new Date(end); d.setDate(end.getDate() - i);
+    const iso = d.toISOString().split('T')[0];
+    const v = volByDay[iso] || 0;
+    days.push({
+      iso,
+      level: v === 0 ? 0 : v < max * 0.5 ? 1 : v < max * 0.85 ? 2 : 3,
+      future: d > today,
+    });
+  }
+  return days;
+}
+
 function calcTotalVolume(logs) {
   let total = 0;
   logs.forEach(log => {
@@ -194,6 +224,7 @@ export default function ProgressPage() {
   if (!userId) return null;
 
   const weeklyData = calcWeeklyVolume(logs);
+  const heatDays = calcHeatmap(logs);
   const prs = calcPRs(logs);
   const totalVolume = calcTotalVolume(logs);
   const totalSessions = new Set(logs.map(l => l.date).filter(Boolean)).size;
@@ -211,7 +242,7 @@ export default function ProgressPage() {
 
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px' }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Progress</h1>
+        <h1 className="gd-disp" style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>Progress</h1>
         <p style={{ margin: '2px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>All time</p>
       </div>
 
@@ -226,7 +257,7 @@ export default function ProgressPage() {
             { value: loading ? '—' : prs.length, label: 'PRs set', color: 'var(--orange)' },
           ].map((s, i) => (
             <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: s.color }}>{s.value}</p>
+              <p className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</p>
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
           ))}
@@ -251,7 +282,7 @@ export default function ProgressPage() {
                   <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>
                     {d.rawVolume >= 1000 ? `${(d.rawVolume/1000).toFixed(1)}k` : Math.round(d.rawVolume)}
                   </span>
-                  <div style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--accent)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)' }} />
+                  <div className={d.isCurrent ? 'gd-shimbar' : undefined} style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--grad)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: d.isCurrent ? '0 4px 18px rgba(255,46,147,0.3)' : 'none' }} />
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{d.week}</span>
                 </div>
               ))}
@@ -259,6 +290,38 @@ export default function ProgressPage() {
           )}
         </div>
         </Reveal>
+
+        {/* ── CONSISTENCY HEATMAP (IGNITE) ── */}
+        {!loading && heatDays.length > 0 && (
+          <Reveal delay={85}>
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={eyebrow}>Consistency</p>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', border: '1px solid var(--line)', borderRadius: 999, padding: '4px 10px' }}>
+                {heatDays.filter(d => d.level > 0).length} of 35 days
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginTop: 12 }}>
+              {heatDays.map((d, i) => (
+                <div key={d.iso} style={{
+                  aspectRatio: '1', borderRadius: 7,
+                  background: d.level === 0 ? 'var(--soft)'
+                    : d.level === 1 ? 'rgba(255,92,57,0.28)'
+                    : d.level === 2 ? 'rgba(255,46,147,0.45)'
+                    : 'var(--grad)',
+                  boxShadow: d.level === 3 ? '0 0 10px rgba(255,46,147,0.4)' : 'none',
+                  opacity: d.future ? 0.3 : 1,
+                  animation: `gdCellIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${i * 18}ms both`,
+                }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+              <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600, letterSpacing: '0.06em' }}>MON</span>
+              <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600, letterSpacing: '0.06em' }}>SUN</span>
+            </div>
+          </div>
+          </Reveal>
+        )}
 
         {/* ── SORENESS ── */}
         <Reveal delay={110}>
@@ -293,7 +356,7 @@ export default function ProgressPage() {
           <div style={{ marginTop: 14, background: 'var(--soft)', borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, letterSpacing: '0.05em' }}>Recovery score</p>
-              <p style={{ margin: '2px 0 0', fontSize: 28, fontWeight: 800, color: status.color, lineHeight: 1 }}>{recoveryScore}%</p>
+              <p className="gd-disp" style={{ margin: '2px 0 0', fontSize: 28, fontWeight: 700, color: status.color, lineHeight: 1 }}>{recoveryScore}%</p>
             </div>
             <div style={{ textAlign: 'right' }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: status.color }}>{status.label}</p>
@@ -314,12 +377,14 @@ export default function ProgressPage() {
           ) : (
             prs.map((pr, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: i === 0 ? 'none' : '1px solid var(--line-2)' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--orange-tint)', color: 'var(--orange-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🏆</div>
+                <div className="gd-shine" style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--grad-soft)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg>
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.exercise}</p>
                   <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{pr.date}</p>
                 </div>
-                <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--accent-strong)', flexShrink: 0 }}>{pr.weight}kg</p>
+                <p className="gd-disp gd-grad-text" style={{ margin: 0, fontSize: 17, fontWeight: 700, flexShrink: 0 }}>{pr.weight}kg</p>
               </div>
             ))
           )}
