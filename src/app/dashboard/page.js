@@ -626,8 +626,8 @@ export default function DashboardPage() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg>
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>10,000 kg club</p>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>July challenge · prize: creatine — see the pack&rsquo;s progress</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>100,000 kg club</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Pack challenge · prize: creatine — see who&rsquo;s closest</p>
           </div>
           <span style={{ color: 'var(--gold)', fontSize: 18 }}>›</span>
         </button>
