@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import { randomQuote } from '@/lib/quotes';
+import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -147,6 +148,9 @@ export default function WorkoutPage() {
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState('');
   const [activePlan, setActivePlan] = useState(null);
+  const [exercises, setExercises] = useState([]); // live, editable session list (starts = published plan)
+  const [picker, setPicker] = useState(null);     // null | { mode: 'add' } | { mode: 'swap', idx }
+  const [pickerGroup, setPickerGroup] = useState('CHEST');
   const [planLoading, setPlanLoading] = useState(true);
   const [planError, setPlanError] = useState(null);
   const [logs, setLogs] = useState({});
@@ -194,6 +198,7 @@ export default function WorkoutPage() {
     if (!userId) return;
     if (userId === 'demo') {
       setActivePlan(DEMO_PLAN);
+      setExercises(DEMO_PLAN.exercises);
       const emptyLogs = {};
       DEMO_PLAN.exercises.forEach((ex, idx) => {
         emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
@@ -208,6 +213,7 @@ export default function WorkoutPage() {
         if (res.ok) {
           const data = await res.json();
           setActivePlan(data);
+          setExercises(Array.isArray(data.exercises) ? data.exercises : []);
           const emptyLogs = {};
           data.exercises.forEach((ex, idx) => {
             emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
@@ -278,12 +284,12 @@ export default function WorkoutPage() {
     setRestTrigger(Date.now());
 
     // If the whole exercise is now done, advance to the next unfinished one.
-    if (activePlan && updated.every(s => s.done)) {
-      const nextIdx = activePlan.exercises.findIndex((_, i) =>
+    if (exercises.length && updated.every(s => s.done)) {
+      const nextIdx = exercises.findIndex((_, i) =>
         i !== exIdx && !((next[i] || []).length > 0 && (next[i] || []).every(s => s.done))
       );
       if (nextIdx !== -1) {
-        showToast(`✅ ${activePlan.exercises[exIdx].name} done — next: ${activePlan.exercises[nextIdx].name}`);
+        showToast(`✅ ${exercises[exIdx].name} done — next: ${exercises[nextIdx].name}`);
         setTimeout(() => setActiveExIdx(nextIdx), 700);
       } else {
         showToast('🎉 All exercises done — hit Finish workout!');
@@ -293,6 +299,49 @@ export default function WorkoutPage() {
 
   const addSet = (exIdx) => {
     setLogs(prev => ({ ...prev, [exIdx]: [...(prev[exIdx] || []), { kg: '', reps: '', done: false }] }));
+  };
+
+  const removeSet = (exIdx, setIdx) => {
+    setLogs(prev => {
+      const rows = (prev[exIdx] || []).filter((_, i) => i !== setIdx);
+      return { ...prev, [exIdx]: rows.length ? rows : [{ kg: '', reps: '', done: false }] };
+    });
+  };
+
+  // Turn an index-keyed object ({0:.., 1:..}) into a contiguous array, mutate, and rekey —
+  // keeps logs / lastSession aligned with the exercises array after add/remove.
+  const asArray = (obj, len) => Array.from({ length: len }, (_, i) => obj[i]);
+  const reArray = (arr) => arr.reduce((o, v, i) => { o[i] = v; return o; }, {});
+
+  const blankSets = (n) => Array(Math.max(1, n || 3)).fill(null).map(() => ({ kg: '', reps: '', done: false }));
+  const fromLib = (e) => ({ name: e.name, sets: e.defaultSets ?? 3, reps: e.defaultReps ?? '10-12', cue: e.cue ?? '', equipment: e.equipment });
+
+  const addExerciseToSession = (libEx) => {
+    const newIdx = exercises.length;
+    setExercises(prev => [...prev, fromLib(libEx)]);
+    setLogs(prev => ({ ...prev, [newIdx]: blankSets(libEx.defaultSets) }));
+    setActiveExIdx(newIdx);
+    setPicker(null);
+    showToast(`➕ Added ${libEx.name}`);
+  };
+
+  const swapExercise = (idx, libEx) => {
+    setExercises(prev => prev.map((e, i) => (i === idx ? fromLib(libEx) : e)));
+    setLogs(prev => ({ ...prev, [idx]: blankSets(libEx.defaultSets) }));
+    setLastSession(prev => { const n = { ...prev }; delete n[idx]; return n; });
+    setPicker(null);
+    showToast(`🔁 Swapped in ${libEx.name}`);
+  };
+
+  const removeExerciseFromSession = (idx) => {
+    const len = exercises.length;
+    if (len <= 1) { showToast('Cannot remove the only exercise'); return; }
+    const name = exercises[idx]?.name;
+    setExercises(prev => prev.filter((_, i) => i !== idx));
+    setLogs(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
+    setLastSession(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
+    setActiveExIdx(a => (a > idx ? a - 1 : Math.min(a, len - 2)));
+    showToast(`🗑 Removed ${name || 'exercise'}`);
   };
 
   const adjustKg = (exIdx, setIdx, delta) => {
@@ -323,7 +372,7 @@ export default function WorkoutPage() {
     if (userId === 'demo') { setSaved(true); setFinishQuote(randomQuote()); setTimeout(() => setSaved(false), 3000); return; }
     setSaving(true); setError(null);
     try {
-      await Promise.all(activePlan.exercises.map((ex, idx) =>
+      await Promise.all(exercises.map((ex, idx) =>
         fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
@@ -335,7 +384,7 @@ export default function WorkoutPage() {
 
       // PR detection: today's heaviest set vs last session's, per exercise
       const newPrs = [];
-      activePlan.exercises.forEach((ex, idx) => {
+      exercises.forEach((ex, idx) => {
         const todayMax = Math.max(0, ...(logs[idx] || []).map(s => parseFloat(s.kg) || 0));
         const prevMax = Math.max(0, ...(lastSession[idx] || []).map(s => parseFloat(s.kg) || 0));
         if (prevMax > 0 && todayMax > prevMax) newPrs.push({ name: ex.name, kg: todayMax, prevKg: prevMax });
@@ -343,7 +392,7 @@ export default function WorkoutPage() {
       setPrs(newPrs);
       setShowComplete(true);
 
-      const summary = activePlan.exercises.map((ex, idx) => {
+      const summary = exercises.map((ex, idx) => {
         const sets = (logs[idx] || []).filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
         return sets ? `${ex.name}: ${sets}` : null;
       }).filter(Boolean).join('. ');
@@ -384,13 +433,13 @@ export default function WorkoutPage() {
     return sets.filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg × ${s.reps||'?'}`).join(', ');
   };
 
-  const totalSets = activePlan ? activePlan.exercises.reduce((sum, _, idx) => sum + (logs[idx]?.length || 0), 0) : 0;
-  const doneSets = activePlan ? activePlan.exercises.reduce((sum, _, idx) => sum + (logs[idx]?.filter(s => s.done).length || 0), 0) : 0;
-  const totalVolume = activePlan ? activePlan.exercises.reduce((sum, _, idx) => {
+  const totalSets = exercises.reduce((sum, _, idx) => sum + (logs[idx]?.length || 0), 0);
+  const doneSets = exercises.reduce((sum, _, idx) => sum + (logs[idx]?.filter(s => s.done).length || 0), 0);
+  const totalVolume = exercises.reduce((sum, _, idx) => {
     return sum + (logs[idx] || []).reduce((s, set) => s + (parseFloat(set.kg) || 0) * (parseInt(set.reps) || 0), 0);
-  }, 0) : 0;
-  const doneExercises = activePlan ? activePlan.exercises.filter((_, idx) => (logs[idx] || []).every(s => s.done) && (logs[idx] || []).length > 0).length : 0;
-  const progressPct = activePlan ? (doneExercises / activePlan.exercises.length) * 100 : 0;
+  }, 0);
+  const doneExercises = exercises.filter((_, idx) => (logs[idx] || []).every(s => s.done) && (logs[idx] || []).length > 0).length;
+  const progressPct = exercises.length ? (doneExercises / exercises.length) * 100 : 0;
 
   if (!userId || planLoading) {
     return (
@@ -414,7 +463,7 @@ export default function WorkoutPage() {
     );
   }
 
-  const activeEx = activePlan.exercises[activeExIdx];
+  const activeEx = exercises[activeExIdx] || exercises[0] || {};
   const activeSets = logs[activeExIdx] || [];
   const lastData = formatLast(activeExIdx);
 
@@ -440,7 +489,7 @@ export default function WorkoutPage() {
 
         {/* ── EXERCISE PAGER ── */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {activePlan.exercises.map((_, i) => {
+          {exercises.map((_, i) => {
             const exDone = (logs[i] || []).length > 0 && (logs[i] || []).every(s => s.done);
             return (
               <div key={i} style={{
@@ -452,11 +501,38 @@ export default function WorkoutPage() {
           })}
         </div>
 
+        {/* ── EXERCISE SELECTOR — tap any exercise, any order (busy-machine friendly) ── */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 6 }}>
+          {exercises.map((ex, i) => {
+            const exDone = (logs[i] || []).length > 0 && (logs[i] || []).every(s => s.done);
+            const active = i === activeExIdx;
+            return (
+              <button key={i} onClick={() => setActiveExIdx(i)} style={{
+                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
+                padding: '8px 13px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+                border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+                background: active ? 'var(--accent-tint)' : 'var(--card)',
+                color: active ? 'var(--accent-strong)' : 'var(--ink-2)',
+              }}>
+                <span style={{
+                  width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, background: exDone ? 'var(--accent)' : 'var(--soft)', color: exDone ? 'var(--on-accent)' : 'var(--ink-3)',
+                }}>{exDone ? '✓' : i + 1}</span>
+                {ex.name}
+              </button>
+            );
+          })}
+          <button onClick={() => { setPicker({ mode: 'add' }); }} style={{
+            flexShrink: 0, cursor: 'pointer', padding: '8px 14px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+            border: '1px dashed var(--line)', background: 'transparent', color: 'var(--accent-strong)',
+          }}>+ Add</button>
+        </div>
+
         {/* ── PROGRESS STATS ── */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
             {[
-              { label: 'Exercises', val: `${doneExercises}/${activePlan.exercises.length}` },
+              { label: 'Exercises', val: `${doneExercises}/${exercises.length}` },
               { label: 'Sets', val: `${doneSets}/${totalSets}` },
               { label: 'Volume', val: `${totalVolume > 0 ? totalVolume.toLocaleString() : '0'} kg` },
             ].map((s, i) => (
@@ -508,15 +584,25 @@ export default function WorkoutPage() {
         <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 22, overflow: 'hidden', marginBottom: 14 }}>
           <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {activeExIdx + 1} OF {activePlan.exercises.length}</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {activeExIdx + 1} OF {exercises.length}</p>
               <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 23, fontWeight: 700, lineHeight: 1.1 }}>{activeEx.name}</h2>
               {lastData && (
                 <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {lastData}</p>
               )}
             </div>
-            <button onClick={() => setShowGuide(!showGuide)} style={{ flexShrink: 0, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 12px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-              Guide
-            </button>
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button onClick={() => setShowGuide(!showGuide)} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 12px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                Guide
+              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { setPicker({ mode: 'swap', idx: activeExIdx }); }} aria-label="Swap exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Swap
+                </button>
+                <button onClick={() => removeExerciseFromSession(activeExIdx)} aria-label="Skip exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-3)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Skip
+                </button>
+              </div>
+            </div>
           </div>
 
           {showGuide && activeEx.cue && (
@@ -566,21 +652,30 @@ export default function WorkoutPage() {
             ))}
           </div>
 
-          <button onClick={() => addSet(activeExIdx)} style={{
-            width: 'calc(100% - 36px)', margin: '6px 18px 16px', background: 'var(--soft)',
-            border: 'none', borderRadius: 12, padding: '12px 0',
-            color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-          }}>
-            + Add set
-          </button>
+          <div style={{ display: 'flex', gap: 8, margin: '6px 18px 16px' }}>
+            <button onClick={() => addSet(activeExIdx)} style={{
+              flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
+              color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+            }}>
+              + Add set
+            </button>
+            {activeSets.length > 1 && (
+              <button onClick={() => removeSet(activeExIdx, activeSets.length - 1)} style={{
+                flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
+                color: 'var(--ink-3)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}>
+                − Remove set
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── UP NEXT ── */}
-        {activePlan.exercises.length > 1 && (
+        {/* ── ALL EXERCISES (tap to jump — any order) ── */}
+        {exercises.length > 1 && (
           <>
-            <p style={{ margin: '0 4px 9px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Up next</p>
+            <p style={{ margin: '0 4px 9px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>All exercises · tap to jump</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activePlan.exercises.map((ex, idx) => {
+              {exercises.map((ex, idx) => {
                 if (idx === activeExIdx) return null;
                 const isDone = (logs[idx] || []).length > 0 && (logs[idx] || []).every(s => s.done);
                 return (
@@ -715,6 +810,38 @@ export default function WorkoutPage() {
           padding: '10px 18px', borderRadius: 999, maxWidth: 'calc(100% - 40px)', textAlign: 'center',
         }}>
           {toast}
+        </div>
+      )}
+
+      {/* ── EXERCISE PICKER (add / swap) ── */}
+      {picker && (
+        <div onClick={() => setPicker(null)} style={{ position: 'fixed', inset: 0, zIndex: 320, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, background: 'var(--card)', borderRadius: '22px 22px 0 0', borderTop: '1px solid var(--line)', maxHeight: '80vh', display: 'flex', flexDirection: 'column', padding: '18px 18px calc(20px + env(safe-area-inset-bottom))' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{picker.mode === 'swap' ? 'Swap exercise' : 'Add exercise'}</p>
+              <button onClick={() => setPicker(null)} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', borderRadius: 10, width: 32, height: 32, color: 'var(--ink-2)', fontSize: 16, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10 }}>
+              {muscleGroups.map(mg => (
+                <button key={mg} onClick={() => setPickerGroup(mg)} style={{
+                  flexShrink: 0, padding: '7px 14px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                  background: pickerGroup === mg ? 'var(--accent-tint)' : 'var(--soft)',
+                  color: pickerGroup === mg ? 'var(--accent-strong)' : 'var(--ink-2)',
+                }}>{mg}</button>
+              ))}
+            </div>
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+              {(exerciseLibrary[pickerGroup] || []).map(e => (
+                <button key={e.name} onClick={() => (picker.mode === 'swap' ? swapExercise(picker.idx, e) : addExerciseToSession(e))} style={{
+                  textAlign: 'left', background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 14, padding: '12px 14px',
+                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+                }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{e.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, flexShrink: 0 }}>{e.equipment}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
