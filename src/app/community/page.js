@@ -287,14 +287,14 @@ export default function CommunityPage() {
         <Reveal>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <p style={eyebrow}>Leaderboard · this week</p>
+            <p style={eyebrow}>Leaderboard · last 7 days</p>
             {myRank >= 0 && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-strong)' }}>You&rsquo;re #{myRank + 1}</span>}
           </div>
           {loading ? (
             <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '14px 0' }}>Loading…</p>
           ) : leaderboard.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '14px 0' }}>
-              No sessions logged this week yet. First to lift leads the pack.
+              No sessions logged in the last 7 days. First to lift leads the pack.
             </p>
           ) : (
             <>
