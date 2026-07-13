@@ -231,7 +231,7 @@ export default function CoachDashboard() {
       <div style={{ padding: '52px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>Coach view</p>
-          <h1 style={{ margin: '2px 0 0', fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Coach HQ</h1>
+          <h1 className="gd-disp" style={{ margin: '2px 0 0', fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em' }}>Coach <span className="gd-grad-text">HQ</span></h1>
         </div>
         <Avatar initials="SC" size={42} />
       </div>
@@ -246,9 +246,9 @@ export default function CoachDashboard() {
             { value: avgReadiness, label: 'avg readiness', color: 'var(--blue-ink)' },
             { value: alerts, label: 'alerts', color: alerts > 0 ? 'var(--orange)' : 'var(--ink-3)' },
           ].map((s, i) => (
-            <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: s.color }}>{s.value}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
+            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '16px 8px', textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
+              <p className="gd-disp" style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: s.color }}>{s.value}</p>
+              <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -322,7 +322,7 @@ export default function CoachDashboard() {
                         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{client.goal}</p>
                       </div>
                       <div style={{ background: rs.bg, borderRadius: 12, padding: '8px 12px', textAlign: 'center', flexShrink: 0 }}>
-                        <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: rs.ink, lineHeight: 1 }}>{client.readiness || '—'}</p>
+                        <p className="gd-disp" style={{ margin: 0, fontSize: 21, fontWeight: 700, color: rs.ink, lineHeight: 1 }}>{client.readiness || '—'}</p>
                         <p style={{ margin: '2px 0 0', fontSize: 10, color: rs.ink, fontWeight: 600 }}>{rs.label}</p>
                       </div>
                     </div>
@@ -341,7 +341,7 @@ export default function CoachDashboard() {
                             { label: 'weight', value: client.weight ? `${client.weight}kg` : '—' },
                           ].map((s, i) => (
                             <div key={i} style={{ background: 'var(--soft)', borderRadius: 12, padding: 10, textAlign: 'center' }}>
-                              <p style={{ margin: '0 0 3px', fontSize: 15, fontWeight: 800 }}>{s.value}</p>
+                              <p className="gd-disp" style={{ margin: '0 0 3px', fontSize: 15, fontWeight: 700 }}>{s.value}</p>
                               <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{s.label}</p>
                             </div>
                           ))}

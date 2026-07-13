@@ -168,6 +168,7 @@ export default function WorkoutPage() {
   const [showComplete, setShowComplete] = useState(false);
   const [prs, setPrs] = useState([]); // [{name, kg, prevKg}]
   const startRef = useRef(Date.now());
+  const activeCardRef = useRef(null);
   const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
   const [toast, setToast] = useState('');
   const toastRef = useRef(null);
@@ -213,12 +214,30 @@ export default function WorkoutPage() {
         if (res.ok) {
           const data = await res.json();
           setActivePlan(data);
-          setExercises(Array.isArray(data.exercises) ? data.exercises : []);
           const emptyLogs = {};
-          data.exercises.forEach((ex, idx) => {
+          (data.exercises || []).forEach((ex, idx) => {
             emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
           });
-          setLogs(emptyLogs);
+          // Restore an in-progress session for this plan/day if one was saved,
+          // so leaving the screen without hitting Finish no longer loses progress.
+          let restored = null;
+          try {
+            const raw = localStorage.getItem('gd-workout-progress');
+            if (raw) {
+              const s = JSON.parse(raw);
+              if (s && s.planId === data.id && s.date === TODAY && Array.isArray(s.exercises) && s.logs) restored = s;
+            }
+          } catch (e) {}
+          if (restored) {
+            setExercises(restored.exercises);
+            setLogs(restored.logs);
+            if (typeof restored.activeExIdx === 'number') setActiveExIdx(restored.activeExIdx);
+            if (restored.startedAt) startRef.current = restored.startedAt;
+            showToast('↩ Restored your in-progress session');
+          } else {
+            setExercises(Array.isArray(data.exercises) ? data.exercises : []);
+            setLogs(emptyLogs);
+          }
         } else {
           setPlanError('No active session found.');
         }
@@ -259,6 +278,24 @@ export default function WorkoutPage() {
       });
     })();
   }, [userId, activePlan]);
+
+  // Auto-save the live session on every change so navigating away, refreshing,
+  // or the app closing never loses logged progress. Cleared once Finish saves.
+  useEffect(() => {
+    if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
+    try {
+      localStorage.setItem('gd-workout-progress', JSON.stringify({
+        planId: activePlan.id, date: TODAY, exercises, logs, activeExIdx, startedAt: startRef.current,
+      }));
+    } catch (e) {}
+  }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId]);
+
+  // Bring the expanded exercise into view when it changes (tap or auto-advance),
+  // so "opening" an exercise happens where you can see it.
+  useEffect(() => {
+    if (planLoading || !exercises.length) return;
+    activeCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeExIdx, planLoading]);
 
   const updateSet = (exIdx, setIdx, field, value) => {
     setLogs(prev => {
@@ -380,6 +417,7 @@ export default function WorkoutPage() {
         })
       ));
       setSaved(true);
+      try { localStorage.removeItem('gd-workout-progress'); } catch (e) {}
       setFinishQuote(randomQuote());
 
       // PR detection: today's heaviest set vs last session's, per exercise
@@ -501,33 +539,6 @@ export default function WorkoutPage() {
           })}
         </div>
 
-        {/* ── EXERCISE SELECTOR — tap any exercise, any order (busy-machine friendly) ── */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 6 }}>
-          {exercises.map((ex, i) => {
-            const exDone = (logs[i] || []).length > 0 && (logs[i] || []).every(s => s.done);
-            const active = i === activeExIdx;
-            return (
-              <button key={i} onClick={() => setActiveExIdx(i)} style={{
-                flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
-                padding: '8px 13px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
-                border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
-                background: active ? 'var(--accent-tint)' : 'var(--card)',
-                color: active ? 'var(--accent-strong)' : 'var(--ink-2)',
-              }}>
-                <span style={{
-                  width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, background: exDone ? 'var(--accent)' : 'var(--soft)', color: exDone ? 'var(--on-accent)' : 'var(--ink-3)',
-                }}>{exDone ? '✓' : i + 1}</span>
-                {ex.name}
-              </button>
-            );
-          })}
-          <button onClick={() => { setPicker({ mode: 'add' }); }} style={{
-            flexShrink: 0, cursor: 'pointer', padding: '8px 14px', borderRadius: 999, fontSize: 12.5, fontWeight: 700,
-            border: '1px dashed var(--line)', background: 'transparent', color: 'var(--accent-strong)',
-          }}>+ Add</button>
-        </div>
-
         {/* ── PROGRESS STATS ── */}
         <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
@@ -580,125 +591,130 @@ export default function WorkoutPage() {
           <div style={{ background: 'var(--red-tint)', borderRadius: 12, padding: '10px 14px', color: 'var(--red-ink)', fontSize: 13, textAlign: 'center', marginBottom: 14 }}>{error}</div>
         )}
 
-        {/* ── ACTIVE EXERCISE ── */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 22, overflow: 'hidden', marginBottom: 14 }}>
-          <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {activeExIdx + 1} OF {exercises.length}</p>
-              <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 23, fontWeight: 700, lineHeight: 1.1 }}>{activeEx.name}</h2>
-              {lastData && (
-                <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {lastData}</p>
-              )}
-            </div>
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <button onClick={() => setShowGuide(!showGuide)} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 12px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                Guide
-              </button>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { setPicker({ mode: 'swap', idx: activeExIdx }); }} aria-label="Swap exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Swap
+        {/* ── EXERCISES · tap any card to expand & log it in place (any order) ── */}
+        <p style={{ margin: '0 4px 9px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Exercises · tap to open</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {exercises.map((ex, idx) => {
+            const sets = logs[idx] || [];
+            const isDone = sets.length > 0 && sets.every(s => s.done);
+            const open = idx === activeExIdx;
+            const last = formatLast(idx);
+
+            if (!open) {
+              return (
+                <button key={idx} onClick={() => setActiveExIdx(idx)} style={{
+                  width: '100%', background: 'var(--card)', border: '1px solid var(--line)',
+                  borderRadius: 18, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${isDone ? 'var(--accent)' : 'var(--line)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isDone ? 'var(--accent)' : 'var(--ink-3)', flexShrink: 0 }}>
+                    {isDone ? '✓' : idx + 1}
+                  </div>
+                  <ExercisePhoto name={ex.name} size={44} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{ex.name}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{ex.sets} sets · {ex.reps} reps</p>
+                  </div>
+                  <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
                 </button>
-                <button onClick={() => removeExerciseFromSession(activeExIdx)} aria-label="Skip exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-3)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Skip
-                </button>
-              </div>
-            </div>
-          </div>
+              );
+            }
 
-          {showGuide && activeEx.cue && (
-            <div style={{ margin: '12px 18px 0', background: 'var(--accent-tint)', borderRadius: 12, padding: '10px 14px' }}>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--accent-strong)', lineHeight: 1.6 }}>🎯 {activeEx.cue}</p>
-            </div>
-          )}
-
-          {/* Column headers */}
-          <div style={{ padding: '14px 18px 4px', display: 'grid', gridTemplateColumns: '30px 1fr 1fr 40px', gap: 8 }}>
-            {['Set', 'Kg', 'Reps', ''].map((h, i) => (
-              <p key={i} style={{ margin: 0, fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.06em', textAlign: i === 0 ? 'center' : 'left', textTransform: 'uppercase' }}>{h}</p>
-            ))}
-          </div>
-
-          {/* Set rows */}
-          <div style={{ padding: '0 18px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {activeSets.map((set, setIdx) => (
-              <div key={setIdx} style={{
-                display: 'grid', gridTemplateColumns: '30px 1fr 1fr 40px', gap: 8, alignItems: 'center',
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-3)', textAlign: 'center' }}>{setIdx + 1}</div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px' }}>
-                  <button onClick={() => adjustKg(activeExIdx, setIdx, -2.5)} aria-label="decrease" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>−</button>
-                  <input type="number" inputMode="decimal" value={set.kg} onChange={(e) => updateSet(activeExIdx, setIdx, 'kg', e.target.value)}
-                    style={{ flex: 1, background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none', width: '100%', minWidth: 0 }}
-                    placeholder="0" />
-                  <button onClick={() => adjustKg(activeExIdx, setIdx, 2.5)} aria-label="increase" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>+</button>
+            return (
+              <div key={idx} ref={activeCardRef} style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 22, overflow: 'hidden', scrollMarginTop: 16 }}>
+                <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {idx + 1} OF {exercises.length}</p>
+                    <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ex.name}</h2>
+                    {last && (
+                      <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {last}</p>
+                    )}
+                  </div>
+                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button onClick={() => setShowGuide(!showGuide)} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 12px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                      Guide
+                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => setPicker({ mode: 'swap', idx })} aria-label="Swap exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-2)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        Swap
+                      </button>
+                      <button onClick={() => removeExerciseFromSession(idx)} aria-label="Skip exercise" style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '8px 10px', color: 'var(--ink-3)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        Skip
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div style={{ background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px', display: 'flex', alignItems: 'center' }}>
-                  <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(activeExIdx, setIdx, 'reps', e.target.value)}
-                    style={{ width: '100%', background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none' }}
-                    placeholder="0" />
+                {showGuide && ex.cue && (
+                  <div style={{ margin: '12px 18px 0', background: 'var(--accent-tint)', borderRadius: 12, padding: '10px 14px' }}>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--accent-strong)', lineHeight: 1.6 }}>🎯 {ex.cue}</p>
+                  </div>
+                )}
+
+                <div style={{ padding: '14px 18px 4px', display: 'grid', gridTemplateColumns: '30px 1fr 1fr 40px', gap: 8 }}>
+                  {['Set', 'Kg', 'Reps', ''].map((h, i) => (
+                    <p key={i} style={{ margin: 0, fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.06em', textAlign: i === 0 ? 'center' : 'left', textTransform: 'uppercase' }}>{h}</p>
+                  ))}
                 </div>
 
-                <button onClick={() => toggleDone(activeExIdx, setIdx)} aria-label="mark set done" style={{
-                  width: 34, height: 34, borderRadius: '50%', border: `2px solid ${set.done ? 'var(--accent)' : 'var(--line)'}`,
-                  background: set.done ? 'var(--accent)' : 'transparent',
-                  color: set.done ? 'var(--on-accent)' : 'transparent', fontSize: 15, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto',
-                  boxShadow: set.done ? '0 0 12px var(--accent-glow)' : 'none',
-                  animation: set.done ? 'gdPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
-                }}>✓</button>
-              </div>
-            ))}
-          </div>
+                <div style={{ padding: '0 18px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {sets.map((set, setIdx) => (
+                    <div key={setIdx} style={{
+                      display: 'grid', gridTemplateColumns: '30px 1fr 1fr 40px', gap: 8, alignItems: 'center',
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-3)', textAlign: 'center' }}>{setIdx + 1}</div>
 
-          <div style={{ display: 'flex', gap: 8, margin: '6px 18px 16px' }}>
-            <button onClick={() => addSet(activeExIdx)} style={{
-              flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
-              color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            }}>
-              + Add set
-            </button>
-            {activeSets.length > 1 && (
-              <button onClick={() => removeSet(activeExIdx, activeSets.length - 1)} style={{
-                flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
-                color: 'var(--ink-3)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              }}>
-                − Remove set
-              </button>
-            )}
-          </div>
-        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px' }}>
+                        <button onClick={() => adjustKg(idx, setIdx, -2.5)} aria-label="decrease" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>−</button>
+                        <input type="number" inputMode="decimal" value={set.kg} onChange={(e) => updateSet(idx, setIdx, 'kg', e.target.value)}
+                          style={{ flex: 1, background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none', width: '100%', minWidth: 0 }}
+                          placeholder="0" />
+                        <button onClick={() => adjustKg(idx, setIdx, 2.5)} aria-label="increase" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>+</button>
+                      </div>
 
-        {/* ── ALL EXERCISES (tap to jump — any order) ── */}
-        {exercises.length > 1 && (
-          <>
-            <p style={{ margin: '0 4px 9px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>All exercises · tap to jump</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {exercises.map((ex, idx) => {
-                if (idx === activeExIdx) return null;
-                const isDone = (logs[idx] || []).length > 0 && (logs[idx] || []).every(s => s.done);
-                return (
-                  <button key={idx} onClick={() => setActiveExIdx(idx)} style={{
-                    width: '100%', background: 'var(--card)', border: '1px solid var(--line)',
-                    borderRadius: 16, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
-                    display: 'flex', alignItems: 'center', gap: 12,
+                      <div style={{ background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px', display: 'flex', alignItems: 'center' }}>
+                        <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)}
+                          style={{ width: '100%', background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none' }}
+                          placeholder="0" />
+                      </div>
+
+                      <button onClick={() => toggleDone(idx, setIdx)} aria-label="mark set done" style={{
+                        width: 34, height: 34, borderRadius: '50%', border: `2px solid ${set.done ? 'var(--accent)' : 'var(--line)'}`,
+                        background: set.done ? 'var(--accent)' : 'transparent',
+                        color: set.done ? 'var(--on-accent)' : 'transparent', fontSize: 15, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto',
+                        boxShadow: set.done ? '0 0 12px var(--accent-glow)' : 'none',
+                        animation: set.done ? 'gdPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+                      }}>✓</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, margin: '6px 18px 16px' }}>
+                  <button onClick={() => addSet(idx)} style={{
+                    flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
+                    color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                   }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${isDone ? 'var(--accent)' : 'var(--line)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isDone ? 'var(--accent)' : 'var(--ink-3)', flexShrink: 0 }}>
-                      {isDone ? '✓' : idx + 1}
-                    </div>
-                    <ExercisePhoto name={ex.name} size={48} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{ex.name}</p>
-                      <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{ex.sets} sets · {ex.reps} reps</p>
-                    </div>
-                    <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
+                    + Add set
                   </button>
-                );
-              })}
-            </div>
-          </>
-        )}
+                  {sets.length > 1 && (
+                    <button onClick={() => removeSet(idx, sets.length - 1)} style={{
+                      flex: 1, background: 'var(--soft)', border: 'none', borderRadius: 12, padding: '12px 0',
+                      color: 'var(--ink-3)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                    }}>
+                      − Remove set
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          <button onClick={() => setPicker({ mode: 'add' })} style={{
+            width: '100%', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 16,
+            padding: '14px 0', color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+          }}>+ Add exercise</button>
+        </div>
 
       </div>
 
