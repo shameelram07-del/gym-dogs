@@ -51,6 +51,7 @@ export default function CommunityPage() {
   const [userInitials, setUserInitials] = useState('A');
   const [posts, setPosts] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [lbScope, setLbScope] = useState('7d');
   const [challenge, setChallenge] = useState(null);
   const [joining, setJoining] = useState(false);
   const [members, setMembers] = useState(null);
@@ -101,6 +102,7 @@ export default function CommunityPage() {
         const data = await res.json();
         setPosts(Array.isArray(data.posts) ? data.posts : []);
         setLeaderboard(Array.isArray(data.leaderboard) ? data.leaderboard : []);
+        setLbScope(data.leaderboardScope || '7d');
         if (data.challenge) setChallenge(data.challenge);
         if (typeof data.members === 'number') setMembers(data.members);
       }
@@ -287,7 +289,7 @@ export default function CommunityPage() {
         <Reveal>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <p style={eyebrow}>Leaderboard · last 7 days</p>
+            <p style={eyebrow}>Leaderboard · {lbScope === 'all' ? 'all time' : 'last 7 days'}</p>
             {myRank >= 0 && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-strong)' }}>You&rsquo;re #{myRank + 1}</span>}
           </div>
           {loading ? (
