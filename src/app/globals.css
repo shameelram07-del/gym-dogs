@@ -223,24 +223,25 @@ input[type="number"] {
   content: '';
   position: fixed;
   border-radius: 50%;
-  filter: blur(80px);
+  filter: blur(60px);
   pointer-events: none;
   z-index: 0;
+  /* Static (no drift animation) — a continuously-animating full-screen
+     blur was killing scroll performance on phones. Same look, no motion. */
 }
 [data-theme="dark"] body::before {
   width: 380px; height: 380px; top: -140px; left: calc(50% - 320px);
   background: radial-gradient(circle, rgba(123,144,180,0.22), transparent 70%);
-  animation: gdDrift 16s ease-in-out infinite alternate;
 }
 [data-theme="dark"] body::after {
   width: 340px; height: 340px; bottom: -130px; left: calc(50% + 10px);
   background: radial-gradient(circle, rgba(123,144,180,0.16), transparent 70%),
               radial-gradient(circle at 30% 70%, rgba(90,110,140,0.12), transparent 60%);
-  animation: gdDrift 20s ease-in-out infinite alternate-reverse;
 }
 @media (prefers-reduced-motion: reduce) {
   [data-theme="dark"] body::before,
   [data-theme="dark"] body::after { animation: none; }
+  .gd-shine::after, .gd-shimbar::after { animation: none; }
 }
 
 /* shared motion vocabulary (used via inline styles on pages) */
@@ -263,7 +264,7 @@ input[type="number"] {
   content: ''; position: absolute; top: -60%; left: -30%; width: 40%; height: 220%;
   transform: rotate(24deg);
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
-  animation: gdSweep 3.4s cubic-bezier(0.22,1,0.36,1) infinite;
+  animation: gdSweep 3.4s cubic-bezier(0.22,1,0.36,1) 3;
 }
 
 /* xp / progress bar shimmer — add className="gd-shimbar" to the fill div */
@@ -271,5 +272,5 @@ input[type="number"] {
 .gd-shimbar::after {
   content: ''; position: absolute; inset: 0;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
-  animation: gdShim 2.2s infinite;
+  animation: gdShim 2.2s 4;
 }
