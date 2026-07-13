@@ -333,10 +333,18 @@ export default function DashboardPage() {
 
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-NZ', { weekday: 'long', month: 'long', day: 'numeric' });
-  const sessionName   = todayPlan?.name      || null;
-  const sessionMins   = todayPlan?.duration  || null;
-  const sessionFocus  = todayPlan?.focus     || todayPlan?.tag || null;
-  const exerciseCount = todayPlan?.exercises?.length || null;
+  // The active plan stays active until a new one is published, so a session from
+  // a previous day shouldn't be shown as today's — only surface a plan dated today.
+  const planDate = todayPlan?.date || null;
+  const todayISO = today.toISOString().split('T')[0];
+  const planIsToday = planDate ? planDate === todayISO : true;
+  const effPlan       = planIsToday ? todayPlan : null;               // today's session (or none)
+  const stalePlan     = todayPlan && !planIsToday ? todayPlan : null; // exists but not for today
+  const sessionName   = effPlan?.name      || null;
+  const sessionMins   = effPlan?.duration  || null;
+  const sessionFocus  = effPlan?.focus     || effPlan?.tag || null;
+  const exerciseCount = effPlan?.exercises?.length || null;
+  const sessionEyebrow = "Today's session";
 
   const readinessLabel = readiness
     ? readiness >= 80 ? 'Primed to train' : readiness >= 60 ? 'Good to go' : 'Take it easy'
@@ -504,15 +512,15 @@ export default function DashboardPage() {
           color: '#fff',
         }}>
           <div
-            onClick={() => todayPlan?.exercises?.length && setSessionOpen(o => !o)}
-            style={{ padding: '20px 20px 14px', cursor: todayPlan?.exercises?.length ? 'pointer' : 'default' }}
+            onClick={() => effPlan?.exercises?.length && setSessionOpen(o => !o)}
+            style={{ padding: '20px 20px 14px', cursor: effPlan?.exercises?.length ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={{ ...eyebrow, color: 'rgba(255,255,255,0.75)' }}>Today&rsquo;s session</p>
+                <p style={{ ...eyebrow, color: 'rgba(255,255,255,0.75)' }}>{sessionEyebrow}</p>
                 <p className="gd-disp" style={{ margin: '6px 0 0', fontSize: 32, fontWeight: 700, lineHeight: 1.05, textTransform: 'uppercase' }}>
-                  {sessionName || 'Rest day'}
-                  {todayPlan?.exercises?.length ? (
+                  {sessionName || (stalePlan ? 'No session today' : 'Rest day')}
+                  {effPlan?.exercises?.length ? (
                     <span style={{
                       display: 'inline-block', marginLeft: 8, fontSize: 15, color: 'rgba(255,255,255,0.7)',
                       transform: sessionOpen ? 'rotate(90deg)' : 'none',
@@ -535,7 +543,7 @@ export default function DashboardPage() {
           </div>
 
           {/* smooth unfold: the exercise list opens like Apple's product cards */}
-          {todayPlan?.exercises?.length > 0 && (
+          {effPlan?.exercises?.length > 0 && (
             <div style={{
               display: 'grid',
               gridTemplateRows: sessionOpen ? '1fr' : '0fr',
@@ -543,7 +551,7 @@ export default function DashboardPage() {
             }}>
               <div style={{ overflow: 'hidden' }}>
                 <div style={{ padding: '2px 20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {todayPlan.exercises.map((ex, i) => (
+                  {effPlan.exercises.map((ex, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ width: 26, height: 26, borderRadius: 999, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', flexShrink: 0 }}>{i + 1}</div>
                       <span style={{ fontSize: 14, fontWeight: 600 }}>{ex.name}</span>
@@ -554,7 +562,7 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {todayPlan ? (
+          {effPlan ? (
             <div style={{ padding: '0 20px 20px' }}>
               {/* mockup: white pill button on the mesh card */}
               <button onClick={() => router.push('/workout')} className="gd-disp" style={{
@@ -569,8 +577,8 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div style={{ padding: '0 20px 20px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 14, textAlign: 'center', color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 600 }}>
-                No session assigned yet
+              <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 14, padding: 14, textAlign: 'center', color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 600, lineHeight: 1.5 }}>
+                {stalePlan ? 'No session set for today yet — check the Train tab or ask your coach.' : 'No session assigned yet'}
               </div>
             </div>
           )}

@@ -15,6 +15,7 @@ const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.az
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
 const TODAY = new Date().toISOString().split('T')[0];
+const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 // Localhost-only preview data so the screen can be reviewed without sign-in.
 // On the live site this never triggers (hostname is not "localhost").
@@ -169,6 +170,8 @@ export default function WorkoutPage() {
   const [prs, setPrs] = useState([]); // [{name, kg, prevKg}]
   const startRef = useRef(Date.now());
   const activeCardRef = useRef(null);
+  const saveTimer = useRef(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState(''); // '' | 'saving' | 'saved'
   const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
   const [toast, setToast] = useState('');
   const toastRef = useRef(null);
@@ -290,6 +293,34 @@ export default function WorkoutPage() {
     } catch (e) {}
   }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId]);
 
+  // Push a single exercise's sets to the server (upsert — safe to call repeatedly).
+  const postLog = (idx, ex, rows) => {
+    if (!activePlan || userId === 'demo' || !ex?.name) return Promise.resolve();
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
+      body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(rows || []) }),
+    }).catch(() => {});
+  };
+
+  // Live auto-save: ~1.2s after you stop changing anything, upsert every exercise
+  // that has data to the server. No "Finish" needed to keep progress.
+  useEffect(() => {
+    if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
+    const hasData = exercises.some((_, i) => (logs[i] || []).some(s => s.kg || s.reps || s.done));
+    if (!hasData) return;
+    setAutoSaveStatus('saving');
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      await Promise.all(exercises.map((ex, idx) => {
+        const rows = logs[idx] || [];
+        return rows.some(s => s.kg || s.reps || s.done) ? postLog(idx, ex, rows) : null;
+      }).filter(Boolean));
+      setAutoSaveStatus('saved');
+    }, 1200);
+    return () => clearTimeout(saveTimer.current);
+  }, [logs, exercises, activePlan, planLoading, showComplete, userId]);
+
   // Bring the expanded exercise into view when it changes (tap or auto-advance),
   // so "opening" an exercise happens where you can see it.
   useEffect(() => {
@@ -363,9 +394,12 @@ export default function WorkoutPage() {
   };
 
   const swapExercise = (idx, libEx) => {
+    const old = exercises[idx];
+    const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);
     setExercises(prev => prev.map((e, i) => (i === idx ? fromLib(libEx) : e)));
     setLogs(prev => ({ ...prev, [idx]: blankSets(libEx.defaultSets) }));
     setLastSession(prev => { const n = { ...prev }; delete n[idx]; return n; });
+    if (hadData && old?.name && old.name !== libEx.name) postLog(idx, old, []); // clear old exercise's saved volume
     setPicker(null);
     showToast(`🔁 Swapped in ${libEx.name}`);
   };
@@ -373,12 +407,14 @@ export default function WorkoutPage() {
   const removeExerciseFromSession = (idx) => {
     const len = exercises.length;
     if (len <= 1) { showToast('Cannot remove the only exercise'); return; }
-    const name = exercises[idx]?.name;
+    const removed = exercises[idx];
+    const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);
     setExercises(prev => prev.filter((_, i) => i !== idx));
     setLogs(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
     setLastSession(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
     setActiveExIdx(a => (a > idx ? a - 1 : Math.min(a, len - 2)));
-    showToast(`🗑 Removed ${name || 'exercise'}`);
+    if (hadData) postLog(idx, removed, []); // clear its saved volume on the server
+    showToast(`🗑 Removed ${removed?.name || 'exercise'}`);
   };
 
   const adjustKg = (exIdx, setIdx, delta) => {
@@ -501,6 +537,32 @@ export default function WorkoutPage() {
     );
   }
 
+  // Date-strict: a published plan stays active until replaced, so if it's from a
+  // previous day, don't present it as today's workout — prompt for a fresh one.
+  const isCoach = userId === COACH_ID;
+  if (activePlan.date && activePlan.date !== TODAY && userId !== 'demo') {
+    const whenStr = new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' });
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
+        <div style={{ fontSize: 48 }}>🐕</div>
+        <p className="gd-disp" style={{ fontWeight: 700, fontSize: 21 }}>No session for today yet</p>
+        <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6, maxWidth: 300 }}>
+          {isCoach
+            ? `Your last session (${activePlan.name} · ${whenStr}) isn't today's. Publish today's workout in the Coach tab.`
+            : `Nothing's been published for today yet. Ask Coach Shameel to set today's session, or give Gym Daddy a nudge.`}
+        </p>
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button onClick={() => router.push(isCoach ? '/coach' : '/community')} style={{ background: 'var(--accent)', border: 'none', borderRadius: 16, padding: '14px 24px', color: 'var(--on-accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            {isCoach ? "Create today's session" : 'Message the pack'}
+          </button>
+          <button onClick={() => router.push('/dashboard')} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 16, padding: '14px 24px', color: 'var(--ink-2)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const activeEx = exercises[activeExIdx] || exercises[0] || {};
   const activeSets = logs[activeExIdx] || [];
   const lastData = formatLast(activeExIdx);
@@ -520,6 +582,11 @@ export default function WorkoutPage() {
         <div style={{ textAlign: 'right' }}>
           <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
           <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', fontWeight: 600 }}>DURATION</p>
+          {autoSaveStatus && (
+            <p style={{ margin: '5px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: autoSaveStatus === 'saved' ? 'var(--accent-strong)' : 'var(--ink-3)' }}>
+              {autoSaveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
+            </p>
+          )}
         </div>
       </div>
 
