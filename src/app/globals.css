@@ -26,11 +26,11 @@
   --line:      rgba(17,17,20,0.08);
   --line-2:    rgba(17,17,20,0.05);
 
-  /* brand + semantic — IGNITE magenta */
-  --accent:        #E11D82;   /* primary magenta */
-  --accent-strong: #B41368;   /* readable magenta text on light tint */
-  --accent-tint:   rgba(225,29,130,0.10);
-  --accent-glow:   rgba(225,29,130,0.22);
+  /* brand + semantic — STEEL */
+  --accent:        #3F5170;   /* primary steel blue */
+  --accent-strong: #2E3D56;   /* readable steel text on light tint */
+  --accent-tint:   rgba(63,81,112,0.10);
+  --accent-glow:   rgba(63,81,112,0.20);
   --on-accent:     #FFFFFF;
 
   --gold:      #D9A514;
@@ -75,10 +75,10 @@
   --line:      rgba(255,255,255,0.09);
   --line-2:    rgba(255,255,255,0.05);
 
-  --accent:        #FF2E93;
-  --accent-strong: #FF6FB3;
-  --accent-tint:   rgba(255,46,147,0.13);
-  --accent-glow:   rgba(255,46,147,0.38);
+  --accent:        #7B90B4;
+  --accent-strong: #B9C8E4;
+  --accent-tint:   rgba(123,144,180,0.16);
+  --accent-glow:   rgba(123,144,180,0.34);
   --on-accent:     #FFFFFF;
 
   --gold:      #FFD166;
@@ -109,12 +109,12 @@
 /* IGNITE brand gradient + helpers — available in BOTH themes */
 :root, [data-theme="light"], [data-theme="dark"] {
   --ember: #FF5C39;
-  --mag:   #FF2E93;
+  --mag:   #7B90B4;
   --vio:   #8B5CF6;
   --ice:   #6EE7F9;
-  --grad:      linear-gradient(135deg, #FF5C39 0%, #FF2E93 52%, #8B5CF6 100%);
-  --grad-soft: linear-gradient(135deg, rgba(255,92,57,0.16), rgba(255,46,147,0.14) 52%, rgba(139,92,246,0.16));
-  --glow-grad: 0 8px 32px rgba(255,46,147,0.35);
+  --grad:      linear-gradient(135deg, #9BA1AE 0%, #7B90B4 50%, #4C5D7A 100%);
+  --grad-soft: linear-gradient(135deg, rgba(155,161,174,0.16), rgba(123,144,180,0.14) 52%, rgba(76,93,122,0.16));
+  --glow-grad: 0 8px 32px rgba(123,144,180,0.32);
 }
 
 /* display face for headings + hero numbers */
@@ -229,13 +229,13 @@ input[type="number"] {
 }
 [data-theme="dark"] body::before {
   width: 380px; height: 380px; top: -140px; left: calc(50% - 320px);
-  background: radial-gradient(circle, rgba(139,92,246,0.26), transparent 70%);
+  background: radial-gradient(circle, rgba(123,144,180,0.22), transparent 70%);
   animation: gdDrift 16s ease-in-out infinite alternate;
 }
 [data-theme="dark"] body::after {
   width: 340px; height: 340px; bottom: -130px; left: calc(50% + 10px);
-  background: radial-gradient(circle, rgba(255,46,147,0.17), transparent 70%),
-              radial-gradient(circle at 30% 70%, rgba(255,92,57,0.14), transparent 60%);
+  background: radial-gradient(circle, rgba(123,144,180,0.16), transparent 70%),
+              radial-gradient(circle at 30% 70%, rgba(90,110,140,0.12), transparent 60%);
   animation: gdDrift 20s ease-in-out infinite alternate-reverse;
 }
 @media (prefers-reduced-motion: reduce) {

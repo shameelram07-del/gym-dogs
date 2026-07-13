@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
-import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
+import { exerciseLibrary, muscleGroups, equipmentTypes } from '@/lib/exercises';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 
@@ -23,7 +23,7 @@ function readinessStyle(score) {
   return { ink: 'var(--red-ink)', bg: 'var(--red-tint)', label: 'Rest day' };
 }
 
-const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', sets: 3, reps: '10-12', cue: '' });
+const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', equipment: '', sets: 3, reps: '10-12', cue: '', equipFilter: 'All' });
 
 // AI plan builder — deterministic fallback templates so a draft is always produced.
 const PLAN_TEMPLATES = {
@@ -37,7 +37,7 @@ function buildFromTemplate(tag) {
   const tpl = PLAN_TEMPLATES[tag] || PLAN_TEMPLATES['FULL BODY'];
   const out = [];
   tpl.forEach(([group, count]) => {
-    (exerciseLibrary[group] || []).slice(0, count).forEach(e => out.push({ muscleGroup: group, name: e.name, sets: e.defaultSets, reps: e.defaultReps, cue: e.cue }));
+    (exerciseLibrary[group] || []).slice(0, count).forEach(e => out.push({ muscleGroup: group, name: e.name, equipment: e.equipment, sets: e.defaultSets, reps: e.defaultReps, cue: e.cue, equipFilter: 'All' }));
   });
   return out.length ? out : [emptyExercise()];
 }
@@ -45,7 +45,7 @@ function findExercise(name) {
   const target = String(name).toLowerCase().trim();
   for (const group of muscleGroups) {
     const found = exerciseLibrary[group]?.find(e => e.name.toLowerCase() === target);
-    if (found) return { muscleGroup: group, name: found.name, sets: found.defaultSets, reps: found.defaultReps, cue: found.cue };
+    if (found) return { muscleGroup: group, name: found.name, equipment: found.equipment, sets: found.defaultSets, reps: found.defaultReps, cue: found.cue, equipFilter: 'All' };
   }
   return null;
 }
@@ -75,6 +75,7 @@ export default function CoachDashboard() {
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
   const [exercises, setExercises] = useState([emptyExercise()]);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
@@ -122,8 +123,9 @@ export default function CoachDashboard() {
   const updateMuscleGroup = (idx, muscleGroup) => setExercises(prev => { const u = [...prev]; u[idx] = { ...emptyExercise(), muscleGroup }; return u; });
   const updateExerciseName = (idx, name) => {
     const found = exerciseLibrary[exercises[idx].muscleGroup]?.find(e => e.name === name);
-    setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], name, sets: found?.defaultSets ?? 3, reps: found?.defaultReps ?? '10-12', cue: found?.cue ?? '' }; return u; });
+    setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], name, equipment: found?.equipment ?? '', sets: found?.defaultSets ?? 3, reps: found?.defaultReps ?? '10-12', cue: found?.cue ?? '' }; return u; });
   };
+  const updateEquipFilter = (idx, equipFilter) => setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], equipFilter }; return u; });
   const updateExercise = (idx, field, value) => setExercises(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: value }; return u; });
 
   const generatePlan = async () => {
@@ -169,7 +171,8 @@ export default function CoachDashboard() {
     if (exercises.some(e => !e.name.trim())) { setSaveMsg({ type: 'error', text: 'Please select all exercise names' }); return; }
     setSaving(true); setSaveMsg(null);
     try {
-      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, exercises, isActive, assignedTo, createdAt: new Date().toISOString() };
+      const cleanExercises = exercises.map(({ equipFilter, ...e }) => e);
+      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, notes: notes.trim(), exercises: cleanExercises, isActive, assignedTo, createdAt: new Date().toISOString() };
       const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify(plan) });
       if (res.ok) {
         setSaveMsg({ type: 'success', text: isActive ? 'Session published and set as active.' : 'Session saved as draft.' });
@@ -177,6 +180,7 @@ export default function CoachDashboard() {
           setActivePlan(plan);
           setPlanName('');
           setSessionDate(new Date().toISOString().split('T')[0]);
+          setNotes('');
           setExercises([emptyExercise()]);
           setAssignedTo([]);
 
@@ -368,6 +372,9 @@ export default function CoachDashboard() {
                 <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent-strong)' }}>CURRENTLY ACTIVE</p>
                 <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>{activePlan.name}</p>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-2)' }}>{activePlan.exercises?.length} exercises · {activePlan.tag} · {activePlan.date}</p>
+                {activePlan.notes && (
+                  <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{activePlan.notes}</p>
+                )}
               </div>
             )}
 
@@ -421,6 +428,19 @@ export default function CoachDashboard() {
                   </p>
                 )}
               </div>
+              <div>
+                <p style={fieldLabel}>Safety notes</p>
+                <textarea
+                  placeholder="How to do this session safely — warm-up, form reminders, weight guidance, injuries to watch."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={4}
+                  style={{ ...inputStyle, fontWeight: 500, lineHeight: 1.5, resize: 'vertical', minHeight: 90 }}
+                />
+                <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--ink-3)' }}>
+                  Shown to clients with the session. Optional.
+                </p>
+              </div>
             </div>
             </Reveal>
 
@@ -459,10 +479,25 @@ export default function CoachDashboard() {
                 </div>
 
                 <div>
+                  <p style={fieldLabel}>Equipment</p>
+                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                    {['All', ...equipmentTypes.filter(t => exerciseLibrary[ex.muscleGroup]?.some(e => e.equipment === t))].map(t => (
+                      <button key={t} onClick={() => updateEquipFilter(idx, t)} style={{
+                        flexShrink: 0, padding: '7px 14px', borderRadius: 999, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: 'none',
+                        background: (ex.equipFilter || 'All') === t ? 'var(--accent-tint)' : 'var(--soft)',
+                        color: (ex.equipFilter || 'All') === t ? 'var(--accent-strong)' : 'var(--ink-2)',
+                      }}>{t}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <p style={fieldLabel}>Exercise</p>
                   <select value={ex.name} onChange={e => updateExerciseName(idx, e.target.value)} style={{ ...inputStyle, background: 'var(--soft)' }}>
                     <option value="">— Select exercise —</option>
-                    {exerciseLibrary[ex.muscleGroup]?.map(e => (<option key={e.name} value={e.name}>{e.name}</option>))}
+                    {exerciseLibrary[ex.muscleGroup]
+                      ?.filter(e => (ex.equipFilter || 'All') === 'All' || e.equipment === ex.equipFilter)
+                      .map(e => (<option key={e.name} value={e.name}>{e.name}</option>))}
                   </select>
                 </div>
 
