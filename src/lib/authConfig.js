@@ -6,8 +6,10 @@ export const msalConfig = {
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin + '/login' : 'http://localhost:3000/login',
   },
   cache: {
-    cacheLocation: 'sessionStorage',
-    storeAuthStateInCookie: false,
+    // localStorage (not sessionStorage) so the login survives the iOS PWA
+    // closing/backgrounding — sessionStorage gets wiped and logs the user out.
+    cacheLocation: 'localStorage',
+    storeAuthStateInCookie: true,
   },
 };
 

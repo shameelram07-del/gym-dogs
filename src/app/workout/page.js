@@ -13,6 +13,8 @@ const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.a
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
+const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
+const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const TODAY = new Date().toISOString().split('T')[0];
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
@@ -197,6 +199,23 @@ export default function WorkoutPage() {
       : user.username?.split('@')[0] || 'Athlete';
     setUserName(name);
   }, [accounts, inProgress, router]);
+
+  // Prefer the saved profile display name (e.g. "Gym Daddy") over the raw login
+  // name, so shared posts and coach notes use the nickname like the other screens.
+  useEffect(() => {
+    if (!userId || userId === 'demo') return;
+    (async () => {
+      try {
+        const res = await fetch(`${PROFILES_URL}?userId=${userId}`, { headers: { 'x-functions-key': PROFILES_KEY || '' } });
+        if (res.ok) {
+          const data = await res.json();
+          const p = Array.isArray(data) ? data.find(x => x.userId === userId) : data;
+          const isGuid = (s) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s).trim());
+          if (p && p.name && !isGuid(p.name)) setUserName(p.name);
+        }
+      } catch (e) {}
+    })();
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -458,6 +477,8 @@ export default function WorkoutPage() {
       ));
       setSaved(true);
       try { localStorage.removeItem('gd-workout-progress'); } catch (e) {}
+      // Mark today's session complete for this user so the dashboard shows it done.
+      try { fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: TODAY }) }); } catch (e) {}
       setFinishQuote(randomQuote());
 
       // PR detection: today's heaviest set vs last session's, per exercise
@@ -546,7 +567,7 @@ export default function WorkoutPage() {
   // Date-strict: a published plan stays active until replaced, so if it's from a
   // previous day, don't present it as today's workout — prompt for a fresh one.
   const isCoach = userId === COACH_ID;
-  if (activePlan.date && activePlan.date !== TODAY && userId !== 'demo') {
+  if (userId !== 'demo' && activePlan.date !== TODAY) {
     const whenStr = new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' });
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>

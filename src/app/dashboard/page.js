@@ -182,6 +182,7 @@ export default function DashboardPage() {
   const [levelInfo, setLevelInfo]   = useState(null);
   const [xpAnimated, setXpAnimated] = useState(false);
   const [todayPlan, setTodayPlan]   = useState(null);
+  const [doneToday, setDoneToday]   = useState(false);
   const [coachNote, setCoachNote]   = useState(null);
   const [coachLoading, setCoachLoading] = useState(false);
   const [askedWhy, setAskedWhy]     = useState(false);
@@ -306,6 +307,7 @@ export default function DashboardPage() {
         if (profile.name && profile.name.length < 50 && !looksLikeGuid(profile.name)) {
           setUserName(titleCase(profile.name));
         }
+        setDoneToday(profile.lastWorkoutDate === new Date().toISOString().split('T')[0]);
       }
 
       // Save the signed-in email to the profile once, so the coach can email this client.
@@ -349,7 +351,7 @@ export default function DashboardPage() {
   // a previous day shouldn't be shown as today's — only surface a plan dated today.
   const planDate = todayPlan?.date || null;
   const todayISO = today.toISOString().split('T')[0];
-  const planIsToday = planDate ? planDate === todayISO : true;
+  const planIsToday = planDate === todayISO;
   const effPlan       = planIsToday ? todayPlan : null;               // today's session (or none)
   const stalePlan     = todayPlan && !planIsToday ? todayPlan : null; // exists but not for today
   const sessionName   = effPlan?.name      || null;
@@ -576,16 +578,23 @@ export default function DashboardPage() {
           )}
           {effPlan ? (
             <div style={{ padding: '0 20px 20px' }}>
-              {/* mockup: white pill button on the mesh card */}
-              <button onClick={() => router.push('/workout')} className="gd-disp" style={{
-                width: '100%', border: 'none', borderRadius: 17,
-                background: '#fff', color: '#140E24', padding: 15, fontSize: 16, fontWeight: 700,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-                boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E24"><polygon points="6 3 20 12 6 21 6 3" /></svg>
-                START WORKOUT
-              </button>
+              {doneToday ? (
+                <div style={{ width: '100%', borderRadius: 17, background: 'rgba(255,255,255,0.16)', color: '#fff', padding: 15, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
+                  Completed today
+                </div>
+              ) : (
+                /* mockup: white pill button on the mesh card */
+                <button onClick={() => router.push('/workout')} className="gd-disp" style={{
+                  width: '100%', border: 'none', borderRadius: 17,
+                  background: '#fff', color: '#140E24', padding: 15, fontSize: 16, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E24"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                  START WORKOUT
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ padding: '0 20px 20px' }}>

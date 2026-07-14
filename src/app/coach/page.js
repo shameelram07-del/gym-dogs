@@ -401,7 +401,7 @@ export default function CoachDashboard() {
         {/* ══ PLAN BUILDER ══ */}
         {view === 'plans' && (
           <>
-            {activePlan && (!activePlan.date || activePlan.date === new Date().toISOString().split('T')[0]) && (
+            {activePlan && activePlan.date === new Date().toISOString().split('T')[0] && (
               <div style={{ background: 'var(--accent-tint)', borderRadius: 16, padding: 16 }}>
                 <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent-strong)' }}>CURRENTLY ACTIVE</p>
                 <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>{activePlan.name}</p>
