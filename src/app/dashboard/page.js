@@ -308,6 +308,17 @@ export default function DashboardPage() {
         }
       }
 
+      // Save the signed-in email to the profile once, so the coach can email this client.
+      try {
+        if (account.username && (!profile || profile.email !== account.username)) {
+          fetch(`${API}/userProfiles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' },
+            body: JSON.stringify({ userId: uid, email: account.username }),
+          });
+        }
+      } catch (e) {}
+
       // Nudge (not force) onboarding if it has never been completed —
       // skipped if done on this device or previously dismissed.
       try {

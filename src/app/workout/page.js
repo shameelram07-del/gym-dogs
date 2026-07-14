@@ -307,14 +307,18 @@ export default function WorkoutPage() {
   // that has data to the server. No "Finish" needed to keep progress.
   useEffect(() => {
     if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
-    const hasData = exercises.some((_, i) => (logs[i] || []).some(s => s.kg || s.reps || s.done));
+    if (activePlan.date && activePlan.date !== TODAY) return; // don't save a previous day's session under today
+    // A set only counts as "logged" if reps were entered or it was ticked done —
+    // pre-filled weights (progressive overload) alone must NOT create a session.
+    const isLogged = (s) => (s.reps && String(s.reps).trim()) || s.done;
+    const hasData = exercises.some((_, i) => (logs[i] || []).some(isLogged));
     if (!hasData) return;
     setAutoSaveStatus('saving');
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       await Promise.all(exercises.map((ex, idx) => {
         const rows = logs[idx] || [];
-        return rows.some(s => s.kg || s.reps || s.done) ? postLog(idx, ex, rows) : null;
+        return rows.some(isLogged) ? postLog(idx, ex, rows) : null;
       }).filter(Boolean));
       setAutoSaveStatus('saved');
     }, 1200);
