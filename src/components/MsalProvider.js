@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { msalConfig } from '@/lib/authConfig';
+import EmailCapture from '@/components/EmailCapture';
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -20,6 +21,7 @@ export default function AuthProvider({ children }) {
 
   return (
     <MsalProvider instance={msalInstance}>
+      <EmailCapture />
       {children}
     </MsalProvider>
   );

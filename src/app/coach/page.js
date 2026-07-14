@@ -137,7 +137,7 @@ export default function CoachDashboard() {
     setExercises((d.exercises && d.exercises.length ? d.exercises : [emptyExercise()]).map(e => ({ equipFilter: 'All', ...e })));
     setDraftId(d.id);
     setSaveMsg({ type: 'success', text: `Editing draft: ${d.name || 'Untitled'}` });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => document.getElementById('gd-builder-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   };
 
   const deleteDraft = async (d) => {
@@ -430,7 +430,7 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            <p style={{ ...eyebrow, marginLeft: 4 }}>{draftId ? 'Editing draft' : 'Create new session'}</p>
+            <p id="gd-builder-form" style={{ ...eyebrow, marginLeft: 4, scrollMarginTop: 12 }}>{draftId ? 'Editing draft' : 'Create new session'}</p>
 
             <Reveal delay={100}>
             <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
