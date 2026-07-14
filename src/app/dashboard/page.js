@@ -250,6 +250,7 @@ export default function DashboardPage() {
         return {
           label,
           dayNum: d.getDate(),
+          iso,
           trained: trainedDates.has(iso),
           isToday: d.toDateString() === now.toDateString(),
         };
@@ -418,8 +419,8 @@ export default function DashboardPage() {
           <Reveal>
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
             {weekDays.map((d, i) => (
-              <div key={i} style={{
-                flex: 1, textAlign: 'center', padding: '9px 0 8px', borderRadius: 14,
+              <button key={i} onClick={() => router.push('/history?date=' + d.iso)} style={{
+                flex: 1, textAlign: 'center', padding: '9px 0 8px', borderRadius: 14, cursor: 'pointer',
                 background: d.isToday ? 'var(--grad)' : 'var(--card)',
                 border: `1px solid ${d.isToday ? 'transparent' : 'var(--line)'}`,
                 boxShadow: d.isToday ? '0 6px 20px var(--accent-glow)' : 'none',
@@ -431,7 +432,7 @@ export default function DashboardPage() {
                   background: d.trained ? (d.isToday ? 'var(--on-accent)' : 'var(--accent)') : 'transparent',
                   boxShadow: d.trained && !d.isToday ? '0 0 6px var(--accent-glow)' : 'none',
                 }} />
-              </div>
+              </button>
             ))}
           </div>
           </Reveal>
@@ -589,7 +590,7 @@ export default function DashboardPage() {
         <Reveal delay={180}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px 9px' }}>
           <p style={eyebrow}>This week</p>
-          <button onClick={() => router.push('/progress')} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+          <button onClick={() => router.push('/history')} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
             View all ›
           </button>
         </div>

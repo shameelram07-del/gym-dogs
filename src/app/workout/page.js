@@ -520,6 +520,7 @@ export default function WorkoutPage() {
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)' }}>
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" style={{ animation: 'gdFloat 2s ease-in-out infinite' }}><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" /></svg>
         <p style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', fontSize: 13 }}>Loading your session...</p>
+        <BottomNav />
       </div>
     );
   }
@@ -533,6 +534,7 @@ export default function WorkoutPage() {
         <button onClick={() => router.push('/dashboard')} style={{ marginTop: 16, background: 'var(--accent)', border: 'none', borderRadius: 16, padding: '14px 28px', color: 'var(--on-accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
           Back to dashboard
         </button>
+        <BottomNav />
       </div>
     );
   }
@@ -559,6 +561,8 @@ export default function WorkoutPage() {
             Home
           </button>
         </div>
+        <button onClick={() => router.push('/history')} style={{ marginTop: 2, background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📅 View past workouts</button>
+        <BottomNav />
       </div>
     );
   }

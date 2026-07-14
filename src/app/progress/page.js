@@ -163,6 +163,12 @@ export default function ProgressPage() {
   const [savingSoreness, setSavingSoreness] = useState(false);
   const [sorenessSaved, setSorenessSaved] = useState(false);
   const [chartOn, setChartOn] = useState(false); // bars grow in after load
+  const [goalWeight, setGoalWeight] = useState('');
+  const [weighIns, setWeighIns] = useState([]); // [{ date:'YYYY-MM-DD', kg:Number }]
+  const [goalInput, setGoalInput] = useState('');
+  const [wiInput, setWiInput] = useState('');
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [savingWi, setSavingWi] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -185,6 +191,8 @@ export default function ProgressPage() {
           if (profile) {
             setProfileRef(profile);
             if (profile.soreness) setSorenessLevels(profile.soreness);
+            if (profile.goalWeight) setGoalWeight(String(profile.goalWeight));
+            if (Array.isArray(profile.weighIns)) setWeighIns(profile.weighIns);
           }
         }
       } catch (e) {}
@@ -221,6 +229,37 @@ export default function ProgressPage() {
     finally { setSavingSoreness(false); }
   };
 
+  const saveProfile = async (patch) => {
+    const merged = { ...(profileRef || {}), userId, ...patch };
+    setProfileRef(merged);
+    await fetch(PROFILES_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
+      body: JSON.stringify(merged),
+    });
+  };
+
+  const saveGoal = async () => {
+    const g = parseFloat(goalInput);
+    if (!g) return;
+    setSavingGoal(true);
+    setGoalWeight(String(g));
+    try { await saveProfile({ goalWeight: g }); } catch (e) {}
+    finally { setSavingGoal(false); setGoalInput(''); }
+  };
+
+  const logWeighIn = async () => {
+    const kg = parseFloat(wiInput);
+    if (!kg) return;
+    const today = new Date().toISOString().split('T')[0];
+    const next = [...weighIns.filter(w => w.date !== today), { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
+    setWeighIns(next);
+    setWiInput('');
+    setSavingWi(true);
+    try { await saveProfile({ weighIns: next, weight: kg }); } catch (e) {}
+    finally { setSavingWi(false); }
+  };
+
   if (!userId) return null;
 
   const weeklyData = calcWeeklyVolume(logs);
@@ -230,6 +269,40 @@ export default function ProgressPage() {
   const totalSessions = new Set(logs.map(l => l.date).filter(Boolean)).size;
   const recoveryScore = calcRecoveryScore(sorenessLevels);
   const status = recoveryStatus(recoveryScore);
+
+  // ── Goal weight + weigh-in tracking ──
+  const latestWi = weighIns.length ? weighIns[weighIns.length - 1] : null;
+  const currentKg = latestWi ? latestWi.kg : (profileRef?.weight ? parseFloat(profileRef.weight) : null);
+  const goalKg = goalWeight ? parseFloat(goalWeight) : null;
+  const startKg = weighIns.length ? weighIns[0].kg : currentKg;
+  const todayIso2 = new Date().toISOString().split('T')[0];
+  const daysSinceWi = latestWi ? Math.floor((new Date(todayIso2) - new Date(latestWi.date)) / 86400000) : null;
+  const needWeighIn = goalKg != null && (latestWi ? daysSinceWi >= 7 : true);
+  const atGoal = goalKg != null && currentKg != null && Math.abs(currentKg - goalKg) <= 0.2;
+
+  let estWeeks = null, estDate = null;
+  if (goalKg != null && currentKg != null && !atGoal) {
+    estWeeks = Math.ceil(Math.abs(currentKg - goalKg) / 0.5); // ~0.5 kg/week healthy pace
+    const d = new Date(); d.setDate(d.getDate() + estWeeks * 7);
+    estDate = d.toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' });
+  }
+
+  let goalPct = 0;
+  if (goalKg != null && currentKg != null && startKg != null && startKg !== goalKg) {
+    goalPct = Math.min(Math.max((startKg - currentKg) / (startKg - goalKg) * 100, 0), 100);
+  }
+
+  const deltaSince = (monthsAgo) => {
+    if (!latestWi || weighIns.length < 2) return null;
+    const c = new Date(); c.setMonth(c.getMonth() - monthsAgo);
+    const cIso = c.toISOString().split('T')[0];
+    const prior = [...weighIns].reverse().find(w => w.date <= cIso);
+    if (!prior) return null;
+    return +(latestWi.kg - prior.kg).toFixed(1);
+  };
+  const milestones = [{ label: '1 month', d: deltaSince(1) }, { label: '3 months', d: deltaSince(3) }, { label: '6 months', d: deltaSince(6) }].filter(m => m.d !== null);
+
+  const wiChart = weighIns.slice(-12);
 
   const aiNote = totalSessions >= 10
     ? 'You have been putting in serious work. Monitor your soreness and consider a deload if several areas read moderate or severe.'
@@ -261,6 +334,82 @@ export default function ProgressPage() {
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
           ))}
+        </div>
+        </Reveal>
+
+        {/* ── GOAL WEIGHT + WEIGH-IN ── */}
+        <Reveal delay={30}>
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={eyebrow}>Goal weight</p>
+            {goalKg != null && currentKg != null && (
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>
+                <span className="gd-grad-text">{currentKg}</span> <span style={{ color: 'var(--ink-3)' }}>&rarr; {goalKg} kg</span>
+              </p>
+            )}
+          </div>
+
+          {goalKg == null ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="number" inputMode="decimal" value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="Target weight (kg)"
+                style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
+              <button onClick={saveGoal} disabled={savingGoal || !goalInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingGoal || !goalInput ? 0.5 : 1 }}>Set</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ background: 'var(--soft)', borderRadius: 999, height: 9, overflow: 'hidden', marginBottom: 8 }}>
+                <div className="gd-shimbar" style={{ width: `${goalPct}%`, height: '100%', borderRadius: 999, background: 'var(--grad)', transition: 'width 1s cubic-bezier(0.22,1,0.36,1)' }} />
+              </div>
+              <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                {atGoal ? '🎉 You’re at your goal — nice work.'
+                  : currentKg == null ? 'Log your first weigh-in to start tracking.'
+                  : <>At a steady pace you&rsquo;ll reach <b style={{ color: 'var(--ink)' }}>{goalKg} kg</b> in about <b style={{ color: 'var(--ink)' }}>{estWeeks} weeks</b> (&asymp; {estDate}).</>}
+              </p>
+
+              {needWeighIn && (
+                <div style={{ background: 'var(--orange-tint)', borderRadius: 12, padding: '9px 12px', marginBottom: 10 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--orange-ink)' }}>&#9200; Time for your weekly weigh-in</p>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" inputMode="decimal" value={wiInput} onChange={e => setWiInput(e.target.value)} placeholder="Weight today (kg)"
+                  style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
+                <button onClick={logWeighIn} disabled={savingWi || !wiInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingWi || !wiInput ? 0.5 : 1 }}>{savingWi ? '…' : 'Log'}</button>
+              </div>
+
+              {wiChart.length >= 2 && (
+                <div style={{ marginTop: 14 }}>
+                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 70, display: 'block' }}>
+                    {(() => {
+                      const kgs = wiChart.map(p => p.kg);
+                      const lo = Math.min(...kgs, goalKg), hi = Math.max(...kgs, goalKg);
+                      const range = (hi - lo) || 1;
+                      const yv = v => 96 - ((v - lo) / range) * 92;
+                      const dPath = wiChart.map((p, i) => `${i === 0 ? 'M' : 'L'}${(i / (wiChart.length - 1) * 100).toFixed(1)},${yv(p.kg).toFixed(1)}`).join(' ');
+                      return (<>
+                        <line x1="0" y1={yv(goalKg)} x2="100" y2={yv(goalKg)} stroke="var(--accent)" strokeWidth="0.7" strokeDasharray="3 2" opacity="0.7" />
+                        <path d={dPath} fill="none" stroke="var(--accent-strong)" strokeWidth="1.6" strokeLinejoin="round" />
+                      </>);
+                    })()}
+                  </svg>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--ink-3)', fontWeight: 600, marginTop: 2 }}>
+                    <span>{wiChart[0].kg}kg</span><span>goal {goalKg}kg</span><span>{wiChart[wiChart.length - 1].kg}kg</span>
+                  </div>
+                </div>
+              )}
+
+              {milestones.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  {milestones.map(m => (
+                    <div key={m.label} style={{ flex: 1, background: 'var(--soft)', borderRadius: 12, padding: '10px 8px', textAlign: 'center' }}>
+                      <p className="gd-disp" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: m.d < 0 ? 'var(--accent-strong)' : m.d > 0 ? 'var(--orange-ink)' : 'var(--ink)' }}>{m.d > 0 ? '+' : ''}{m.d}kg</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>vs {m.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
         </Reveal>
 
