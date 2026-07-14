@@ -80,6 +80,8 @@ export default function CoachDashboard() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
   const [activePlan, setActivePlan] = useState(null);
+  const [drafts, setDrafts] = useState([]);
+  const [draftId, setDraftId] = useState(null); // id of the draft being edited (reused on save)
   const [generating, setGenerating] = useState(false);
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -109,12 +111,40 @@ export default function CoachDashboard() {
   useEffect(() => {
     if (!userId) return;
     fetchActivePlan();
+    fetchDrafts();
   }, [userId]);
 
   const fetchActivePlan = async () => {
     try {
       const res = await fetch(PLANS_API_URL, { headers: { 'x-functions-key': PLANS_API_KEY } });
       if (res.ok) setActivePlan(await res.json());
+    } catch (e) {}
+  };
+
+  const fetchDrafts = async () => {
+    try {
+      const res = await fetch(`${PLANS_API_URL}?drafts=true`, { headers: { 'x-functions-key': PLANS_API_KEY } });
+      if (res.ok) { const d = await res.json(); setDrafts(Array.isArray(d) ? d : []); }
+    } catch (e) {}
+  };
+
+  const editDraft = (d) => {
+    setPlanName(d.name || '');
+    setPlanTag(d.tag || 'STRENGTH');
+    setSessionDate(d.date || new Date().toISOString().split('T')[0]);
+    setNotes(d.notes || '');
+    setAssignedTo(Array.isArray(d.assignedTo) ? d.assignedTo : []);
+    setExercises((d.exercises && d.exercises.length ? d.exercises : [emptyExercise()]).map(e => ({ equipFilter: 'All', ...e })));
+    setDraftId(d.id);
+    setSaveMsg({ type: 'success', text: `Editing draft: ${d.name || 'Untitled'}` });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteDraft = async (d) => {
+    setDrafts(prev => prev.filter(x => x.id !== d.id));
+    if (draftId === d.id) setDraftId(null);
+    try {
+      await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify({ ...d, archived: true, isActive: false }) });
     } catch (e) {}
   };
 
@@ -172,11 +202,13 @@ export default function CoachDashboard() {
     setSaving(true); setSaveMsg(null);
     try {
       const cleanExercises = exercises.map(({ equipFilter, ...e }) => e);
-      const plan = { id: Date.now().toString(), name: planName, tag: planTag, date: sessionDate, notes: notes.trim(), exercises: cleanExercises, isActive, assignedTo, createdAt: new Date().toISOString() };
+      const plan = { id: draftId || Date.now().toString(), name: planName, tag: planTag, date: sessionDate, notes: notes.trim(), exercises: cleanExercises, isActive, assignedTo, createdAt: new Date().toISOString() };
       const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify(plan) });
       if (res.ok) {
         setSaveMsg({ type: 'success', text: isActive ? 'Session published and set as active.' : 'Session saved as draft.' });
+        fetchDrafts();
         if (isActive) {
+          setDraftId(null);
           setActivePlan(plan);
           setPlanName('');
           setSessionDate(new Date().toISOString().split('T')[0]);
@@ -203,6 +235,8 @@ export default function CoachDashboard() {
               }),
             });
           } catch (e) {}
+        } else {
+          setDraftId(plan.id);
         }
       } else { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
     } catch (e) { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
@@ -378,7 +412,25 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            <p style={{ ...eyebrow, marginLeft: 4 }}>Create new session</p>
+            {drafts.length > 0 && (
+              <div>
+                <p style={{ ...eyebrow, marginLeft: 4, marginBottom: 8 }}>Saved drafts</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {drafts.map(d => (
+                    <div key={d.id} style={{ background: 'var(--card)', border: `1px solid ${draftId === d.id ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name || 'Untitled'}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)' }}>{d.exercises?.length || 0} exercises · {d.tag} · {d.date}</p>
+                      </div>
+                      <button onClick={() => editDraft(d)} style={{ flexShrink: 0, background: 'var(--accent-tint)', border: 'none', borderRadius: 10, padding: '8px 12px', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Edit</button>
+                      <button onClick={() => deleteDraft(d)} aria-label="Delete draft" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--red-ink)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Delete</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p style={{ ...eyebrow, marginLeft: 4 }}>{draftId ? 'Editing draft' : 'Create new session'}</p>
 
             <Reveal delay={100}>
             <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
