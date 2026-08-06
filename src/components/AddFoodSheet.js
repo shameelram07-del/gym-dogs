@@ -35,6 +35,16 @@ const primaryBtn = (on = true) => ({
 
 const macroLine = (i) => `${i.calories} kcal · P${i.protein} C${i.carbs} F${i.fat}`;
 
+// Shown after any AI call. Keeps model choice an observation rather than a belief.
+function Perf({ perf }) {
+  if (!perf || !perf.model) return null;
+  return (
+    <p style={{ margin: '10px 0 0', fontSize: 11.5, color: 'var(--ink-3)', letterSpacing: '0.02em' }}>
+      {perf.model} &middot; {(perf.ms / 1000).toFixed(1)}s
+    </p>
+  );
+}
+
 function Spinner({ label }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 2px', color: 'var(--ink-3)', fontSize: 14 }}>
@@ -87,6 +97,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   const [aiError, setAiError] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [aiAdded, setAiAdded] = useState([]);   // indices already logged
+  const [perf, setPerf] = useState(null);       // which model answered, and how fast
   const fileRef = useRef();
   const labelRef = useRef();
 
@@ -168,6 +179,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     try {
       const data = await aiFromLabel(dataUrl);
       setSearching(false);
+      setPerf(data.item ? { model: data.item.model, ms: data.item.ms } : null);
       if (data.found) {
         pick(data.item);
         if (data.confidence === 'low') setAiError('That was hard to read — check the numbers before you add it.');
@@ -184,7 +196,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     if (!aiText.trim()) return;
     setAiBusy(true); setAiError(null); setAiResult(null);
     setAiAdded([]);
-    try { setAiResult(await aiFromText(aiText.trim())); }
+    try { const r = await aiFromText(aiText.trim()); setAiResult(r); setPerf({ model: r.model, ms: r.ms }); }
     catch (e) { setAiError(e.message); }
     finally { setAiBusy(false); }
   }
@@ -197,6 +209,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
       // Bigger than a meal photo: nutrition print is small and needs the pixels.
       const dataUrl = await fileToCompressedDataUrl(file, 1100, 0.8);
       const data = await aiFromLabel(dataUrl);
+      setPerf(data.item ? { model: data.item.model, ms: data.item.ms } : null);
       if (data.found) {
         pick(data.item);
         if (data.confidence === 'low') setAiError('That was hard to read — check the numbers before you add it.');
@@ -218,7 +231,8 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
       setPhotoPreview(dataUrl);
-      setAiResult(await aiFromPhoto(dataUrl, aiText.trim() || undefined));
+      const r = await aiFromPhoto(dataUrl, aiText.trim() || undefined);
+      setAiResult(r); setPerf({ model: r.model, ms: r.ms });
     } catch (err) {
       setAiError(err.message);
     } finally {
@@ -344,7 +358,9 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                   <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>{macroLine(scaleToGrams(picked, grams))}</div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 10 }}>
+                <Perf perf={perf} />
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                   <button onClick={() => onSaveFavourites(toggleFavourite(favourites, scaleToGrams(picked, grams)))} style={{
                     padding: '14px 16px', borderRadius: 14, border: '1px solid var(--line)', background: 'var(--soft)',
                     color: isFavourite(favourites, scaleToGrams(picked, grams)) ? 'var(--gold)' : 'var(--ink-2)',
@@ -514,8 +530,10 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                           Add {aiAdded.length ? 'the rest' : `all ${aiResult.items.length}`} and close
                         </button>
                         <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-                          {aiResult.note ? `${aiResult.note} ` : ''}These are estimates &mdash; tap a number to fix it after adding if you know better.
+                          {aiResult.note ? `${aiResult.note} ` : ''}These are estimates &mdash; tap anything in your day to correct it, and I&rsquo;ll remember.
+                          {aiResult.reconciled > 0 && ` I corrected the calorie figure on ${aiResult.reconciled} of these to match their own macros.`}
                         </p>
+                        <Perf perf={perf} />
                       </>
                     )}
                   </div>
