@@ -124,16 +124,19 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
   async function onBarcode(code) {
     setScanning(false);
     if (!code) return;
-    setTab('search');
-    setSearching(true);
-    setResults(null);
+    setTab('scan');
+    setAiError(null);
+    setAiBusy(true);
     try {
       const data = await lookupBarcode(code);
-      if (data.found) { setSearching(false); pick(data.item); }
-      else { setResults([]); setSearching(false); setQ(''); setAiError(data.message); }
+      setAiBusy(false);
+      if (data.found) { pick(data.item); return; }
+      // Not in the database is the COMMON case for NZ products, not an error —
+      // so say so plainly and point at the label scanner sitting right there.
+      setAiError(`Barcode ${code} isn't in the food database. Photograph the nutrition panel instead — that works for anything.`);
     } catch (e) {
-      setSearching(false);
-      setAiError('Lookup failed — try again or add it by hand.');
+      setAiBusy(false);
+      setAiError(`Couldn't reach the food database. Photograph the nutrition panel instead, or add it by hand.`);
     }
   }
 
@@ -377,8 +380,12 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
                 </button>
                 <input ref={labelRef} type="file" accept="image/*" capture="environment" onChange={onLabelFile} style={{ display: 'none' }} />
 
-                {aiBusy && <Spinner label="Reading the label…" />}
-                {aiError && <p style={{ margin: '14px 0 0', fontSize: 13.5, color: 'var(--orange-ink)', lineHeight: 1.5 }}>{aiError}</p>}
+                {aiBusy && <Spinner label="Looking it up…" />}
+                {aiError && (
+                  <div style={{ marginTop: 14, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 14, padding: 14 }}>
+                    <p style={{ margin: 0, fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55 }}>{aiError}</p>
+                  </div>
+                )}
 
                 <p style={{ margin: '18px 0 0', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
                   Barcode not found? Photograph the panel on the back instead &mdash; get it square on and filling the frame.
