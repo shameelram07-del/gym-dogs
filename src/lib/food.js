@@ -32,6 +32,10 @@ async function postAI(body) {
 export const aiFromText = (description) => postAI({ mode: 'text', description });
 export const aiFromPhoto = (image, hint) => postAI({ mode: 'photo', image, hint });
 
+// Reads a nutrition information panel and returns a per-100g item, same shape as
+// a barcode hit — so it flows into the identical portion editor.
+export const aiFromLabel = (image) => postAI({ mode: 'label', image });
+
 // ── Portions ──────────────────────────────────────────────────────────────
 
 // Database entries are per 100g. Turn one into an actual logged item.

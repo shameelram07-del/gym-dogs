@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import BarcodeScanner from './BarcodeScanner';
 import {
-  lookupBarcode, searchFoods, aiFromText, aiFromPhoto,
+  lookupBarcode, searchFoods, aiFromText, aiFromPhoto, aiFromLabel,
   scaleToGrams, defaultGrams, fileToCompressedDataUrl,
   toggleFavourite, isFavourite, recentFoods,
 } from '@/lib/food';
@@ -87,6 +87,7 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
   const [aiError, setAiError] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const fileRef = useRef();
+  const labelRef = useRef();
 
   // quick add
   const [quick, setQuick] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
@@ -136,12 +137,56 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
     }
   }
 
+  // The scanner handed us a frame of the nutrition panel. Read it, then drop the
+  // result into the exact same portion editor a barcode hit would use.
+  async function onLabelShot(dataUrl) {
+    setScanning(false);
+    setTab('search');
+    setAiError(null);
+    setSearching(true);
+    try {
+      const data = await aiFromLabel(dataUrl);
+      setSearching(false);
+      if (data.found) {
+        pick(data.item);
+        if (data.confidence === 'low') setAiError('That was hard to read — check the numbers before you add it.');
+      } else {
+        setAiError(data.note || 'Could not read a nutrition panel there. Try filling the frame with just the panel.');
+      }
+    } catch (e) {
+      setSearching(false);
+      setAiError(e.message);
+    }
+  }
+
   async function runAiText() {
     if (!aiText.trim()) return;
     setAiBusy(true); setAiError(null); setAiResult(null);
     try { setAiResult(await aiFromText(aiText.trim())); }
     catch (e) { setAiError(e.message); }
     finally { setAiBusy(false); }
+  }
+
+  async function onLabelFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setAiBusy(true); setAiError(null);
+    try {
+      // Bigger than a meal photo: nutrition print is small and needs the pixels.
+      const dataUrl = await fileToCompressedDataUrl(file, 1100, 0.8);
+      const data = await aiFromLabel(dataUrl);
+      if (data.found) {
+        pick(data.item);
+        if (data.confidence === 'low') setAiError('That was hard to read — check the numbers before you add it.');
+      } else {
+        setAiError(data.note || 'Could not read a nutrition panel there.');
+      }
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiBusy(false);
+      e.target.value = '';
+    }
   }
 
   async function onPhoto(e) {
@@ -164,7 +209,7 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
 
   return (
     <>
-      {scanning && <BarcodeScanner onDetected={onBarcode} onClose={() => setScanning(false)} />}
+      {scanning && <BarcodeScanner onDetected={onBarcode} onLabel={onLabelShot} onClose={() => setScanning(false)} />}
 
       <div style={{ position: 'fixed', inset: 0, zIndex: 320, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
            onClick={onClose}>
@@ -304,12 +349,40 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
 
             {/* ── SCAN (the camera itself is an overlay) ── */}
             {!picked && tab === 'scan' && !scanning && (
-              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
-                <div style={{ fontSize: 40, marginBottom: 14 }}>▊▍▊</div>
-                <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                  Point your camera at the barcode on the packet and I&rsquo;ll pull the nutrition straight off it.
+              <div style={{ padding: '10px 0' }}>
+                <button onClick={() => setScanning(true)} style={{
+                  width: '100%', textAlign: 'left', cursor: 'pointer', background: 'var(--card)',
+                  border: '1px solid var(--line)', borderRadius: 18, padding: 18, display: 'flex', gap: 14, alignItems: 'center',
+                }}>
+                  <span style={{ fontSize: 26 }}>▊▍▊</span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 15.5, fontWeight: 700 }}>Scan the barcode</span>
+                    <span style={{ display: 'block', fontSize: 12.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.5 }}>
+                      Fastest when the product is in the database.
+                    </span>
+                  </span>
+                </button>
+
+                <button onClick={() => labelRef.current && labelRef.current.click()} style={{
+                  width: '100%', textAlign: 'left', cursor: 'pointer', background: 'var(--card)',
+                  border: '1px solid var(--line)', borderRadius: 18, padding: 18, display: 'flex', gap: 14, alignItems: 'center', marginTop: 10,
+                }}>
+                  <span style={{ fontSize: 26 }}>📄</span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: 15.5, fontWeight: 700 }}>Photograph the label</span>
+                    <span style={{ display: 'block', fontSize: 12.5, color: 'var(--ink-3)', marginTop: 3, lineHeight: 1.5 }}>
+                      Reads the nutrition panel directly. Works for anything, even if it&rsquo;s not in the database.
+                    </span>
+                  </span>
+                </button>
+                <input ref={labelRef} type="file" accept="image/*" capture="environment" onChange={onLabelFile} style={{ display: 'none' }} />
+
+                {aiBusy && <Spinner label="Reading the label…" />}
+                {aiError && <p style={{ margin: '14px 0 0', fontSize: 13.5, color: 'var(--orange-ink)', lineHeight: 1.5 }}>{aiError}</p>}
+
+                <p style={{ margin: '18px 0 0', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+                  Barcode not found? Photograph the panel on the back instead &mdash; get it square on and filling the frame.
                 </p>
-                <button onClick={() => setScanning(true)} style={primaryBtn(true)}>Open camera</button>
               </div>
             )}
 
