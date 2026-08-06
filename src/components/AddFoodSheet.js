@@ -86,11 +86,29 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [aiAdded, setAiAdded] = useState([]);   // indices already logged
   const fileRef = useRef();
   const labelRef = useRef();
 
   // quick add
   const [quick, setQuick] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+
+  // Feedback. The sheet deliberately stays open so you can log a whole meal in
+  // one visit — which means every add MUST confirm itself, or it reads as broken.
+  const [added, setAdded] = useState([]);          // names, most recent last
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef();
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  function commit(item, { close } = {}) {
+    onAdd(item);
+    setAdded((a) => [...a, item.name]);
+    setToast(item.name);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 1800);
+    if (navigator.vibrate) navigator.vibrate(18);
+    if (close) onClose();
+  }
 
   const favourites = (profile && profile.foodFavourites) || [];
 
@@ -116,8 +134,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   }
 
   function confirmPortion() {
-    const item = scaleToGrams(picked, grams);
-    onAdd(item);
+    commit(scaleToGrams(picked, grams));
     setPicked(null);
   }
 
@@ -165,6 +182,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   async function runAiText() {
     if (!aiText.trim()) return;
     setAiBusy(true); setAiError(null); setAiResult(null);
+    setAiAdded([]);
     try { setAiResult(await aiFromText(aiText.trim())); }
     catch (e) { setAiError(e.message); }
     finally { setAiBusy(false); }
@@ -195,7 +213,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   async function onPhoto(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    setAiBusy(true); setAiError(null); setAiResult(null);
+    setAiBusy(true); setAiError(null); setAiResult(null); setAiAdded([]);
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
       setPhotoPreview(dataUrl);
@@ -218,14 +236,23 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
            onClick={onClose}>
         <div onClick={(e) => e.stopPropagation()} style={{
           background: 'var(--card)', borderTopLeftRadius: 26, borderTopRightRadius: 26,
-          width: '100%', maxWidth: 480, height: '88vh', display: 'flex', flexDirection: 'column',
+          width: '100%', maxWidth: 480, height: '88vh', display: 'flex', flexDirection: 'column', position: 'relative',
         }}>
           {/* Handle + title */}
           <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
             <div style={{ width: 38, height: 4, background: 'var(--line)', borderRadius: 999, margin: '0 auto 14px' }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 className="gd-disp" style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>Add food</h3>
-              <button onClick={onClose} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', color: 'var(--ink-2)', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer' }}>×</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <h3 className="gd-disp" style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>Add food</h3>
+                {added.length > 0 && (
+                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--accent-strong)', fontWeight: 600 }}>
+                    {added.length} added &mdash; keep going or tap Done
+                  </p>
+                )}
+              </div>
+              {added.length > 0
+                ? <button onClick={onClose} style={{ background: 'var(--accent)', border: 'none', color: 'var(--on-accent)', padding: '9px 16px', borderRadius: 999, fontSize: 14, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>Done</button>
+                : <button onClick={onClose} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', color: 'var(--ink-2)', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>×</button>}
             </div>
           </div>
 
@@ -246,6 +273,19 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
             })}
           </div>
 
+          {/* Confirmation — sits above the body so it's visible from any tab */}
+          {toast && (
+            <div style={{
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(24px + env(safe-area-inset-bottom))',
+              background: 'var(--accent)', color: 'var(--on-accent)', padding: '11px 18px', borderRadius: 999,
+              fontSize: 14, fontWeight: 700, boxShadow: '0 12px 30px -10px rgba(0,0,0,0.5)', zIndex: 5,
+              maxWidth: '84%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              animation: 'gdRise .25s ease',
+            }}>
+              ✓ {toast}
+            </div>
+          )}
+
           {/* Body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px calc(20px + env(safe-area-inset-bottom))' }}>
 
@@ -255,7 +295,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                 <p style={{ ...eyebrow, marginBottom: 9 }}>Favourites</p>
                 <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
                   {favourites.map((fav, i) => (
-                    <button key={i} onClick={() => onAdd({ ...fav, id: Date.now() + Math.random() })} style={{
+                    <button key={i} onClick={() => commit({ ...fav, id: Date.now() + Math.random() })} style={{
                       flexShrink: 0, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 14,
                       padding: '9px 13px', cursor: 'pointer', textAlign: 'left', maxWidth: 160,
                     }}>
@@ -333,7 +373,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     <p style={{ ...eyebrow, margin: '20px 0 9px' }}>Recent</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {recentFoods(profile && profile.foodRecent).map((r, i) => (
-                        <button key={i} onClick={() => onAdd({ ...r, id: Date.now() + Math.random() })} style={{
+                        <button key={i} onClick={() => commit({ ...r, id: Date.now() + Math.random() })} style={{
                           display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer',
                           background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '12px 14px',
                         }}>
@@ -426,20 +466,40 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                           }}>{aiResult.confidence} confidence</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {aiResult.items.map((it, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '12px 14px' }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 14.5, fontWeight: 700 }}>{it.name}</div>
-                                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                                  {it.portion ? `${it.portion} · ` : ''}{macroLine(it)}
+                          {aiResult.items.map((it, i) => {
+                            const on = aiAdded.includes(i);
+                            return (
+                              <div key={i} style={{
+                                display: 'flex', alignItems: 'center', gap: 12, borderRadius: 14, padding: '12px 14px',
+                                background: on ? 'var(--accent-tint)' : 'var(--card)',
+                                border: `1px solid ${on ? 'var(--accent)' : 'var(--line)'}`,
+                                transition: 'background .2s ease, border-color .2s ease',
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 14.5, fontWeight: 700 }}>{it.name}</div>
+                                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                                    {it.portion ? `${it.portion} · ` : ''}{macroLine(it)}
+                                  </div>
                                 </div>
+                                <button
+                                  onClick={() => { if (on) return; commit({ ...it, id: Date.now() + Math.random() }); setAiAdded((a) => [...a, i]); }}
+                                  aria-label={on ? 'Added' : `Add ${it.name}`}
+                                  style={{
+                                    background: on ? 'var(--accent)' : 'none', border: 'none', borderRadius: '50%',
+                                    width: 30, height: 30, flexShrink: 0, fontSize: on ? 15 : 22,
+                                    color: on ? 'var(--on-accent)' : 'var(--accent-strong)',
+                                    cursor: on ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    animation: on ? 'gdPop .3s ease' : 'none',
+                                  }}>{on ? '✓' : '+'}</button>
                               </div>
-                              <button onClick={() => onAdd({ ...it, id: Date.now() + Math.random() })} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--accent-strong)', cursor: 'pointer' }}>+</button>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
-                        <button onClick={() => { aiResult.items.forEach((it, i) => onAdd({ ...it, id: Date.now() + i })); }} style={{ ...primaryBtn(true), width: '100%', marginTop: 12 }}>
-                          Add all {aiResult.items.length}
+                        <button onClick={() => {
+                          aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
+                          onClose(); // adding a whole meal means you're done
+                        }} style={{ ...primaryBtn(true), width: '100%', marginTop: 12 }}>
+                          Add {aiAdded.length ? 'the rest' : `all ${aiResult.items.length}`} and close
                         </button>
                         <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
                           {aiResult.note ? `${aiResult.note} ` : ''}These are estimates &mdash; tap a number to fix it after adding if you know better.
@@ -468,11 +528,14 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     </div>
                   ))}
                 </div>
-                <button disabled={!quickValid} onClick={() => onAdd({
-                  id: Date.now(), name: quick.name.trim(),
-                  calories: parseInt(quick.calories) || 0, protein: parseInt(quick.protein) || 0,
-                  carbs: parseInt(quick.carbs) || 0, fat: parseInt(quick.fat) || 0,
-                })} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add it</button>
+                <button disabled={!quickValid} onClick={() => {
+                  commit({
+                    id: Date.now(), name: quick.name.trim(),
+                    calories: parseInt(quick.calories) || 0, protein: parseInt(quick.protein) || 0,
+                    carbs: parseInt(quick.carbs) || 0, fat: parseInt(quick.fat) || 0,
+                  });
+                  setQuick({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+                }} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add it</button>
               </div>
             )}
           </div>
