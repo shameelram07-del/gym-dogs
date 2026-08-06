@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -247,7 +248,7 @@ export default function DashboardPage() {
       const days = dayLabels.map((label, i) => {
         const d = new Date(weekStart);
         d.setDate(weekStart.getDate() + i);
-        const iso = d.toISOString().split('T')[0];
+        const iso = toLocalISO(d);
         return {
           label,
           dayNum: d.getDate(),
@@ -307,7 +308,7 @@ export default function DashboardPage() {
         if (profile.name && profile.name.length < 50 && !looksLikeGuid(profile.name)) {
           setUserName(titleCase(profile.name));
         }
-        setDoneToday(profile.lastWorkoutDate === new Date().toISOString().split('T')[0]);
+        setDoneToday(profile.lastWorkoutDate === todayISO());
       }
 
       // Save the signed-in email to the profile once, so the coach can email this client.
@@ -350,7 +351,7 @@ export default function DashboardPage() {
   // The active plan stays active until a new one is published, so a session from
   // a previous day shouldn't be shown as today's — only surface a plan dated today.
   const planDate = todayPlan?.date || null;
-  const todayISO = today.toISOString().split('T')[0];
+  const todayISO = toLocalISO(today);
   const planIsToday = planDate === todayISO;
   const effPlan       = planIsToday ? todayPlan : null;               // today's session (or none)
   const stalePlan     = todayPlan && !planIsToday ? todayPlan : null; // exists but not for today

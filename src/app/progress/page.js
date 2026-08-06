@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,7 +53,7 @@ function calcWeeklyVolume(logs) {
     const date = new Date(log.date);
     const weekStart = new Date(date);
     weekStart.setDate(date.getDate() - date.getDay());
-    const weekKey = weekStart.toISOString().split('T')[0];
+    const weekKey = toLocalISO(weekStart);
     if (!weeks[weekKey]) weeks[weekKey] = 0;
     try {
       const sets = JSON.parse(log.sets_data || '[]');
@@ -110,7 +111,7 @@ function calcHeatmap(logs) {
   const days = [];
   for (let i = 34; i >= 0; i--) {
     const d = new Date(end); d.setDate(end.getDate() - i);
-    const iso = d.toISOString().split('T')[0];
+    const iso = toLocalISO(d);
     const v = volByDay[iso] || 0;
     days.push({
       iso,
@@ -251,7 +252,7 @@ export default function ProgressPage() {
   const logWeighIn = async () => {
     const kg = parseFloat(wiInput);
     if (!kg) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayISO();
     const next = [...weighIns.filter(w => w.date !== today), { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
     setWeighIns(next);
     setWiInput('');
@@ -275,7 +276,7 @@ export default function ProgressPage() {
   const currentKg = latestWi ? latestWi.kg : (profileRef?.weight ? parseFloat(profileRef.weight) : null);
   const goalKg = goalWeight ? parseFloat(goalWeight) : null;
   const startKg = weighIns.length ? weighIns[0].kg : currentKg;
-  const todayIso2 = new Date().toISOString().split('T')[0];
+  const todayIso2 = todayISO();
   const daysSinceWi = latestWi ? Math.floor((new Date(todayIso2) - new Date(latestWi.date)) / 86400000) : null;
   const needWeighIn = goalKg != null && (latestWi ? daysSinceWi >= 7 : true);
   const atGoal = goalKg != null && currentKg != null && Math.abs(currentKg - goalKg) <= 0.2;
@@ -295,7 +296,7 @@ export default function ProgressPage() {
   const deltaSince = (monthsAgo) => {
     if (!latestWi || weighIns.length < 2) return null;
     const c = new Date(); c.setMonth(c.getMonth() - monthsAgo);
-    const cIso = c.toISOString().split('T')[0];
+    const cIso = toLocalISO(c);
     const prior = [...weighIns].reverse().find(w => w.date <= cIso);
     if (!prior) return null;
     return +(latestWi.kg - prior.kg).toFixed(1);

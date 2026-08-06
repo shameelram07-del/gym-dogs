@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -15,7 +16,6 @@ import {
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
-const TODAY = new Date().toISOString().split('T')[0];
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
@@ -84,6 +84,15 @@ export default function NutritionPage() {
   const [adding, setAdding] = useState(false);
   const [editingWater, setEditingWater] = useState(false);
   const [editing, setEditing] = useState(null);   // the logged item being corrected
+  // Recomputed, never cached at module scope: a phone that sat on this page all
+  // night must roll over to the new day rather than keep yesterday's total.
+  const [TODAY, setTODAY] = useState(todayISO());
+
+  useEffect(() => onDayChange(TODAY, (next) => {
+    setTODAY(next);
+    setItems([]);
+    setWaterMl(0);
+  }), [TODAY]);
 
   // Targets setup
   const [setupOpen, setSetupOpen] = useState(false);
@@ -103,7 +112,7 @@ export default function NutritionPage() {
           const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
           if (p && !p.error) {
             setProfileRef(p);
-            if (p.nutrition && p.nutrition.date === TODAY) {
+            if (p.nutrition && p.nutrition.date === todayISO()) {
               // flattenEntries covers days saved before meal buckets were dropped
               setItems(flattenEntries(p.nutrition.items || p.nutrition.meals));
               setWaterMl(migrateWater(p.nutrition));

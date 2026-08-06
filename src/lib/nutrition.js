@@ -88,7 +88,13 @@ export const findRate = (id) => RATE_OPTIONS.find((r) => r.id === id) || RATE_OP
 // ── Dates ─────────────────────────────────────────────────────────────────
 
 const DAY_MS = 86400000;
-export const toISODate = (d) => new Date(d).toISOString().split('T')[0];
+// Local calendar date, not UTC — see lib/day.js for why that matters here.
+export const toISODate = (d) => {
+  const date = new Date(d);
+  if (isNaN(date)) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
 const dayNumber = (iso) => Math.floor(new Date(`${iso}T00:00:00Z`).getTime() / DAY_MS);
 const daysBetween = (a, b) => dayNumber(b) - dayNumber(a);
 

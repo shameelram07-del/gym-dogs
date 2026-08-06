@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -31,7 +32,7 @@ export default function HistoryPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
-  const [selected, setSelected] = useState(new Date().toISOString().split('T')[0]);
+  const [selected, setSelected] = useState(todayISO());
 
   useEffect(() => {
     if (inProgress !== 'none') return;
@@ -85,7 +86,7 @@ export default function HistoryPage() {
 
   if (!userId) return null;
 
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = todayISO();
   const sel = byDate[selected];
   const shiftMonth = (delta) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   const selLabel = new Date(selected + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });

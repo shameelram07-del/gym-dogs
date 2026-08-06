@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -74,7 +75,7 @@ export default function CoachDashboard() {
   const [view, setView] = useState('clients');
   const [planName, setPlanName] = useState('');
   const [planTag, setPlanTag] = useState('STRENGTH');
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState(todayISO());
   const [notes, setNotes] = useState('');
   const [exercises, setExercises] = useState([emptyExercise()]);
   const [saving, setSaving] = useState(false);
@@ -131,7 +132,7 @@ export default function CoachDashboard() {
   const editDraft = (d) => {
     setPlanName(d.name || '');
     setPlanTag(d.tag || 'STRENGTH');
-    setSessionDate(d.date || new Date().toISOString().split('T')[0]);
+    setSessionDate(d.date || todayISO());
     setNotes(d.notes || '');
     setAssignedTo(Array.isArray(d.assignedTo) ? d.assignedTo : []);
     setExercises((d.exercises && d.exercises.length ? d.exercises : [emptyExercise()]).map(e => ({ equipFilter: 'All', ...e })));
@@ -211,7 +212,7 @@ export default function CoachDashboard() {
           setDraftId(null);
           setActivePlan(plan);
           setPlanName('');
-          setSessionDate(new Date().toISOString().split('T')[0]);
+          setSessionDate(todayISO());
           setNotes('');
           setExercises([emptyExercise()]);
           setAssignedTo([]);
@@ -401,7 +402,7 @@ export default function CoachDashboard() {
         {/* ══ PLAN BUILDER ══ */}
         {view === 'plans' && (
           <>
-            {activePlan && activePlan.date === new Date().toISOString().split('T')[0] && (
+            {activePlan && activePlan.date === todayISO() && (
               <div style={{ background: 'var(--accent-tint)', borderRadius: 16, padding: 16 }}>
                 <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent-strong)' }}>CURRENTLY ACTIVE</p>
                 <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800 }}>{activePlan.name}</p>

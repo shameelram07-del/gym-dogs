@@ -22,8 +22,24 @@ export async function searchFoods(q) {
   return getJson(`${BASE}/foodLookup?q=${encodeURIComponent(q)}`);
 }
 
+// A reasoning model can think for minutes, and the Function App gives up at five.
+// Nobody stands in a kitchen that long — cut it off and say so plainly.
+const AI_TIMEOUT_MS = 45000;
+
 async function postAI(body) {
-  const res = await fetch(`${BASE}/foodAI`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(`${BASE}/foodAI`, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('That took too long — the AI model is being slow. Try again, or add it by hand.');
+    }
+    throw new Error('Could not reach the AI. Check your connection.');
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `AI failed (${res.status})`);
   return data;

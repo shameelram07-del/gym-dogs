@@ -1,4 +1,5 @@
 'use client';
+import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -16,7 +17,7 @@ const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
-const TODAY = new Date().toISOString().split('T')[0];
+const TODAY = todayISO();
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 // Localhost-only preview data so the screen can be reviewed without sign-in.
