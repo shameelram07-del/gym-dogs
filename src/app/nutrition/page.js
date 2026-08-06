@@ -26,18 +26,50 @@ const timeOf = (iso) => {
   return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
-function MacroBar({ label, value, goal, color }) {
-  const pct = goal ? Math.min(Math.round((value / goal) * 100), 100) : 0;
+// Grouping by part of the day gives the list shape without forcing anyone to
+// decide whether 10pm chips count as "dinner" or "snacks".
+const PARTS = [
+  { id: 'morning',   label: 'Morning',   until: 11 },
+  { id: 'midday',    label: 'Midday',    until: 15 },
+  { id: 'afternoon', label: 'Afternoon', until: 18 },
+  { id: 'evening',   label: 'Evening',   until: 24 },
+];
+function partOf(iso) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d)) return PARTS[3];
+  const h = d.getHours();
+  return PARTS.find((p) => h < p.until) || PARTS[3];
+}
+
+// A little visual anchor per row. Cheap, and it makes a long list scannable.
+const EMOJI = [
+  [/burger|zinger|patty|whopper/i, '🍔'], [/chip|fries|wedges/i, '🍟'],
+  [/chicken|wing|drumstick/i, '🍗'], [/rice|sushi|noodle|ramen/i, '🍚'],
+  [/coffee|latte|flat white|espresso/i, '☕'], [/beer|wine|cider/i, '🍺'],
+  [/drink|coke|pepsi|juice|soda|lemonade/i, '🥤'], [/shake|protein|whey/i, '🥛'],
+  [/milk|yoghurt|yogurt|cheese/i, '🧀'], [/egg/i, '🥚'], [/bread|toast|sandwich|roll|wrap/i, '🥪'],
+  [/salad|greens|lettuce|veg/i, '🥗'], [/apple|banana|fruit|berry|orange/i, '🍎'],
+  [/steak|beef|mince|lamb/i, '🥩'], [/fish|salmon|tuna|prawn/i, '🐟'], [/pizza/i, '🍕'],
+  [/pasta|spaghetti/i, '🍝'], [/choc|candy|lolly|sweet|dessert|cake|biscuit|bar/i, '🍫'],
+  [/nut|almond|peanut/i, '🥜'], [/potato|gravy|mash/i, '🥔'], [/soup|stew|curry/i, '🍲'],
+  [/oat|cereal|porridge|muesli/i, '🥣'],
+];
+const emojiFor = (name) => (EMOJI.find(([re]) => re.test(name || '')) || [null, '🍽️'])[1];
+
+// MacroFactor writes macros as one compact line with the letters carrying colour.
+function MacroLine({ item }) {
+  const bits = [
+    { v: item.protein, l: 'P', c: 'var(--accent-strong)' },
+    { v: item.carbs,   l: 'C', c: 'var(--blue-ink)' },
+    { v: item.fat,     l: 'F', c: 'var(--orange-ink)' },
+  ];
   return (
-    <div style={{ flex: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-        <span style={{ fontSize: 12, color: 'var(--ink-2)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{Math.round(value)}/{goal}g</span>
-      </div>
-      <div style={{ height: 6, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 999, transition: 'width 0.3s' }} />
-      </div>
-    </div>
+    <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+      <strong style={{ color: 'var(--ink-2)', fontWeight: 700 }}>{item.calories}</strong> kcal
+      {bits.map((b) => (
+        <span key={b.l}> &middot; {Math.round(b.v || 0)}<span style={{ color: b.c, fontWeight: 700 }}>{b.l}</span></span>
+      ))}
+    </span>
   );
 }
 
@@ -197,28 +229,65 @@ export default function NutritionPage() {
         )}
 
         {/* ── CALORIE SUMMARY ── */}
-        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 18 }}>
-          <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
-            <svg width="100" height="100" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
-              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--accent)" strokeWidth="11" strokeLinecap="round"
-                strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - calPct)} transform="rotate(-90 60 60)" />
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="gd-disp" style={{ fontSize: 24, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.02em' }}>{Math.round(total.calories)}</span>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)', marginTop: 3 }}>KCAL</span>
+        <div style={{ ...cardStyle, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ position: 'relative', width: 104, height: 104, flexShrink: 0 }}>
+              <svg width="104" height="104" viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="calRing" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="var(--accent-strong)" />
+                    <stop offset="100%" stopColor="var(--accent)" />
+                  </linearGradient>
+                </defs>
+                <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="12" />
+                <circle cx="60" cy="60" r={R} fill="none" stroke="url(#calRing)" strokeWidth="12" strokeLinecap="round"
+                  strokeDasharray={CIRC} strokeDashoffset={CIRC * (1 - calPct)} transform="rotate(-90 60 60)"
+                  style={{ transition: 'stroke-dashoffset .5s cubic-bezier(.4,0,.2,1)' }} />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="gd-disp" style={{ fontSize: 27, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>{Math.round(total.calories)}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.11em', color: 'var(--ink-3)', marginTop: 4 }}>EATEN</span>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="gd-disp" style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {remaining}
+              </p>
+              <p style={{ margin: '5px 0 0', fontSize: 13.5, color: 'var(--ink-2)' }}>
+                kcal left of <strong style={{ color: 'var(--ink)' }}>{T.calories}</strong>
+                {!targets && <span style={{ color: 'var(--ink-3)' }}> (generic)</span>}
+              </p>
+              {total.calories > T.calories && (
+                <p style={{ margin: '6px 0 0', fontSize: 12.5, color: 'var(--orange-ink)', fontWeight: 600 }}>
+                  {Math.round(total.calories - T.calories)} over &mdash; one day doesn&rsquo;t undo a week.
+                </p>
+              )}
             </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{remaining} kcal left</p>
-            <p style={{ margin: '3px 0 12px', fontSize: 13, color: 'var(--ink-2)' }}>
-              of {T.calories} goal{!targets && ' (generic)'}
-            </p>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <MacroBar label="Protein" value={total.protein} goal={T.protein} color="var(--accent)" />
-              <MacroBar label="Carbs" value={total.carbs} goal={T.carbs} color="var(--blue)" />
-              <MacroBar label="Fat" value={total.fat} goal={T.fat} color="var(--orange)" />
-            </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+            {[
+              { label: 'Protein', letter: 'P', value: total.protein, goal: T.protein, color: 'var(--accent)' },
+              { label: 'Carbs',   letter: 'C', value: total.carbs,   goal: T.carbs,   color: 'var(--blue)' },
+              { label: 'Fat',     letter: 'F', value: total.fat,     goal: T.fat,     color: 'var(--orange)' },
+            ].map((m) => {
+              const pct = m.goal ? Math.min((m.value / m.goal) * 100, 100) : 0;
+              const over = m.value > m.goal;
+              return (
+                <div key={m.letter} style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>{m.label}</span>
+                    <span style={{ fontSize: 11.5, color: over ? 'var(--orange-ink)' : 'var(--ink-3)', fontWeight: 600 }}>
+                      {Math.round(m.value)}<span style={{ color: 'var(--ink-3)' }}>/{m.goal}g</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 7, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: m.color, borderRadius: 999, transition: 'width .4s ease' }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -323,30 +392,62 @@ export default function NutritionPage() {
           )}
         </div>
 
-        {/* ── TODAY'S FOOD — one list, in the order it was eaten ── */}
+        {/* ── TODAY'S FOOD — grouped by part of the day ── */}
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px' }}>
             <p style={eyebrow}>What you&rsquo;ve eaten</p>
-            {items.length > 0 && <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 600 }}>{items.length} item{items.length === 1 ? '' : 's'}</span>}
+            {items.length > 0 && (
+              <span style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {items.length} item{items.length === 1 ? '' : 's'} &middot; {Math.round(total.calories)} kcal
+              </span>
+            )}
           </div>
 
           {items.length === 0 && (
-            <p style={{ margin: 0, padding: '0 18px 16px', fontSize: 13.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>
+            <p style={{ margin: 0, padding: '0 18px 18px', fontSize: 13.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>
               Nothing yet. Add things as you eat them &mdash; scan a barcode, photograph the label, or just describe it.
             </p>
           )}
 
-          {items.map((item) => (
-            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 18px', borderTop: '1px solid var(--line-2)' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 14.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>
-                  {item.at ? `${timeOf(item.at)} · ` : ''}{item.calories} kcal · P{item.protein} C{item.carbs} F{item.fat}
-                </p>
+          {PARTS.map((part) => {
+            const rows = items.filter((i) => partOf(i.at).id === part.id);
+            if (!rows.length) return null;
+            const kcal = rows.reduce((a, i) => a + (i.calories || 0), 0);
+            return (
+              <div key={part.id}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                  padding: '9px 18px', background: 'var(--soft)', borderTop: '1px solid var(--line-2)',
+                }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--ink-2)' }}>{part.label}</span>
+                  <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{kcal} kcal</span>
+                </div>
+
+                {rows.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
+                    <span style={{ fontSize: 19, width: 26, textAlign: 'center', flexShrink: 0 }}>{emojiFor(item.name)}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
+                        {(item.grams || item.portion) && (
+                          <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flexShrink: 0, fontWeight: 600 }}>
+                            {item.grams ? `${item.grams} g` : item.portion}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <MacroLine item={item} />
+                        {item.at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{timeOf(item.at)}</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => removeItem(item.id)} aria-label={`Remove ${item.name}`} style={{
+                      background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 19, cursor: 'pointer', flexShrink: 0, padding: '4px 2px',
+                    }}>×</button>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => removeItem(item.id)} aria-label="Remove" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 19, cursor: 'pointer', flexShrink: 0, padding: '0 2px' }}>×</button>
-            </div>
-          ))}
+            );
+          })}
 
           <button onClick={() => setAdding(true)} style={{
             width: '100%', padding: 15, background: 'var(--soft)', border: 'none', borderTop: '1px solid var(--line-2)',
