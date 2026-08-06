@@ -6,7 +6,8 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import TargetsSetup from '@/components/TargetsSetup';
 import AddFoodSheet from '@/components/AddFoodSheet';
-import { pushRecent } from '@/lib/food';
+import EditItemSheet from '@/components/EditItemSheet';
+import { pushRecent, toCustomFood, upsertCustomFood } from '@/lib/food';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
@@ -82,6 +83,7 @@ export default function NutritionPage() {
   const [waterMl, setWaterMl] = useState(0);
   const [adding, setAdding] = useState(false);
   const [editingWater, setEditingWater] = useState(false);
+  const [editing, setEditing] = useState(null);   // the logged item being corrected
 
   // Targets setup
   const [setupOpen, setSetupOpen] = useState(false);
@@ -187,6 +189,22 @@ export default function NutritionPage() {
     const next = items.filter((i) => i.id !== id);
     setItems(next);
     saveNutrition(next, waterMl);
+  };
+
+  // Saving a correction can also mint a personal food entry, which then outranks
+  // the database next time the same thing is logged.
+  const saveEdit = (next, remember) => {
+    const arr = items.map((i) => (i.id === next.id ? next : i));
+    setItems(arr);
+    const patch = {
+      nutrition: { date: TODAY, items: arr, waterMl },
+      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(arr, TODAY)),
+    };
+    if (remember) {
+      patch.foodCustom = upsertCustomFood((profileRef && profileRef.foodCustom) || [], toCustomFood(next));
+    }
+    saveProfile(patch);
+    setEditing(null);
   };
 
   const setWater = (ml) => {
@@ -426,7 +444,7 @@ export default function NutritionPage() {
                 {rows.map((item) => (
                   <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
                     <span style={{ fontSize: 19, width: 26, textAlign: 'center', flexShrink: 0 }}>{emojiFor(item.name)}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <button onClick={() => setEditing(item)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                         <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
                         {(item.grams || item.portion) && (
@@ -435,11 +453,12 @@ export default function NutritionPage() {
                           </span>
                         )}
                       </div>
-                      <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <MacroLine item={item} />
                         {item.at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{timeOf(item.at)}</span>}
+                        {item.corrected && <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--accent-strong)', letterSpacing: '0.04em' }}>EDITED</span>}
                       </div>
-                    </div>
+                    </button>
                     <button onClick={() => removeItem(item.id)} aria-label={`Remove ${item.name}`} style={{
                       background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 19, cursor: 'pointer', flexShrink: 0, padding: '4px 2px',
                     }}>×</button>
@@ -449,9 +468,14 @@ export default function NutritionPage() {
             );
           })}
 
+          {items.length > 0 && (
+            <p style={{ margin: 0, padding: '10px 18px 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5, borderTop: '1px solid var(--line-2)' }}>
+              Tap anything to fix its numbers &mdash; and I&rsquo;ll remember it for next time.
+            </p>
+          )}
           <button onClick={() => setAdding(true)} style={{
             width: '100%', padding: 15, background: 'var(--soft)', border: 'none', borderTop: '1px solid var(--line-2)',
-            color: 'var(--accent-strong)', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+            color: 'var(--accent-strong)', fontSize: 15, fontWeight: 800, cursor: 'pointer', marginTop: items.length ? 10 : 0,
           }}>
             + Add food
           </button>
@@ -466,6 +490,16 @@ export default function NutritionPage() {
           profile={profileRef}
           onSave={saveSetup}
           onCancel={() => setSetupOpen(false)}
+        />
+      )}
+
+      {/* ── FIX A LOGGED ITEM ── */}
+      {editing && (
+        <EditItemSheet
+          item={editing}
+          onSave={saveEdit}
+          onDelete={(id) => { removeItem(id); setEditing(null); }}
+          onClose={() => setEditing(null)}
         />
       )}
 

@@ -87,6 +87,41 @@ export function fileToCompressedDataUrl(file, maxDim = 800, quality = 0.72) {
   });
 }
 
+// ── Your own foods ────────────────────────────────────────────────────────
+// A correction the user made becomes a first-class database entry for them. It
+// outranks anything from Open Food Facts, because they measured it and we didn't.
+
+export function toCustomFood(item) {
+  const g = Number(item.grams);
+  if (!isFinite(g) || g <= 0) return null;
+  const per = (v) => Math.round(((Number(v) || 0) / g) * 100 * 10) / 10;
+  return {
+    id: `mine-${String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    barcode: item.barcode || null,
+    name: item.name,
+    brand: null,
+    image: null,
+    servingGrams: Math.round(g),
+    servingLabel: null,
+    per100g: { kcal: Math.round(per(item.calories)), protein: per(item.protein), carbs: per(item.carbs), fat: per(item.fat) },
+    source: 'Yours',
+    mine: true,
+  };
+}
+
+export function upsertCustomFood(list, food) {
+  if (!food) return Array.isArray(list) ? list : [];
+  const rest = (Array.isArray(list) ? list : []).filter((f) => f.id !== food.id);
+  return [...rest, food].slice(-120);
+}
+
+/** Your foods first, matched loosely — this runs on every keystroke. */
+export function searchCustomFoods(list, q) {
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return [];
+  return (Array.isArray(list) ? list : []).filter((f) => String(f.name).toLowerCase().includes(needle)).slice(0, 6);
+}
+
 // ── Favourites ────────────────────────────────────────────────────────────
 
 const sameFood = (a, b) => (a.barcode && b.barcode ? a.barcode === b.barcode : a.name === b.name);

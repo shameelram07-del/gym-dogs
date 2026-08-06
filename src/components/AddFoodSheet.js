@@ -12,7 +12,7 @@ import BarcodeScanner from './BarcodeScanner';
 import {
   lookupBarcode, searchFoods, aiFromText, aiFromPhoto, aiFromLabel,
   scaleToGrams, defaultGrams, fileToCompressedDataUrl,
-  toggleFavourite, isFavourite, recentFoods,
+  toggleFavourite, isFavourite, recentFoods, searchCustomFoods,
 } from '@/lib/food';
 
 const TABS = [
@@ -58,7 +58,7 @@ function FoodRow({ item, onPick }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</div>
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {item.brand ? `${item.brand} · ` : ''}{Math.round(p.kcal)} kcal / 100g
+          {item.mine ? '★ Yours · ' : item.brand ? `${item.brand} · ` : ''}{Math.round(p.kcal)} kcal / 100g
         </div>
       </div>
       <span style={{ fontSize: 20, color: 'var(--accent-strong)', flexShrink: 0 }}>+</span>
@@ -111,6 +111,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   }
 
   const favourites = (profile && profile.foodFavourites) || [];
+  const myFoods = searchCustomFoods((profile && profile.foodCustom) || [], q);
 
   // Debounced search — Open Food Facts rate-limits search hard, so don't fire per keystroke.
   useEffect(() => {
@@ -365,7 +366,18 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     Nothing found. Try the <strong>AI</strong> tab and just describe it &mdash; that works for home cooking and takeaways.
                   </p>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                {myFoods.length > 0 && (
+                  <>
+                    <p style={{ ...eyebrow, margin: '18px 0 9px' }}>Your foods</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {myFoods.map((item) => <FoodRow key={item.id} item={item} onPick={pick} />)}
+                    </div>
+                  </>
+                )}
+                {results && results.length > 0 && myFoods.length > 0 && (
+                  <p style={{ ...eyebrow, margin: '18px 0 9px' }}>Food database</p>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: myFoods.length ? 0 : 12 }}>
                   {(results || []).map((item) => <FoodRow key={item.id} item={item} onPick={pick} />)}
                 </div>
                 {!results && !searching && recentFoods(profile && profile.foodRecent).length > 0 && (
