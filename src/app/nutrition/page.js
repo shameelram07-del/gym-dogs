@@ -9,24 +9,22 @@ import AddFoodSheet from '@/components/AddFoodSheet';
 import { pushRecent } from '@/lib/food';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
-  summariseDay, upsertDay,
+  summariseDay, upsertDay, flattenEntries, migrateWater,
 } from '@/lib/nutrition';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 const TODAY = new Date().toISOString().split('T')[0];
 
-const MEAL_ORDER = [
-  { key: 'breakfast', label: 'Breakfast', icon: '🌅' },
-  { key: 'lunch',     label: 'Lunch',     icon: '🥗' },
-  { key: 'dinner',    label: 'Dinner',    icon: '🍽️' },
-  { key: 'snacks',    label: 'Snacks',    icon: '🍎' },
-];
-
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
 const pillBase = { padding: '9px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--line)', background: 'var(--soft)', color: 'var(--ink-2)' };
 const pillOn = { ...pillBase, background: 'var(--accent-tint)', borderColor: 'var(--accent)', color: 'var(--accent-strong)' };
+
+const timeOf = (iso) => {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
 
 function MacroBar({ label, value, goal, color }) {
   const pct = goal ? Math.min(Math.round((value / goal) * 100), 100) : 0;
@@ -48,9 +46,10 @@ export default function NutritionPage() {
   const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
   const [profileRef, setProfileRef] = useState(null);
-  const [meals, setMeals] = useState({ breakfast: [], lunch: [], dinner: [], snacks: [] });
-  const [water, setWater] = useState(0);
-  const [adding, setAdding] = useState(null); // meal key the sheet is adding to
+  const [items, setItems] = useState([]);   // flat, in the order they were eaten
+  const [waterMl, setWaterMl] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [editingWater, setEditingWater] = useState(false);
 
   // Targets setup
   const [setupOpen, setSetupOpen] = useState(false);
@@ -71,8 +70,9 @@ export default function NutritionPage() {
           if (p && !p.error) {
             setProfileRef(p);
             if (p.nutrition && p.nutrition.date === TODAY) {
-              if (p.nutrition.meals) setMeals(p.nutrition.meals);
-              if (typeof p.nutrition.water === 'number') setWater(p.nutrition.water);
+              // flattenEntries covers days saved before meal buckets were dropped
+              setItems(flattenEntries(p.nutrition.items || p.nutrition.meals));
+              setWaterMl(migrateWater(p.nutrition));
             }
           }
         }
@@ -90,6 +90,8 @@ export default function NutritionPage() {
   }, [saved, profileRef]);
 
   const T = targets || DEFAULT_TARGETS;
+  // Explicit override wins; otherwise the bodyweight-derived suggestion.
+  const waterGoalMl = (profileRef && profileRef.waterGoalMl) || T.waterMl || 2500;
 
   async function saveProfile(patch) {
     if (!userId) return;
@@ -106,11 +108,10 @@ export default function NutritionPage() {
 
   // Saving a meal also files the day's totals into nutritionLog — that history
   // is what the adaptive expenditure model reads from.
-  function saveNutrition(mealsArg, waterArg) {
-    const rollup = summariseDay(mealsArg, TODAY);
+  function saveNutrition(itemsArg, waterArg) {
     saveProfile({
-      nutrition: { date: TODAY, meals: mealsArg, water: waterArg },
-      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], rollup),
+      nutrition: { date: TODAY, items: itemsArg, waterMl: waterArg },
+      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
     });
   }
 
@@ -127,8 +128,7 @@ export default function NutritionPage() {
 
   if (!userId) return null;
 
-  const allItems = Object.values(meals).flat();
-  const total = allItems.reduce((a, i) => ({
+  const total = items.reduce((a, i) => ({
     calories: a.calories + (i.calories || 0),
     protein: a.protein + (i.protein || 0),
     carbs: a.carbs + (i.carbs || 0),
@@ -139,23 +139,28 @@ export default function NutritionPage() {
   const calPct = Math.min(total.calories / T.calories, 1);
   const R = 52, CIRC = 2 * Math.PI * R;
 
-  const openAdd = (mealKey) => setAdding(mealKey);
-
-  // The sheet stays open after an add, so you can log a whole meal in one go.
+  // The sheet stays open after an add, so a whole meal goes in without reopening.
   const addItem = (item) => {
-    const next = { ...meals, [adding]: [...meals[adding], item] };
-    setMeals(next);
-    const rollup = summariseDay(next, TODAY);
+    const stamped = { ...item, at: new Date().toISOString() };
+    const next = [...items, stamped];
+    setItems(next);
     saveProfile({
-      nutrition: { date: TODAY, meals: next, water },
-      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], rollup),
+      nutrition: { date: TODAY, items: next, waterMl },
+      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(next, TODAY)),
       foodRecent: pushRecent((profileRef && profileRef.foodRecent) || [], item),
     });
   };
-  const removeItem = (mealKey, id) => {
-    const next = { ...meals, [mealKey]: meals[mealKey].filter(i => i.id !== id) };
-    setMeals(next);
-    saveNutrition(next, water);
+
+  const removeItem = (id) => {
+    const next = items.filter((i) => i.id !== id);
+    setItems(next);
+    saveNutrition(next, waterMl);
+  };
+
+  const setWater = (ml) => {
+    const v = Math.max(0, Math.min(ml, 6000));
+    setWaterMl(v);
+    saveNutrition(items, v);
   };
 
   return (
@@ -163,7 +168,6 @@ export default function NutritionPage() {
 
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
         <div style={{ flex: 1 }}>
           <h1 className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Nutrition</h1>
           <p style={{ margin: '1px 0 0', fontSize: 13, color: 'var(--ink-3)' }}>Today</p>
@@ -277,49 +281,80 @@ export default function NutritionPage() {
 
         {/* ── WATER ── */}
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
             <p style={eyebrow}>Water</p>
-            <span style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>{water} / {T.water} glasses</span>
+            <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
+              <strong className="gd-disp" style={{ fontSize: 17, color: 'var(--ink)' }}>{(waterMl / 1000).toFixed(2).replace(/\.?0+$/, '')}</strong>
+              {' / '}{(waterGoalMl / 1000).toFixed(1)} L
+            </button>
           </div>
+
+          <div style={{ height: 10, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ width: `${Math.min((waterMl / waterGoalMl) * 100, 100)}%`, height: '100%', background: 'var(--blue)', borderRadius: 999, transition: 'width .3s ease' }} />
+          </div>
+
           <div style={{ display: 'flex', gap: 8 }}>
-            {Array.from({ length: T.water }).map((_, i) => (
-              <button key={i} onClick={() => { const nw = i + 1 === water ? i : i + 1; setWater(nw); saveNutrition(meals, nw); }} aria-label={`${i + 1} glasses`} style={{
-                flex: 1, height: 40, borderRadius: 10, cursor: 'pointer', border: 'none',
-                background: i < water ? 'var(--blue-tint)' : 'var(--soft)',
-                color: i < water ? 'var(--blue-ink)' : 'var(--ink-3)', fontSize: 16,
-              }}>💧</button>
+            {[250, 500, 1000].map((ml) => (
+              <button key={ml} onClick={() => setWater(waterMl + ml)} style={{
+                flex: 1, padding: '11px 6px', borderRadius: 12, cursor: 'pointer', border: '1px solid var(--line)',
+                background: 'var(--soft)', color: 'var(--ink-2)', fontSize: 13.5, fontWeight: 700,
+              }}>+{ml < 1000 ? `${ml}ml` : '1L'}</button>
             ))}
+            <button onClick={() => setWater(waterMl - 250)} disabled={waterMl <= 0} aria-label="Undo a glass" style={{
+              padding: '11px 15px', borderRadius: 12, cursor: waterMl > 0 ? 'pointer' : 'not-allowed', border: '1px solid var(--line)',
+              background: 'var(--soft)', color: 'var(--ink-3)', fontSize: 15, fontWeight: 700,
+            }}>&minus;</button>
           </div>
+
+          {editingWater && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line-2)' }}>
+              <p style={{ ...eyebrow, marginBottom: 9 }}>Daily goal</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[1500, 2000, 2500, 3000, 3500, 4000].map((g) => (
+                  <button key={g} onClick={() => { saveProfile({ waterGoalMl: g }); setEditingWater(false); }} style={{
+                    padding: '8px 13px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    border: `1px solid ${g === waterGoalMl ? 'var(--accent)' : 'var(--line)'}`,
+                    background: g === waterGoalMl ? 'var(--accent-tint)' : 'var(--soft)',
+                    color: g === waterGoalMl ? 'var(--accent-strong)' : 'var(--ink-2)',
+                  }}>{(g / 1000).toFixed(1)} L</button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── MEALS ── */}
-        {MEAL_ORDER.map(meal => {
-          const items = meals[meal.key];
-          const kcal = items.reduce((a, i) => a + (i.calories || 0), 0);
-          return (
-            <div key={meal.key} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>{meal.icon}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700 }}>{meal.label}</span>
-                </div>
-                <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 600 }}>{kcal} kcal</span>
+        {/* ── TODAY'S FOOD — one list, in the order it was eaten ── */}
+        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px' }}>
+            <p style={eyebrow}>What you&rsquo;ve eaten</p>
+            {items.length > 0 && <span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 600 }}>{items.length} item{items.length === 1 ? '' : 's'}</span>}
+          </div>
+
+          {items.length === 0 && (
+            <p style={{ margin: 0, padding: '0 18px 16px', fontSize: 13.5, color: 'var(--ink-3)', lineHeight: 1.55 }}>
+              Nothing yet. Add things as you eat them &mdash; scan a barcode, photograph the label, or just describe it.
+            </p>
+          )}
+
+          {items.map((item) => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 18px', borderTop: '1px solid var(--line-2)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 14.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>
+                  {item.at ? `${timeOf(item.at)} · ` : ''}{item.calories} kcal · P{item.protein} C{item.carbs} F{item.fat}
+                </p>
               </div>
-              {items.map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderTop: '1px solid var(--line-2)' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
-                    <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{item.calories} kcal · P{item.protein} C{item.carbs} F{item.fat}</p>
-                  </div>
-                  <button onClick={() => removeItem(meal.key, item.id)} aria-label="Remove" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>×</button>
-                </div>
-              ))}
-              <button onClick={() => openAdd(meal.key)} style={{ width: '100%', padding: '13px', background: 'var(--soft)', border: 'none', borderTop: '1px solid var(--line-2)', color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                + Add food
-              </button>
+              <button onClick={() => removeItem(item.id)} aria-label="Remove" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 19, cursor: 'pointer', flexShrink: 0, padding: '0 2px' }}>×</button>
             </div>
-          );
-        })}
+          ))}
+
+          <button onClick={() => setAdding(true)} style={{
+            width: '100%', padding: 15, background: 'var(--soft)', border: 'none', borderTop: '1px solid var(--line-2)',
+            color: 'var(--accent-strong)', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+          }}>
+            + Add food
+          </button>
+        </div>
 
       </div>
 
@@ -336,11 +371,10 @@ export default function NutritionPage() {
       {/* ── ADD FOOD ── */}
       {adding && (
         <AddFoodSheet
-          mealLabel={(MEAL_ORDER.find(m => m.key === adding) || {}).label || 'meal'}
           profile={profileRef}
           onAdd={addItem}
           onSaveFavourites={(favs) => saveProfile({ foodFavourites: favs })}
-          onClose={() => setAdding(null)}
+          onClose={() => setAdding(false)}
         />
       )}
 

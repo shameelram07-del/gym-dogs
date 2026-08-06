@@ -66,7 +66,7 @@ function FoodRow({ item, onPick }) {
   );
 }
 
-export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourites, onClose }) {
+export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose }) {
   const [tab, setTab] = useState('search');
   const [scanning, setScanning] = useState(false);
 
@@ -224,7 +224,7 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
           <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
             <div style={{ width: 38, height: 4, background: 'var(--line)', borderRadius: 999, margin: '0 auto 14px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 className="gd-disp" style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>Add to {mealLabel}</h3>
+              <h3 className="gd-disp" style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>Add food</h3>
               <button onClick={onClose} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', color: 'var(--ink-2)', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer' }}>×</button>
             </div>
           </div>
@@ -309,7 +309,7 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
                     color: isFavourite(favourites, scaleToGrams(picked, grams)) ? 'var(--gold)' : 'var(--ink-2)',
                     fontSize: 18, cursor: 'pointer',
                   }}>★</button>
-                  <button onClick={confirmPortion} style={{ ...primaryBtn(true), flex: 1 }}>Add to {mealLabel}</button>
+                  <button onClick={confirmPortion} style={{ ...primaryBtn(true), flex: 1 }}>Add it</button>
                 </div>
               </div>
             )}
@@ -472,7 +472,7 @@ export default function AddFoodSheet({ mealLabel, profile, onAdd, onSaveFavourit
                   id: Date.now(), name: quick.name.trim(),
                   calories: parseInt(quick.calories) || 0, protein: parseInt(quick.protein) || 0,
                   carbs: parseInt(quick.carbs) || 0, fat: parseInt(quick.fat) || 0,
-                })} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add to {mealLabel}</button>
+                })} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add it</button>
               </div>
             )}
           </div>

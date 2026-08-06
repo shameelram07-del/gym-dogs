@@ -253,14 +253,15 @@ export function calculateTargets(setup, nutritionLog, weighIns, today) {
   const protein = Math.min(PROTEIN_PER_KG[direction] * currentWeight, 250);
   const fat = Math.max((calories * 0.25) / 9, 0.6 * currentWeight);
   const carbs = Math.max((calories - protein * 4 - fat * 9) / 4, 0);
-  const water = clamp(Math.round((currentWeight * 35) / 250), 6, 14);
+  // ~35 ml per kg, rounded to a friendly quarter-litre, held between 1.5 and 4 L.
+  const waterMl = clamp(Math.round((currentWeight * 35) / 250) * 250, 1500, 4000);
 
   return {
     calories: round(calories, 10),
     protein: round(protein, 5),
     carbs: round(carbs, 5),
     fat: round(fat, 5),
-    water,
+    waterMl,
     expenditure: Math.round(exp.value),
     expenditureSource: exp.source,
     confidence: exp.confidence,
@@ -276,13 +277,13 @@ export function calculateTargets(setup, nutritionLog, weighIns, today) {
 }
 
 // What the app shows before anyone has set anything up.
-export const DEFAULT_TARGETS = { calories: 2200, protein: 160, carbs: 220, fat: 70, water: 8 };
+export const DEFAULT_TARGETS = { calories: 2200, protein: 160, carbs: 220, fat: 70, waterMl: 2500 };
 
 // ── Daily log helpers ─────────────────────────────────────────────────────
 
 /** Roll a day's meals into the compact row stored in profile.nutritionLog. */
-export function summariseDay(meals, date) {
-  const items = Object.values(meals || {}).flat();
+export function summariseDay(entry, date) {
+  const items = flattenEntries(entry);
   const t = items.reduce(
     (a, i) => ({
       kcal: a.kcal + (Number(i.calories) || 0),
@@ -293,6 +294,25 @@ export function summariseDay(meals, date) {
     { kcal: 0, p: 0, c: 0, f: 0 }
   );
   return { date, kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f) };
+}
+
+/**
+ * Accepts either the current flat array of items or the old
+ * { breakfast: [], lunch: [], ... } shape, so days logged before the
+ * meal buckets were dropped still read correctly.
+ */
+export function flattenEntries(entry) {
+  if (Array.isArray(entry)) return entry;
+  if (entry && typeof entry === 'object') return Object.values(entry).flat();
+  return [];
+}
+
+/** Old logs counted glasses; one glass was 250 ml. */
+export function migrateWater(nutrition) {
+  if (!nutrition) return 0;
+  if (typeof nutrition.waterMl === 'number') return nutrition.waterMl;
+  if (typeof nutrition.water === 'number') return nutrition.water * 250;
+  return 0;
 }
 
 /** Insert or replace today's row without disturbing history. */
