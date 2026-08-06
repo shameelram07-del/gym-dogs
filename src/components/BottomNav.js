@@ -8,6 +8,7 @@ const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 const ICONS = {
   home:     <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
   train:    <><path d="M6 7v10M18 7v10M4 9v6M20 9v6M6 12h12" /></>,
+  eat:      <><path d="M4 3v6a2 2 0 0 0 2 2h.5a2 2 0 0 0 2-2V3" /><path d="M6.25 11v10" /><path d="M20 14V3a4.5 4.5 0 0 0-4 4.5V12a2 2 0 0 0 2 2h2zm0 0v7" /></>,
   progress: <><path d="M4 19V5M4 19h16M8 16l4-5 3 3 5-7" /></>,
   community:<><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 20c0-2 1-3 3-3s3 1 3 3" /></>,
   coach:    <><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.4-4.9-2.6-4.9 2.6.9-5.4-4-3.9 5.5-.8z" /></>,
@@ -24,6 +25,7 @@ export default function BottomNav() {
   const tabs = [
     { label: 'Home',      key: 'home',      href: '/dashboard' },
     { label: 'Train',     key: 'train',     href: '/workout'   },
+    { label: 'Eat',       key: 'eat',       href: '/nutrition' },
     { label: 'Progress',  key: 'progress',  href: '/progress'  },
     { label: 'Community', key: 'community', href: '/community' },
     ...(isCoach ? [{ label: 'Coach', key: 'coach', href: '/coach' }] : []),
