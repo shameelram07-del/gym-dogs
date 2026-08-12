@@ -446,7 +446,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     </span>
                   </span>
                 </button>
-                <input ref={labelRef} type="file" accept="image/*" capture="environment" onChange={onLabelFile} style={{ display: 'none' }} />
+                <input ref={labelRef} type="file" accept="image/*" onChange={onLabelFile} style={{ display: 'none' }} />
 
                 {aiBusy && <Spinner label="Looking it up…" />}
                 {aiError && (
@@ -473,7 +473,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     color: 'var(--ink-2)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
                   }}>📷 Photo</button>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onPhoto} style={{ display: 'none' }} />
+                <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: 'none' }} />
 
                 {photoPreview && <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 16, marginTop: 14, maxHeight: 200, objectFit: 'cover' }} />}
                 {aiBusy && <Spinner label="Working it out…" />}
