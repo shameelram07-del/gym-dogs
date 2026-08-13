@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local scratch — holds a 16MB source tarball that must not enter history
+_to_delete/
