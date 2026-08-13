@@ -7,6 +7,7 @@ import { useMsal } from '@azure/msal-react';
 import { exerciseLibrary, muscleGroups, equipmentTypes } from '@/lib/exercises';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
+import { captureError } from '@/lib/monitoring';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
@@ -103,8 +104,15 @@ export default function CoachDashboard() {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) setClients(data);
+        } else {
+          captureError(new Error(`clients failed (${res.status})`), {
+            screen: 'coach', action: 'load-clients', endpoint: 'clients', status: res.status,
+          });
         }
-      } catch (e) {}
+      } catch (e) {
+        // "No clients yet" and "the call failed" render identically.
+        captureError(e, { screen: 'coach', action: 'load-clients', endpoint: 'clients' });
+      }
       finally { setClientsLoading(false); }
     })();
   }, [userId]);
@@ -119,14 +127,18 @@ export default function CoachDashboard() {
     try {
       const res = await fetch(PLANS_API_URL, { headers: { 'x-functions-key': PLANS_API_KEY } });
       if (res.ok) setActivePlan(await res.json());
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'coach', action: 'load-active-plan', endpoint: 'workoutPlans' });
+    }
   };
 
   const fetchDrafts = async () => {
     try {
       const res = await fetch(`${PLANS_API_URL}?drafts=true`, { headers: { 'x-functions-key': PLANS_API_KEY } });
       if (res.ok) { const d = await res.json(); setDrafts(Array.isArray(d) ? d : []); }
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'coach', action: 'load-drafts', endpoint: 'workoutPlans' });
+    }
   };
 
   const editDraft = (d) => {
@@ -146,7 +158,11 @@ export default function CoachDashboard() {
     if (draftId === d.id) setDraftId(null);
     try {
       await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify({ ...d, archived: true, isActive: false }) });
-    } catch (e) {}
+    } catch (e) {
+      // The draft has already vanished from the list — if the write failed it
+      // comes back on the next load with no explanation.
+      captureError(e, { screen: 'coach', action: 'delete-draft', endpoint: 'workoutPlans' });
+    }
   };
 
   const addExercise = () => setExercises(prev => [...prev, emptyExercise()]);
@@ -172,7 +188,14 @@ export default function CoachDashboard() {
           body: JSON.stringify({ message: prompt, prompt }),
         });
         if (res.ok) { const d = await res.json(); text = d.reply || d.message || (typeof d === 'string' ? d : ''); }
-      } catch (e) {}
+        else captureError(new Error(`aiCoach failed (${res.status})`), {
+          screen: 'coach', action: 'generate-plan', endpoint: 'aiCoach', status: res.status,
+        });
+      } catch (e) {
+        // Falls back to a template below, so the coach never sees an error —
+        // which is exactly why the failure has to be reported somewhere.
+        captureError(e, { screen: 'coach', action: 'generate-plan', endpoint: 'aiCoach' });
+      }
 
       let parsed = [];
       const match = text && text.match(/\[[\s\S]*\]/);
@@ -182,7 +205,11 @@ export default function CoachDashboard() {
             const lib = findExercise(item.name);
             return lib ? { ...lib, sets: item.sets || lib.sets, reps: item.reps || lib.reps } : null;
           }).filter(Boolean);
-        } catch (e) {}
+        } catch (e) {
+          // The model returned something JSON-shaped that isn't valid JSON —
+          // worth knowing, because it silently downgrades to the template.
+          captureError(e, { screen: 'coach', action: 'parse-ai-plan' });
+        }
       }
 
       const usedAI = parsed.length >= 3;
@@ -192,6 +219,7 @@ export default function CoachDashboard() {
     } catch (e) {
       setExercises(buildFromTemplate(planTag));
       setSaveMsg({ type: 'success', text: 'Draft ready — review and publish.' });
+      captureError(e, { screen: 'coach', action: 'generate-plan', tag: planTag });
     } finally {
       setGenerating(false);
     }
@@ -235,12 +263,23 @@ export default function CoachDashboard() {
                 tag: '📋 New session',
               }),
             });
-          } catch (e) {}
+          } catch (e) {
+            // The session published fine; only the announcement failed.
+            captureError(e, { screen: 'coach', action: 'announce-session', endpoint: 'communityPosts' });
+          }
         } else {
           setDraftId(plan.id);
         }
-      } else { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
-    } catch (e) { setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' }); }
+      } else {
+        setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
+        captureError(new Error(`Publish failed (${res.status})`), {
+          screen: 'coach', action: isActive ? 'publish' : 'save-draft', endpoint: 'workoutPlans', status: res.status,
+        });
+      }
+    } catch (e) {
+      setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
+      captureError(e, { screen: 'coach', action: isActive ? 'publish' : 'save-draft', endpoint: 'workoutPlans' });
+    }
     finally { setSaving(false); }
   };
 

@@ -13,6 +13,7 @@
 // "Trying to play video that is already playing" warning).
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { captureError } from '@/lib/monitoring';
 
 const ZXING_CDN = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
 const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
@@ -96,7 +97,7 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
             const avail = await window.BarcodeDetector.getSupportedFormats();
             const usable = FORMATS.filter((f) => avail.includes(f));
             if (usable.length) supported = usable;
-          } catch (e) { /* fall back to our list */ }
+          } catch (e) { /* deliberate: older browsers, fall back to our list */ }
 
           const detector = new window.BarcodeDetector({ formats: supported });
           const scan = async () => {
@@ -104,7 +105,11 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
             try {
               const hits = await detector.detect(video);
               if (hits && hits.length) return finish(hits[0].rawValue);
-            } catch (e) { /* transient frame errors are normal */ }
+            } catch (e) {
+              // Deliberate, and must stay that way: this runs once per animation
+              // frame, and a failed decode on a blurry frame is the normal case.
+              // Reporting from here would empty the event quota in seconds.
+            }
             rafId = requestAnimationFrame(scan);
           };
           rafId = requestAnimationFrame(scan);
@@ -130,17 +135,22 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
         setStatus('Point at the barcode');
       } catch (e) {
         setStatus('');
+        const denied = e && e.name === 'NotAllowedError';
         setError(
-          e && e.name === 'NotAllowedError'
+          denied
             ? 'Camera permission denied. Allow it in your browser settings, or type the number in.'
             : (e && e.message) || 'Could not start the camera.'
         );
+        // A denied permission is the user's choice, not a fault. Anything else —
+        // the CDN blocked, no camera, ZXing missing — is worth knowing about.
+        if (!denied) captureError(e, { screen: 'food', action: 'start-scanner' });
       }
     })();
 
     return () => {
       stopRef.current = true;
       if (rafId) cancelAnimationFrame(rafId);
+      // Deliberate: unmount teardown, nothing left to salvage if reset throws.
       try { if (readerRef.current) readerRef.current.reset(); } catch (e) {}
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };

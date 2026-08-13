@@ -15,6 +15,7 @@ import {
   toggleFavourite, isFavourite, recentFoods, searchCustomFoods,
   sumItems, mealNameFrom,
 } from '@/lib/food';
+import { captureError } from '@/lib/monitoring';
 
 const TABS = [
   { id: 'search', label: 'Search', icon: '🔍' },
@@ -156,7 +157,10 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
         const data = await searchFoods(q.trim());
         setResults(data.items || []);
       } catch (e) {
+        // Shows as "nothing found", which is a lie when the lookup broke.
+        // The query is the user's own words, so it stays out of the report.
         setResults([]);
+        captureError(e, { screen: 'food', action: 'search', endpoint: 'foodLookup' });
       } finally { setSearching(false); }
     }, 450);
     return () => clearTimeout(searchTimer.current);
@@ -188,6 +192,9 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     } catch (e) {
       setAiBusy(false);
       setAiError(`Couldn't reach the food database. Photograph the nutrition panel instead, or add it by hand.`);
+      // A barcode simply not being in the database is handled above and is not
+      // an error — this branch is the lookup itself failing.
+      captureError(e, { screen: 'food', action: 'barcode-lookup', endpoint: 'foodLookup' });
     }
   }
 
@@ -211,6 +218,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     } catch (e) {
       setSearching(false);
       setAiError(e.message);
+      captureError(e, { screen: 'food', action: 'label-scan', endpoint: 'foodAI' });
     }
   }
 
@@ -231,7 +239,11 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
       setAiResult(r);
       setPerf({ model: r.model, ms: r.ms });
     }
-    catch (e) { setAiError(e.message); }
+    catch (e) {
+      setAiError(e.message);
+      // Which path was taken matters; what they typed or photographed does not.
+      captureError(e, { screen: 'food', action: 'ai-estimate', endpoint: 'foodAI', fromPhoto: !!photoPreview });
+    }
     finally { setAiBusy(false); }
   }
 
@@ -252,6 +264,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
       }
     } catch (err) {
       setAiError(err.message);
+      captureError(err, { screen: 'food', action: 'label-photo', endpoint: 'foodAI' });
     } finally {
       setAiBusy(false);
       e.target.value = '';
@@ -269,6 +282,8 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
       setPhotoPreview(dataUrl);
     } catch (err) {
       setAiError(err.message);
+      // The image never leaves the device — only the fact it wouldn't decode.
+      captureError(err, { screen: 'food', action: 'compress-photo' });
     } finally {
       setAiBusy(false);
       e.target.value = ''; // let the same file be picked again

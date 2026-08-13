@@ -51,7 +51,8 @@ function — same shape as `weighInReminder` — which is an API change and a zi
   something to slip into a UI brief.
 - **Bad dates already in Cosmos.** The `TODAY` fix stops new logs landing on the wrong day, but
   workouts already saved with yesterday's date stay wrong. Needs a count and a one-off cleanup.
-- **No error monitoring.** Both bugs found on 13 Aug were invisible because catches swallowed them.
+- ~~**No error monitoring.**~~ Done 14 Aug — see the entry below. **Needs the DSN from Shameel
+  before it does anything**, and source-map upload is still outstanding.
 - **Sweep item 4** — UTC date-string parsing in profile/progress/dashboard. Correct at UTC+12,
   wrong anywhere else. Deliberately skipped.
 - **Progress tab goals** — blocked on Shameel deciding what the goal tracks.
@@ -70,6 +71,41 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 ```
 
 ---
+
+### 2026-08-14 — error monitoring + the catch sweep (error-monitoring.md)
+Built by: Claude Code
+Shipped: `@sentry/browser` (not `@sentry/nextjs` — no server half to instrument), wired through a
+new `src/lib/monitoring.js`. **72 `catch` sites across 16 files were gone through one at a time**:
+61 now report, 11 are documented as deliberate (localStorage in private mode, the per-frame barcode
+decode, our own 45s AI timeout). New `src/components/ErrorMonitor.js` renders inside `MsalProvider`
+and sets the user to `{ id }` only, plus a screen breadcrumb per route.
+
+Privacy is enforced in `scrubEvent()`, which is exported and was verified directly against a
+deliberately poisoned event: **no email, name, weight, goalWeight, weighIns or nutritionLog can
+reach Sentry** — values are dropped, emails in messages redacted, `event.user` reduced to an id.
+Only field *names* are ever attached (`fields: 'weighIns,weight'`). Quota control: same
+message+stack within 60s is one event, extension noise and aborts dropped, and localhost doesn't
+initialise at all unless `NEXT_PUBLIC_SENTRY_LOCAL=1`.
+
+Also fixed while sweeping: `dashboard/page.js` referenced an out-of-scope `account` variable, so it
+threw a `ReferenceError` on **every single load** and an inner catch ate it. That block is now
+removed — `EmailCapture` has done the job app-wide since 13 Aug. `MsalProvider` had no `.catch()`
+on `msalInstance.initialize()`; if it ever fails the whole app is a blank screen, so that now
+reports.
+
+Touched: `package.json`, `src/lib/monitoring.js` (new), `src/components/ErrorMonitor.js` (new),
+`MsalProvider`, `EmailCapture`, `AddFoodSheet`, `BarcodeScanner`, `EditItemSheet`, `ThemeToggle`,
+`lib/food.js`, and the dashboard, workout, nutrition, community, progress, coach, profile,
+onboarding and history screens. Workflow gains `NEXT_PUBLIC_SENTRY_DSN` + `NEXT_PUBLIC_COMMIT_SHA`.
+
+Still needed: **frontend push**, and two things only Shameel can do — (1) create the sentry.io
+project (platform **Browser JavaScript**), put the DSN in `.env.local` and add it as the GitHub
+Actions secret `NEXT_PUBLIC_SENTRY_DSN`; (2) set alert rules in the Sentry UI. No API redeploy, no
+`FIELDS` change. Until the DSN exists the app behaves exactly as before — no init, no network
+calls, every capture a no-op. **Untested in the browser — Shameel to run `npm run dev`.**
+
+Follow-up for Cowork: **source-map upload is out of scope and not done**, so stack traces will be
+minified until it's built. It needs a Sentry auth token in CI and is a separate job.
 
 ### 2026-08-13 — Coach Dog card on Nutrition (nutrition-coach-card.md)
 Built by: Claude Code

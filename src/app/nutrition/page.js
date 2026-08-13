@@ -10,6 +10,7 @@ import AddFoodSheet from '@/components/AddFoodSheet';
 import EditItemSheet from '@/components/EditItemSheet';
 import Reveal from '@/components/Reveal';
 import { pushRecent, toCustomFood, upsertCustomFood } from '@/lib/food';
+import { captureError } from '@/lib/monitoring';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
@@ -148,7 +149,11 @@ export default function NutritionPage() {
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        // Silently losing this leaves the screen showing an empty day over the
+        // top of food that is actually saved.
+        captureError(e, { screen: 'nutrition', action: 'load-day', endpoint: 'userProfiles' });
+      }
     })();
   }, [accounts, inProgress, router]);
 
@@ -188,6 +193,12 @@ export default function NutritionPage() {
       setSaveError('');
     } catch (e) {
       setSaveError("Today's food isn't saved — check your connection.");
+      // Field NAMES only — what was being written, never the values, which are
+      // this person's weight, goal and food log.
+      captureError(e, {
+        screen: 'nutrition', action: 'save-profile', endpoint: 'userProfiles',
+        fields: Object.keys(patch || {}).join(','),
+      });
     }
   }
 
@@ -244,9 +255,17 @@ export default function NutritionPage() {
         if (reply && String(reply).trim()) text = String(reply).trim();
       } else {
         console.error(`Nutrition coach: aiCoach failed (${res.status})`);
+        captureError(new Error(`aiCoach failed (${res.status})`), {
+          screen: 'nutrition', action: 'coach-note', endpoint: 'aiCoach', status: res.status,
+        });
       }
     } catch (e) {
       console.error('Nutrition coach: aiCoach failed', e);
+      // The 20s cut-off firing is our own timeout, not a fault — the card falls
+      // back to the deterministic read and nobody sees an error.
+      if (e.name !== 'AbortError') {
+        captureError(e, { screen: 'nutrition', action: 'coach-note', endpoint: 'aiCoach' });
+      }
     } finally {
       clearTimeout(timer);
     }

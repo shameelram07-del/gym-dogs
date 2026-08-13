@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
+import { captureError } from '@/lib/monitoring';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
@@ -83,7 +84,10 @@ export default function OnboardingPage() {
           const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
           if (p && !p.error) setProfileRef(p);
         }
-      } catch (e) {}
+      } catch (e) {
+        // Losing the existing profile here means the save below overwrites it.
+        captureError(e, { screen: 'onboarding', action: 'load-profile', endpoint: 'userProfiles' });
+      }
     })();
   }, [accounts]);
 
@@ -97,14 +101,23 @@ export default function OnboardingPage() {
         body: JSON.stringify({ ...(profileRef || {}), userId, onboarding: answers, onboardingComplete: true }),
       });
       savedOk = res.ok;
-      if (!res.ok) console.error(`Onboarding: answers not saved (${res.status})`);
+      if (!res.ok) {
+        console.error(`Onboarding: answers not saved (${res.status})`);
+        captureError(new Error(`Onboarding not saved (${res.status})`), {
+          screen: 'onboarding', action: 'save-answers', endpoint: 'userProfiles', status: res.status,
+        });
+      }
     } catch (e) {
       console.error('Onboarding: answers not saved', e);
+      // Nothing on screen says this failed — it goes straight to "You are in."
+      captureError(e, { screen: 'onboarding', action: 'save-answers', endpoint: 'userProfiles' });
     }
     // Remember on this device so login never loops back to onboarding, even if
     // the profile READ is flaky. Only after a confirmed write, though — setting
     // it on a failed save buries the answers with no way back to re-enter them.
     if (savedOk) {
+      // Deliberate: private mode blocks this. The profile write already
+      // succeeded, so the flag is only a shortcut.
       try { localStorage.setItem('gd-onboarded', userId); } catch (e) {}
     }
   }

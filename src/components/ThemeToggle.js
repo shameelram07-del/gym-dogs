@@ -17,6 +17,8 @@ export default function ThemeToggle({ size = 38 }) {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
     document.documentElement.setAttribute('data-theme', next);
+    // Deliberate: private mode blocks localStorage. The theme still applies for
+    // this session, it just isn't remembered.
     try { localStorage.setItem(KEY, next); } catch (e) {}
   }
 

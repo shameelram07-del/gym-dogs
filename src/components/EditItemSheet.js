@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { aiFromText, sumItems, mealNameFrom, describeMealCorrection } from '@/lib/food';
+import { captureError } from '@/lib/monitoring';
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const field = {
@@ -72,6 +73,12 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
     } catch (e) {
       // Never wipe a logged meal on a failed call — leave it exactly as it was.
       setFixError(e.message || 'That did not work. Try again.');
+      // The correction text is the user's own words about their food — the
+      // number of components is all the context this needs.
+      captureError(e, {
+        screen: 'nutrition', action: 'meal-correction', endpoint: 'foodAI',
+        components: Array.isArray(components) ? components.length : 0,
+      });
     } finally {
       setFixBusy(false);
     }

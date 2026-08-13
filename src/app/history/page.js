@@ -7,6 +7,7 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
+import { captureError } from '@/lib/monitoring';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -18,7 +19,12 @@ const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color:
 const CARD_R = 26;
 
 function setsOf(sets_data) {
-  try { return JSON.parse(sets_data || '[]'); } catch { return []; }
+  try { return JSON.parse(sets_data || '[]'); }
+  catch (e) {
+    // A day that shows no sets when sets were logged starts here.
+    captureError(e, { screen: 'history', action: 'parse-sets' });
+    return [];
+  }
 }
 function volumeOf(sets_data) {
   return setsOf(sets_data).reduce((s, x) => s + (parseFloat(x.kg) || 0) * (parseInt(x.reps) || 0), 0);
@@ -61,7 +67,13 @@ export default function HistoryPage() {
       try {
         const res = await fetch(`${API_URL}?userId=${userId}`, { headers: { 'x-functions-key': API_KEY } });
         if (res.ok) { const d = await res.json(); setLogs(Array.isArray(d) ? d.filter(x => x.date) : []); }
-      } catch (e) {}
+        else captureError(new Error(`gymLogs failed (${res.status})`), {
+          screen: 'history', action: 'load-logs', endpoint: 'gymLogs', status: res.status,
+        });
+      } catch (e) {
+        // An empty calendar looks the same whether you trained or the call died.
+        captureError(e, { screen: 'history', action: 'load-logs', endpoint: 'gymLogs' });
+      }
       finally { setLoading(false); }
     })();
   }, [userId]);

@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { randomQuote } from '@/lib/quotes';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
+import { captureError, breadcrumb } from '@/lib/monitoring';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -224,7 +225,9 @@ export default function WorkoutPage() {
           const isGuid = (s) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s).trim());
           if (p && p.name && !isGuid(p.name)) setUserName(p.name);
         }
-      } catch (e) {}
+      } catch (e) {
+        captureError(e, { screen: 'workout', action: 'load-display-name', endpoint: 'userProfiles' });
+      }
     })();
   }, [userId]);
 
@@ -260,7 +263,11 @@ export default function WorkoutPage() {
               const s = JSON.parse(raw);
               if (s && s.planId === data.id && s.date === TODAY && Array.isArray(s.exercises) && s.logs) restored = s;
             }
-          } catch (e) {}
+          } catch (e) {
+            // We wrote this blob ourselves — if it won't parse, an in-progress
+            // session was just silently thrown away.
+            captureError(e, { screen: 'workout', action: 'restore-progress' });
+          }
           if (restored) {
             setExercises(restored.exercises);
             setLogs(restored.logs);
@@ -272,9 +279,13 @@ export default function WorkoutPage() {
             setLogs(emptyLogs);
           }
         } else {
+          // Not an error: the coach simply hasn't published one.
           setPlanError('No active session found.');
         }
-      } catch { setPlanError('Could not load session.'); }
+      } catch (e) {
+        setPlanError('Could not load session.');
+        captureError(e, { screen: 'workout', action: 'load-plan', endpoint: 'workoutPlans' });
+      }
       finally { setPlanLoading(false); }
     })();
   }, [userId]);
@@ -291,7 +302,11 @@ export default function WorkoutPage() {
             const data = await res.json();
             if (data.length > 0) results[idx] = JSON.parse(data[0].sets_data || '[]');
           }
-        } catch {}
+        } catch (e) {
+          // Losing this loses the progressive-overload pre-fill, which reads as
+          // "the app forgot what I lifted last week".
+          captureError(e, { screen: 'workout', action: 'last-session', endpoint: 'gymLogs' });
+        }
       }));
       setLastSession(results);
 
@@ -320,7 +335,10 @@ export default function WorkoutPage() {
       localStorage.setItem('gd-workout-progress', JSON.stringify({
         planId: activePlan.id, date: TODAY, exercises, logs, activeExIdx, startedAt: startRef.current,
       }));
-    } catch (e) {}
+    } catch (e) {
+      // Not cosmetic: this is the crash-recovery copy of the live session.
+      captureError(e, { screen: 'workout', action: 'autosave-local' });
+    }
   }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId, TODAY]);
 
   // Push a single exercise's sets to the server (upsert — safe to call repeatedly).
@@ -332,7 +350,12 @@ export default function WorkoutPage() {
       body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(rows || []) }),
     })
       .then(res => { if (!res.ok) throw new Error(`autosave failed (${res.status})`); })
-      .catch(() => { throw new Error('autosave failed'); });
+      .catch((e) => {
+        // Keep the real cause — the caller only needs to know it failed, but a
+        // report saying "autosave failed" and nothing else is unanswerable.
+        captureError(e, { screen: 'workout', action: 'autosave-set', endpoint: 'gymLogs', exIdx: idx });
+        throw new Error('autosave failed');
+      });
   };
 
   // Live auto-save: ~1.2s after you stop changing anything, upsert every exercise
@@ -357,6 +380,8 @@ export default function WorkoutPage() {
       } catch (e) {
         // Don't show "saved" over a write that never landed. Finish still
         // retries every exercise, so the session isn't lost.
+        // Deliberately not captured here — postLog already reported the real
+        // cause, and this would only add a second event saying "it failed".
         setAutoSaveStatus('unsaved');
       }
     }, 1200);
@@ -479,13 +504,17 @@ export default function WorkoutPage() {
         body: JSON.stringify({ message: p, prompt: p, userId })
       });
       if (res.ok) { const data = await res.json(); setCoachNote(data.reply || data.message); }
-    } catch {} finally { setCoachNoteLoading(false); }
+      else captureError(new Error(`aiCoach failed (${res.status})`), { screen: 'workout', action: 'coach-note', endpoint: 'aiCoach', status: res.status });
+    } catch (e) {
+      captureError(e, { screen: 'workout', action: 'coach-note', endpoint: 'aiCoach' });
+    } finally { setCoachNoteLoading(false); }
   };
 
   const handleSave = async () => {
     if (!userId || !activePlan) return;
     if (userId === 'demo') { setSaved(true); setFinishQuote(randomQuote()); setTimeout(() => setSaved(false), 3000); return; }
     setSaving(true); setError(null);
+    breadcrumb('finish workout', { exercises: exercises.length });
     try {
       // fetch only rejects on a network error, so a 500 would sail through
       // Promise.all — and the localStorage clear below would then throw away
@@ -500,14 +529,26 @@ export default function WorkoutPage() {
       const failed = results.filter(r => !r.ok);
       if (failed.length) throw new Error(`${failed.length} of ${results.length} exercises failed to save (${failed[0].status})`);
       setSaved(true);
+      // Deliberate: the sets are already on the server by this point, so a
+      // failure to clear the local copy costs nothing.
       try { localStorage.removeItem('gd-workout-progress'); } catch (e) {}
       // Mark today's session complete for this user so the dashboard shows it done.
       // The sets are already saved by this point, so a failure here isn't worth
       // failing the finish over — but it's the reason "done today" goes missing,
       // so it must not fail silently.
       fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: TODAY }) })
-        .then(r => { if (!r.ok) console.error(`Workout: lastWorkoutDate not saved (${r.status}) — dashboard won't show today as done`); })
-        .catch(e => console.error('Workout: lastWorkoutDate not saved', e));
+        .then(r => {
+          if (!r.ok) {
+            console.error(`Workout: lastWorkoutDate not saved (${r.status}) — dashboard won't show today as done`);
+            captureError(new Error(`lastWorkoutDate not saved (${r.status})`), {
+              screen: 'workout', action: 'mark-done', endpoint: 'userProfiles', status: r.status,
+            });
+          }
+        })
+        .catch(e => {
+          console.error('Workout: lastWorkoutDate not saved', e);
+          captureError(e, { screen: 'workout', action: 'mark-done', endpoint: 'userProfiles' });
+        });
       setFinishQuote(randomQuote());
 
       // PR detection: today's heaviest set vs last session's, per exercise
@@ -526,7 +567,12 @@ export default function WorkoutPage() {
       }).filter(Boolean).join('. ');
       if (summary) getAICoachNote(summary);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) { setError(e.message || 'Failed to save. Please try again.'); }
+    } catch (e) {
+      // The user is told, but a session that wouldn't save is the single worst
+      // failure in this app — it's an hour of someone's work.
+      setError(e.message || 'Failed to save. Please try again.');
+      captureError(e, { screen: 'workout', action: 'finish', endpoint: 'gymLogs', exercises: exercises.length });
+    }
     finally { setSaving(false); }
   };
 
@@ -550,8 +596,16 @@ export default function WorkoutPage() {
         }),
       });
       if (res.ok) { setShared(true); showToast('🔥 Posted to the community feed'); }
-      else showToast('Could not share — try again');
-    } catch (e) { showToast('Could not share — try again'); }
+      else {
+        showToast('Could not share — try again');
+        captureError(new Error(`Share failed (${res.status})`), {
+          screen: 'workout', action: 'share-to-feed', endpoint: 'communityPosts', status: res.status,
+        });
+      }
+    } catch (e) {
+      showToast('Could not share — try again');
+      captureError(e, { screen: 'workout', action: 'share-to-feed', endpoint: 'communityPosts' });
+    }
     finally { setSharing(false); }
   };
 

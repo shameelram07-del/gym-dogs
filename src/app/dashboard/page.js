@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
+import { captureError, breadcrumb } from '@/lib/monitoring';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 
@@ -19,11 +20,15 @@ async function getJson(url, key, label) {
     const res = await fetch(url, { headers: { 'x-functions-key': key } });
     if (!res.ok) {
       console.error(`Dashboard: ${label} failed (${res.status} ${res.statusText})`);
+      captureError(new Error(`${label} failed (${res.status})`), {
+        screen: 'dashboard', action: 'load', endpoint: label, status: res.status,
+      });
       return null;
     }
     return await res.json();
   } catch (err) {
     console.error(`Dashboard: ${label} failed`, err);
+    captureError(err, { screen: 'dashboard', action: 'load', endpoint: label });
     return null;
   }
 }
@@ -52,7 +57,11 @@ function looksLikeGuid(s) {
 function logSets(log) {
   try {
     if (log.sets_data) return JSON.parse(log.sets_data);
-  } catch (e) {}
+  } catch (e) {
+    // Not expected — a doc we wrote ourselves failing to parse means that
+    // session's volume silently reads as zero across the whole app.
+    captureError(e, { screen: 'dashboard', action: 'parse-sets' });
+  }
   return log.exercises?.flatMap((e) => e.sets || []) || [];
 }
 
@@ -212,6 +221,8 @@ export default function DashboardPage() {
 
   const dismissSetup = () => {
     setShowSetup(false);
+    // Deliberate: private mode blocks localStorage. Worst case the nudge
+    // reappears next visit.
     try { localStorage.setItem('gd-setup-dismissed', userId); } catch (e) {}
   };
 
@@ -237,14 +248,22 @@ export default function DashboardPage() {
         // keys and accept either response shape.
         body: JSON.stringify({ message: promptText, prompt: promptText, userId }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        captureError(new Error(`aiCoach failed (${res.status})`), {
+          screen: 'dashboard', action: 'coach-note', endpoint: 'aiCoach', status: res.status,
+        });
+        return;
+      }
       const data = await res.json();
       const text = data.reply || data.message || (typeof data === 'string' ? data : null);
       if (text) setCoachNote(text);
-    } catch (err) {} finally { setCoachLoading(false); }
+    } catch (err) {
+      captureError(err, { screen: 'dashboard', action: 'coach-note', endpoint: 'aiCoach' });
+    } finally { setCoachLoading(false); }
   }
 
   async function loadDashboardData(uid) {
+    breadcrumb('dashboard load started');
     try {
       const key = process.env.NEXT_PUBLIC_API_KEY || '';
 
@@ -328,21 +347,14 @@ export default function DashboardPage() {
         setDoneToday(profile.lastWorkoutDate === todayISO());
       }
 
-      // Save the signed-in email to the profile once, so the coach can email this client.
-      try {
-        if (account.username && (!profile || profile.email !== account.username)) {
-          fetch(`${API}/userProfiles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' },
-            body: JSON.stringify({ userId: uid, email: account.username }),
-          })
-            .then(r => { if (!r.ok) console.error(`Dashboard: email not saved (${r.status})`); })
-            .catch(e => console.error('Dashboard: email not saved', e));
-        }
-      } catch (e) {}
+      // The email save that used to live here referenced an `account` variable
+      // that isn't in this function's scope, so it threw a ReferenceError on
+      // every single load and the surrounding catch ate it. `EmailCapture`
+      // (rendered app-wide inside MsalProvider) does this job properly now.
 
       // Nudge (not force) onboarding if it has never been completed —
       // skipped if done on this device or previously dismissed.
+      // Deliberate: localStorage throws in private mode; the nudge just doesn't show.
       try {
         const done = (profile && !profile.error && profile.onboardingComplete)
           || localStorage.getItem('gd-onboarded') === uid;
@@ -353,7 +365,11 @@ export default function DashboardPage() {
       askCoach(`Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${weekSessions} sessions this week.`);
 
     } catch (err) {
+      // This catch is the reason this whole brief exists: it swallowed a
+      // TypeError on every load for weeks and the screen just quietly did half
+      // its job. Anything that lands here is a bug, not a condition.
       console.error('Dashboard load error:', err);
+      captureError(err, { screen: 'dashboard', action: 'load' });
     } finally {
       setLoading(false);
     }

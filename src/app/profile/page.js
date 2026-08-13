@@ -6,6 +6,7 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import Reveal from '@/components/Reveal';
+import { captureError } from '@/lib/monitoring';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -63,7 +64,9 @@ function calcPRCount(logs) {
           if (!maxByExercise[log.exName] || kg > maxByExercise[log.exName]) maxByExercise[log.exName] = kg;
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'profile', action: 'parse-sets' });
+    }
   });
   return Object.keys(maxByExercise).length;
 }
@@ -85,7 +88,10 @@ function calcTotalVolume(logs) {
     try {
       const sets = JSON.parse(log.sets_data || '[]');
       sets.forEach(s => { if (s.kg && s.reps) total += parseFloat(s.kg) * parseFloat(s.reps); });
-    } catch (e) {}
+    } catch (e) {
+      // Same corrupt-doc case as the dashboard — here it silently lowers the level.
+      captureError(e, { screen: 'profile', action: 'parse-sets' });
+    }
   });
   return total;
 }
@@ -162,7 +168,9 @@ export default function ProfilePage() {
             setTempStats(savedStats);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        captureError(e, { screen: 'profile', action: 'load-profile', endpoint: 'userProfiles' });
+      }
     };
     fetchProfile();
   }, [accounts, inProgress, router]);
@@ -177,7 +185,9 @@ export default function ProfilePage() {
           setLogs(data);
           setJoinDate(getJoinDate(data));
         }
-      } catch (e) {}
+      } catch (e) {
+        captureError(e, { screen: 'profile', action: 'load-logs', endpoint: 'gymLogs' });
+      }
       finally { setStatsLoading(false); }
     };
     fetchLogs();
@@ -197,8 +207,15 @@ export default function ProfilePage() {
         setUserName(tempName.trim());
         setUserInitials(initials);
         setEditingName(false);
+      } else {
+        // The modal just sits there on a failure, which reads as a dead button.
+        captureError(new Error(`Name not saved (${res.status})`), {
+          screen: 'profile', action: 'save-name', endpoint: 'userProfiles', status: res.status,
+        });
       }
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'profile', action: 'save-name', endpoint: 'userProfiles' });
+    }
     finally { setSavingName(false); }
   };
 
@@ -219,8 +236,19 @@ export default function ProfilePage() {
         setEditingStats(false);
         setStatsSaved(true);
         setTimeout(() => setStatsSaved(false), 2000);
+      } else {
+        // Field names only — the body stats themselves stay on the device.
+        captureError(new Error(`Body stats not saved (${res.status})`), {
+          screen: 'profile', action: 'save-stats', endpoint: 'userProfiles', status: res.status,
+          fields: 'weight,height,age,bodyFat',
+        });
       }
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, {
+        screen: 'profile', action: 'save-stats', endpoint: 'userProfiles',
+        fields: 'weight,height,age,bodyFat',
+      });
+    }
     finally { setSavingStats(false); }
   };
 

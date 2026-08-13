@@ -31,6 +31,11 @@ jobs:
           NEXT_PUBLIC_PLANS_API_KEY: ${{ secrets.NEXT_PUBLIC_PLANS_API_KEY }}
           NEXT_PUBLIC_AI_COACH_KEY: ${{ secrets.NEXT_PUBLIC_AI_COACH_KEY }}
           NEXT_PUBLIC_PROFILES_API_KEY: ${{ secrets.NEXT_PUBLIC_PROFILES_API_KEY }}
+          # Error monitoring. If the secret isn't set the build still succeeds and
+          # the app simply doesn't report anything.
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          # Stamps each event with the commit it came from.
+          NEXT_PUBLIC_COMMIT_SHA: ${{ github.sha }}
       - name: Build And Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:

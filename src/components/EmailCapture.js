@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useMsal } from '@azure/msal-react';
+import { captureError } from '@/lib/monitoring';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
@@ -28,6 +29,8 @@ export default function EmailCapture() {
     const uid = acc.localAccountId;
     if (!email || !uid) return;
     const key = 'gd-email-saved-' + uid;
+    // Deliberate: sessionStorage throws in private mode. Losing the de-dupe just
+    // means one extra POST, which is harmless.
     try { if (sessionStorage.getItem(key) === email) return; } catch (e) {}
     fetch(PROFILES_URL, {
       method: 'POST',
@@ -40,11 +43,18 @@ export default function EmailCapture() {
         // coach silently has no email for that client.
         if (!res.ok) {
           console.error(`EmailCapture: email not saved for ${uid} (${res.status})`);
+          captureError(new Error(`Email not saved (${res.status})`), {
+            screen: 'app', action: 'save-email', endpoint: 'userProfiles', status: res.status,
+          });
           return;
         }
+        // Deliberate: see above — private mode only costs a repeat POST.
         try { sessionStorage.setItem(key, email); } catch (e) {}
       })
-      .catch((e) => console.error('EmailCapture: email not saved', e));
+      .catch((e) => {
+        console.error('EmailCapture: email not saved', e);
+        captureError(e, { screen: 'app', action: 'save-email', endpoint: 'userProfiles' });
+      });
   }, [accounts, inProgress]);
   return null;
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
+import { captureError } from '@/lib/monitoring';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 const KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -89,7 +90,9 @@ export default function CommunityPage() {
             setUserInitials((p.initials || p.name.substring(0, 2)).toUpperCase());
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        captureError(e, { screen: 'community', action: 'load-display-name', endpoint: 'userProfiles' });
+      }
     })();
 
     loadFeed();
@@ -105,8 +108,15 @@ export default function CommunityPage() {
         setLbScope(data.leaderboardScope || '7d');
         if (data.challenge) setChallenge(data.challenge);
         if (typeof data.members === 'number') setMembers(data.members);
+      } else {
+        captureError(new Error(`Feed load failed (${res.status})`), {
+          screen: 'community', action: 'load-feed', endpoint: 'communityPosts', status: res.status,
+        });
       }
-    } catch (e) {}
+    } catch (e) {
+      // An empty feed and a broken feed look identical on screen.
+      captureError(e, { screen: 'community', action: 'load-feed', endpoint: 'communityPosts' });
+    }
     finally { setLoading(false); }
   }
 
@@ -126,8 +136,15 @@ export default function CommunityPage() {
         setComposeText('');
       } else {
         showNotice('Could not post — try again');
+        // The post text is the user's own words — never attach it.
+        captureError(new Error(`Post failed (${res.status})`), {
+          screen: 'community', action: 'post', endpoint: 'communityPosts', status: res.status,
+        });
       }
-    } catch (e) { showNotice('Could not post — try again'); }
+    } catch (e) {
+      showNotice('Could not post — try again');
+      captureError(e, { screen: 'community', action: 'post', endpoint: 'communityPosts' });
+    }
     finally { setPosting(false); }
   }
 
@@ -149,6 +166,7 @@ export default function CommunityPage() {
       // The tap already moved on screen — put the feed back the way the server
       // has it rather than leaving a reaction that was never recorded.
       showNotice('Could not react — try again');
+      captureError(e, { screen: 'community', action: 'react', endpoint: 'communityPosts' });
       loadFeed();
     }
   }
@@ -176,6 +194,8 @@ export default function CommunityPage() {
         : p));
       setCommentText(text);
       showNotice('Could not comment — try again');
+      // The comment text itself stays out of the report.
+      captureError(e, { screen: 'community', action: 'comment', endpoint: 'communityPosts' });
     }
   }
 
@@ -189,7 +209,13 @@ export default function CommunityPage() {
         body: JSON.stringify({ action: 'joinChallenge', userId }),
       });
       if (res.ok) loadFeed();
-    } catch (e) {}
+      else captureError(new Error(`Join challenge failed (${res.status})`), {
+        screen: 'community', action: 'join-challenge', endpoint: 'communityPosts', status: res.status,
+      });
+    } catch (e) {
+      // Nothing on screen changes when this fails — the button just does nothing.
+      captureError(e, { screen: 'community', action: 'join-challenge', endpoint: 'communityPosts' });
+    }
     finally { setJoining(false); }
   }
 

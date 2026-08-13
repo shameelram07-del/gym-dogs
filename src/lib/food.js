@@ -3,6 +3,8 @@
 // The API functions live behind function keys. If NEXT_PUBLIC_PROFILES_API_KEY
 // happens to be a HOST key it already opens these too; otherwise set
 // NEXT_PUBLIC_FOOD_API_KEY to a host key and this picks it up.
+import { captureError } from '@/lib/monitoring';
+
 const BASE = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 const KEY = process.env.NEXT_PUBLIC_FOOD_API_KEY || process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
@@ -34,8 +36,11 @@ async function postAI(body) {
     res = await fetch(`${BASE}/foodAI`, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
   } catch (e) {
     if (e.name === 'AbortError') {
+      // Deliberate: our own 45s cut-off firing, not a fault. The user is told
+      // plainly and the timeout rate is a backend concern, not a frontend crash.
       throw new Error('That took too long — the AI model is being slow. Try again, or add it by hand.');
     }
+    captureError(e, { screen: 'food', action: 'ai-request', endpoint: 'foodAI', mode: body.mode });
     throw new Error('Could not reach the AI. Check your connection.');
   } finally {
     clearTimeout(timer);
@@ -45,12 +50,17 @@ async function postAI(body) {
   // JSON input" — hiding the real status behind a useless SyntaxError.
   if (!res.ok) {
     let detail = '';
+    // Deliberate: an error body often isn't JSON at all. There's nothing to
+    // report here — the status below is the real signal.
     try { detail = (await res.json()).error || ''; } catch (e) {}
-    throw new Error(detail || `AI failed (${res.status})`);
+    const err = new Error(detail || `AI failed (${res.status})`);
+    captureError(err, { screen: 'food', action: 'ai-request', endpoint: 'foodAI', mode: body.mode, status: res.status });
+    throw err;
   }
   try {
     return await res.json();
   } catch (e) {
+    captureError(e, { screen: 'food', action: 'ai-parse', endpoint: 'foodAI', mode: body.mode, status: res.status });
     throw new Error('The AI sent back something unreadable. Try again.');
   }
 }

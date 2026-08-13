@@ -8,6 +8,7 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
+import { captureError } from '@/lib/monitoring';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -59,7 +60,10 @@ function calcWeeklyVolume(logs) {
     try {
       const sets = JSON.parse(log.sets_data || '[]');
       sets.forEach(s => { if (s.kg && s.reps) weeks[weekKey] += parseFloat(s.kg) * parseFloat(s.reps); });
-    } catch (e) {}
+    } catch (e) {
+      // A doc we wrote that won't parse understates this week's volume.
+      captureError(e, { screen: 'progress', action: 'parse-sets' });
+    }
   });
   const sorted = Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b)).slice(-4);
   const max = Math.max(...sorted.map(([, v]) => v), 1);
@@ -85,7 +89,9 @@ function calcPRs(logs) {
           }
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'progress', action: 'parse-sets' });
+    }
   });
   return Object.entries(maxByExercise)
     .map(([exercise, { kg, date }]) => ({ exercise, weight: kg, date: getWeekLabel(date) }))
@@ -102,7 +108,9 @@ function calcHeatmap(logs) {
     try {
       const sets = JSON.parse(log.sets_data || '[]');
       sets.forEach(s => { if (s.kg && s.reps) volByDay[day] = (volByDay[day] || 0) + parseFloat(s.kg) * parseFloat(s.reps); });
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'progress', action: 'parse-sets' });
+    }
   });
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const end = new Date(today);
@@ -128,7 +136,9 @@ function calcTotalVolume(logs) {
     try {
       const sets = JSON.parse(log.sets_data || '[]');
       sets.forEach(s => { if (s.kg && s.reps) total += parseFloat(s.kg) * parseFloat(s.reps); });
-    } catch (e) {}
+    } catch (e) {
+      captureError(e, { screen: 'progress', action: 'parse-sets' });
+    }
   });
   if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
   return `${Math.round(total)}`;
@@ -197,7 +207,9 @@ export default function ProgressPage() {
             if (Array.isArray(profile.weighIns)) setWeighIns(profile.weighIns);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        captureError(e, { screen: 'progress', action: 'load-profile', endpoint: 'userProfiles' });
+      }
     };
     fetchProfile();
   }, [accounts, inProgress, router]);
@@ -208,7 +220,13 @@ export default function ProgressPage() {
       try {
         const res = await fetch(`${API_URL}?userId=${userId}`, { headers: { 'x-functions-key': API_KEY } });
         if (res.ok) setLogs(await res.json());
-      } catch (e) {}
+        else captureError(new Error(`gymLogs failed (${res.status})`), {
+          screen: 'progress', action: 'load-logs', endpoint: 'gymLogs', status: res.status,
+        });
+      } catch (e) {
+        // Charts render empty on failure, which reads as "I've never trained".
+        captureError(e, { screen: 'progress', action: 'load-logs', endpoint: 'gymLogs' });
+      }
       finally { setLoading(false); }
     };
     fetchLogs();
@@ -229,7 +247,10 @@ export default function ProgressPage() {
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
       setSorenessSaved(true);
       setTimeout(() => setSorenessSaved(false), 1500);
-    } catch (e) { setSaveError('Could not save — check your connection.'); }
+    } catch (e) {
+      setSaveError('Could not save — check your connection.');
+      captureError(e, { screen: 'progress', action: 'save-soreness', endpoint: 'userProfiles' });
+    }
     finally { setSavingSoreness(false); }
   };
 
@@ -254,7 +275,11 @@ export default function ProgressPage() {
     setSaveError('');
     setGoalWeight(String(g));
     try { await saveProfile({ goalWeight: g }); }
-    catch (e) { setSaveError('Could not save your goal — check your connection.'); }
+    catch (e) {
+      setSaveError('Could not save your goal — check your connection.');
+      // The goal weight itself never leaves the device.
+      captureError(e, { screen: 'progress', action: 'save-goal', endpoint: 'userProfiles', fields: 'goalWeight' });
+    }
     finally { setSavingGoal(false); setGoalInput(''); }
   };
 
@@ -268,7 +293,11 @@ export default function ProgressPage() {
     setSavingWi(true);
     setSaveError('');
     try { await saveProfile({ weighIns: next, weight: kg }); }
-    catch (e) { setSaveError('Could not save your weigh-in — check your connection.'); }
+    catch (e) {
+      setSaveError('Could not save your weigh-in — check your connection.');
+      // Field names only — the weight itself is exactly what must not be sent.
+      captureError(e, { screen: 'progress', action: 'save-weigh-in', endpoint: 'userProfiles', fields: 'weighIns,weight' });
+    }
     finally { setSavingWi(false); }
   };
 
