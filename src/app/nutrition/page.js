@@ -1,7 +1,7 @@
 'use client';
 import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
@@ -13,10 +13,21 @@ import { pushRecent, toCustomFood, upsertCustomFood } from '@/lib/food';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
+  coachFallback, buildCoachPrompt,
 } from '@/lib/nutrition';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
+const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
+const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
+
+// Cost control. This card is the first thing in the app that could actually
+// spend money, so every one of these exists to stop it calling the model more
+// than the day's eating genuinely warrants.
+const COACH_DEBOUNCE_MS = 8000;   // adding three things to a meal is one call
+const COACH_KCAL_DELTA  = 150;    // smaller than this isn't worth a new read
+const COACH_MAX_CALLS   = 6;      // hard ceiling per user per day
+const COACH_TIMEOUT_MS  = 20000;
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
@@ -86,6 +97,13 @@ export default function NutritionPage() {
   const [editingWater, setEditingWater] = useState(false);
   const [editing, setEditing] = useState(null);   // the logged item being corrected
   const [saveError, setSaveError] = useState('');
+
+  // Coach note. The text lives in state for rendering; the whole cached object
+  // lives in a ref so the save helpers below always write the current one
+  // without needing it in their dependency lists.
+  const [coachNote, setCoachNote] = useState('');
+  const [coachBusy, setCoachBusy] = useState(false);
+  const noteRef = useRef({ date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null });
   // Recomputed, never cached at module scope: a phone that sat on this page all
   // night must roll over to the new day rather than keep yesterday's total.
   const [TODAY, setTODAY] = useState(todayISO());
@@ -94,6 +112,9 @@ export default function NutritionPage() {
     setTODAY(next);
     setItems([]);
     setWaterMl(0);
+    // New day, new note — and a fresh call budget.
+    noteRef.current = { date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null };
+    setCoachNote('');
   }), [TODAY]);
 
   // Targets setup
@@ -118,6 +139,12 @@ export default function NutritionPage() {
               // flattenEntries covers days saved before meal buckets were dropped
               setItems(flattenEntries(p.nutrition.items || p.nutrition.meals));
               setWaterMl(migrateWater(p.nutrition));
+              // Restore today's cached note so reopening the screen spends nothing.
+              const cached = p.nutrition.coachNote;
+              if (cached && cached.date === todayISO()) {
+                noteRef.current = cached;
+                setCoachNote(cached.text || '');
+              }
             }
           }
         }
@@ -138,6 +165,13 @@ export default function NutritionPage() {
   // Explicit override wins; otherwise the bodyweight-derived suggestion.
   const waterGoalMl = (profileRef && profileRef.waterGoalMl) || T.waterMl || 2500;
 
+  const total = items.reduce((a, i) => ({
+    calories: a.calories + (i.calories || 0),
+    protein: a.protein + (i.protein || 0),
+    carbs: a.carbs + (i.carbs || 0),
+    fat: a.fat + (i.fat || 0),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
   async function saveProfile(patch) {
     if (!userId) return;
     const next = { ...(profileRef || {}), userId, ...patch };
@@ -157,14 +191,105 @@ export default function NutritionPage() {
     }
   }
 
+  // Every write to profile.nutrition goes through this. Building the object by
+  // hand at each call site is how the cached coachNote would get silently
+  // dropped the next time an item was logged — and a dropped cache is a paid
+  // model call.
+  function nutritionPayload(itemsArg, waterArg) {
+    const out = { date: TODAY, items: itemsArg, waterMl: waterArg };
+    if (noteRef.current.date === TODAY) out.coachNote = noteRef.current;
+    return out;
+  }
+
   // Saving a meal also files the day's totals into nutritionLog — that history
   // is what the adaptive expenditure model reads from.
   function saveNutrition(itemsArg, waterArg) {
     saveProfile({
-      nutrition: { date: TODAY, items: itemsArg, waterMl: waterArg },
+      nutrition: nutritionPayload(itemsArg, waterArg),
       nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
     });
   }
+
+  // ── Coach note ───────────────────────────────────────────────────────
+  async function generateCoachNote(kcal, count) {
+    setCoachBusy(true);
+    let text = '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), COACH_TIMEOUT_MS);
+    try {
+      const trend = (profileRef && profileRef.weighIns) || [];
+      const prompt = buildCoachPrompt({
+        items,
+        targets: T,
+        expenditure: targets.expenditure,
+        weeklyRate: targets.weeklyRate,
+        expenditureSource: targets.expenditureSource,
+        log: (profileRef && profileRef.nutritionLog) || [],
+        goalWeight: profileRef && profileRef.goalWeight,
+        latestWeighIn: trend.length ? trend[trend.length - 1].kg : null,
+        hour: new Date().getHours(),
+        today: TODAY,
+      });
+      const res = await fetch(AI_COACH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY || '' },
+        // userId so the backend's member snapshot comes along; both keys because
+        // the function contract varies between screens.
+        body: JSON.stringify({ message: prompt, prompt, userId }),
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const reply = d.reply || d.message || (typeof d === 'string' ? d : '');
+        if (reply && String(reply).trim()) text = String(reply).trim();
+      } else {
+        console.error(`Nutrition coach: aiCoach failed (${res.status})`);
+      }
+    } catch (e) {
+      console.error('Nutrition coach: aiCoach failed', e);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    // The call is recorded even when it failed, so a broken endpoint can't be
+    // retried six times a minute. An empty `text` renders the deterministic
+    // fallback instead — the card never shows an error.
+    const prev = noteRef.current;
+    noteRef.current = {
+      date: TODAY,
+      text,
+      itemCount: count,
+      kcal,
+      calls: (prev.date === TODAY ? prev.calls : 0) + 1,
+      generatedAt: new Date().toISOString(),
+    };
+    setCoachNote(text);
+    setCoachBusy(false);
+    saveProfile({ nutrition: nutritionPayload(items, waterMl) });
+  }
+
+  useEffect(() => {
+    // An empty day must drop any note it was holding, or yesterday's read
+    // survives the midnight rollover and gets shown against a blank day.
+    if (items.length === 0) { setCoachNote(''); setCoachBusy(false); return; }
+    // No targets set yet: a model call would only describe generic numbers.
+    if (!userId || !targets) { setCoachBusy(false); return; }
+
+    const kcal = Math.round(total.calories);
+    const n = noteRef.current;
+    const freshToday = n.date === TODAY;
+
+    // Water moves none of these, so filling a glass never triggers a call.
+    const unchanged = freshToday && n.itemCount === items.length && Math.abs(kcal - n.kcal) <= COACH_KCAL_DELTA;
+    if (unchanged || (freshToday && n.calls >= COACH_MAX_CALLS)) {
+      setCoachNote(n.text || '');
+      return;
+    }
+
+    const id = setTimeout(() => generateCoachNote(kcal, items.length), COACH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, userId, TODAY, total.calories, !!targets]);
 
   function openSetup() {
     setSetupForm(seedFromProfile(profileRef));
@@ -179,13 +304,6 @@ export default function NutritionPage() {
 
   if (!userId) return null;
 
-  const total = items.reduce((a, i) => ({
-    calories: a.calories + (i.calories || 0),
-    protein: a.protein + (i.protein || 0),
-    carbs: a.carbs + (i.carbs || 0),
-    fat: a.fat + (i.fat || 0),
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
   const remaining = Math.max(T.calories - total.calories, 0);
   const calPct = Math.min(total.calories / T.calories, 1);
   const R = 52, CIRC = 2 * Math.PI * R;
@@ -196,7 +314,7 @@ export default function NutritionPage() {
     const next = [...items, stamped];
     setItems(next);
     saveProfile({
-      nutrition: { date: TODAY, items: next, waterMl },
+      nutrition: nutritionPayload(next, waterMl),
       nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(next, TODAY)),
       foodRecent: pushRecent((profileRef && profileRef.foodRecent) || [], item),
     });
@@ -214,7 +332,7 @@ export default function NutritionPage() {
     const arr = items.map((i) => (i.id === next.id ? next : i));
     setItems(arr);
     const patch = {
-      nutrition: { date: TODAY, items: arr, waterMl },
+      nutrition: nutritionPayload(arr, waterMl),
       nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(arr, TODAY)),
     };
     if (remember) {
@@ -332,6 +450,19 @@ export default function NutritionPage() {
               );
             })}
           </div>
+        </Reveal>
+
+        {/* ── COACH DOG — a read of the day, not just the numbers ── */}
+        <Reveal delay={75} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
+          <p style={{ ...eyebrow, color: 'var(--ice)' }}>Coach Dog</p>
+          <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
+            {coachNote || coachFallback(total, T, new Date().getHours())}
+          </p>
+          {coachBusy && (
+            <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>
+              <div className="gd-shimbar" style={{ height: '100%', width: '100%', background: 'var(--grad-soft)', borderRadius: 999 }} />
+            </div>
+          )}
         </Reveal>
 
         {/* ── EXPENDITURE / HOW THESE NUMBERS ARE SET ── */}

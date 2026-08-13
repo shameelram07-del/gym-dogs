@@ -56,6 +56,20 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-13 — Coach Dog card on Nutrition (nutrition-coach-card.md)
+Built by: Claude Code
+Shipped: a live AI read of the day between the calorie ring and "Your daily burn", styled as the
+dark AI panel with an `--ice` COACH DOG eyebrow. Two new pure functions in `lib/nutrition.js`:
+`coachFallback` (the deterministic sentence) and `buildCoachPrompt` (~430 tokens, well under the
+600 budget). Cost controls as specified: cached in `nutrition.coachNote`, regenerated only when
+item count changes or kcal moves >150, 8s debounce, hard cap of 6 calls/day, zero calls on an empty
+day or an unchanged reopen.
+Touched: `src/app/nutrition/page.js`, `src/lib/nutrition.js`
+Still needed: frontend push. **No API redeploy, no `FIELDS` change** — `coachNote` rides inside the
+existing `nutrition` object, same trick as `components` in the meal-logging brief.
+Watch: all four `profile.nutrition` writes now go through one `nutritionPayload()` helper. Building
+that object inline anywhere would drop the cached note — and a dropped cache is a paid model call.
+
 ### 2026-08-13 — workout, profile, coach + radii sweep (ui-slate.md, phase 4 of 4) — **SLATE COMPLETE**
 Built by: Claude Code
 Shipped: workout gained the `Reveal` stagger and eyebrow labels — applied to the header, stats card

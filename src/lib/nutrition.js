@@ -341,6 +341,121 @@ export function loggingStreak(log, today) {
   return { streak, last14 };
 }
 
+// ── Coach note ────────────────────────────────────────────────────────────
+// Both of these are pure and take the clock as an argument, so the note can be
+// tested at 08:00 and 22:00 without touching the system time.
+
+const MEAL_PHASES = [
+  { until: 11, phase: 'morning' },
+  { until: 15, phase: 'midday' },
+  { until: 18, phase: 'afternoon' },
+  { until: 22, phase: 'evening' },
+];
+export const phaseOfDay = (hour) => (MEAL_PHASES.find((p) => hour < p.until) || { phase: 'late night' }).phase;
+
+// A day this far under target is worth flagging kindly, not celebrating.
+const UNDEREATING_RATIO = 0.6;
+
+/**
+ * The deterministic read of the day. Used whenever the model is unavailable,
+ * so the card is never empty and never shows an error.
+ * @param {{calories:number,protein:number,carbs:number,fat:number}} eaten
+ * @param {{calories:number,protein:number}} targets
+ * @param {number} hour local hour, 0-23
+ * @returns {string}
+ */
+export function coachFallback(eaten, targets, hour) {
+  const kcal = Math.round(Number(eaten?.calories) || 0);
+  const goal = Math.round(Number(targets?.calories) || 0);
+  const p = Math.round(Number(eaten?.protein) || 0);
+  const pGoal = Math.round(Number(targets?.protein) || 0);
+
+  if (kcal <= 0) return "Nothing logged yet. Add breakfast and I'll tell you how the day's shaping up.";
+
+  const left = goal - kcal;
+  const parts = [];
+
+  if (left < 0) parts.push(`${kcal} in — that's ${Math.abs(left)} over today's ${goal}.`);
+  else parts.push(`${kcal} in, ${left} left of ${goal}.`);
+
+  // Protein is the macro worth naming; the others follow it around.
+  if (pGoal > 0) {
+    if (p >= pGoal) parts.push(`Protein's already there at ${p}g.`);
+    else if (p < pGoal * 0.7) parts.push(`Protein's the one to watch: ${p}g of ${pGoal}g.`);
+    else parts.push(`Protein's close — ${p}g of ${pGoal}g.`);
+  }
+
+  // Reassurance goes last, so it's the thought the sentence ends on rather than
+  // something buried before a macro count.
+  if (left < 0) parts.push('One day barely moves the weekly average, so carry on as normal tomorrow.');
+
+  // Late and well short is undereating, not discipline.
+  if (left > 0 && goal > 0 && kcal < goal * UNDEREATING_RATIO && hour >= 18) {
+    parts.push("That's a fair way under for this time of day — worth eating a bit more tonight.");
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * The prompt sent to the existing aiCoach endpoint. Kept pure and here rather
+ * than in the page so the wording is reviewable in one place and the token
+ * budget is easy to see: the item list is capped and history is daily totals
+ * only, never raw items.
+ */
+export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expenditureSource, log, goalWeight, latestWeighIn, hour, today }) {
+  const eaten = summariseDay(items || [], today);
+  const t = targets || {};
+  const time = `${String(hour).padStart(2, '0')}:00`;
+
+  const lines = (items || []).slice(0, 12).map((i) => {
+    const at = i.at ? new Date(i.at) : null;
+    const clock = at && !isNaN(at) ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '—';
+    return `  - ${i.name}, ${clock}, ${Math.round(Number(i.calories) || 0)} kcal, P${Math.round(Number(i.protein) || 0)} C${Math.round(Number(i.carbs) || 0)} F${Math.round(Number(i.fat) || 0)}`;
+  });
+  const more = (items || []).length > 12 ? `  - …and ${items.length - 12} more` : null;
+
+  // Daily rollups only — a week of raw item lists would blow the token budget.
+  const recent = (Array.isArray(log) ? log : [])
+    .filter((r) => r && r.date && r.date < today)
+    .slice(-7)
+    .map((r) => `${r.date.slice(5)} ${Math.round(r.kcal)}kcal/${Math.round(r.p || 0)}g`)
+    .join(', ');
+
+  const sourceLabel = expenditureSource === 'formula'
+    ? 'still a starting estimate from height/weight/age'
+    : expenditureSource === 'blended' ? 'part measured, still learning' : 'measured from real intake and weight change';
+
+  return [
+    'You are Coach Dog, the AI coach in a fitness app. Write 2 to 3 short sentences to the user about their eating today. Conversational, second person. No greeting, no sign-off, no markdown, no bullet points.',
+    '',
+    `LOCAL TIME: ${time} (${phaseOfDay(hour)})`,
+    `TODAY'S TARGET: ${t.calories} kcal, P${t.protein} C${t.carbs} F${t.fat}`,
+    `EATEN SO FAR: ${eaten.kcal} kcal, P${eaten.p} C${eaten.c} F${eaten.f}`,
+    ...lines,
+    ...(more ? [more] : []),
+    `DAILY BURN: ${expenditure} kcal (${sourceLabel}); aiming for ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg per week`,
+    // "Logged", not "calendar" — a gap in logging shouldn't be presented as a
+    // run of consecutive days.
+    recent ? `LAST 7 LOGGED DAYS (kcal/protein): ${recent}` : 'LAST 7 LOGGED DAYS: not enough logged yet',
+    goalWeight ? `GOAL WEIGHT: ${goalWeight} kg${latestWeighIn ? `, latest weigh-in ${latestWeighIn} kg` : ''}` : null,
+    '',
+    'What to cover, in this order:',
+    '1. Read today against the target — what is on track, what is short, what is over. Protein is usually the interesting one.',
+    '2. Put it in context of the last 7 days: a normal day, a light day, or a big one.',
+    '3. Say one concrete, small thing that would help. "A yoghurt and you\'re there", not a lecture.',
+    'If it is late and the day looks finished, summarise it and point at tomorrow instead of suggesting more food.',
+    '',
+    'Rules you must follow:',
+    '- Never invent or prescribe calorie or macro targets beyond the ones given above. Describe what the numbers already say.',
+    '- No moralising about food. Never use the words good, bad, clean or cheat about what they ate. No guilt for going over — one day does not matter, the seven-day average does.',
+    '- Do not comment on their body or their weight beyond the goal they set themselves.',
+    '- If today is very low on calories, say so kindly and suggest eating more. Never congratulate a large deficit.',
+    // Only drop absent optional lines — '' entries are deliberate blank lines
+    // separating the sections, and filter(Boolean) would eat them.
+  ].filter((l) => l !== null && l !== undefined).join('\n');
+}
+
 // ── Setup form plumbing ───────────────────────────────────────────────────
 
 // Pre-fill the setup form from what the profile already knows, so nobody is
