@@ -33,7 +33,22 @@ breaks. `providerNote` in the response says which provider answered.
 Still open on that job: the frontend doesn't send `userId` to `foodAI`, so the per-user daily cap
 is inert. Small change in `src/lib/food.js` and its callers.
 
+### NEXT UP — Coach Dog on a timeline (Shameel's idea, 13 Aug, paused to 14 Aug)
+Replace the change-triggered coach note with **four timed slots**: morning, midday, evening, and an
+**11pm wrap** that closes the day out. One note per slot, so max four calls, naturally paced, and
+the last one is a real summary instead of another running total. Supersedes the 6-call cap in
+`docs/briefs/nutrition-coach-card.md`.
+
+The catch he needs to decide on: this is a static web app with no push, so an 11pm note **only
+appears if someone opens the app before midnight**. Making it land means emailing it from a timer
+function — same shape as `weighInReminder` — which is an API change and a zip redeploy.
+**Undecided: client-side slots only, or slots plus the emailed wrap.** Ask him before building.
+
 ### Other open items
+- **Test runner.** `CLAUDE.md` claimed `src/lib/nutrition.js` was unit-tested; it isn't — no jest,
+  no vitest, no test script anywhere in the repo. The pure functions take the clock as an argument
+  specifically so they can be tested. Adding a framework is a real dependency decision, not
+  something to slip into a UI brief.
 - **Bad dates already in Cosmos.** The `TODAY` fix stops new logs landing on the wrong day, but
   workouts already saved with yesterday's date stay wrong. Needs a count and a one-off cleanup.
 - **No error monitoring.** Both bugs found on 13 Aug were invisible because catches swallowed them.
