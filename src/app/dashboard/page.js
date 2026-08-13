@@ -11,6 +11,23 @@ import Reveal from '@/components/Reveal';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 
+// Fetch JSON from the API without letting one bad response take the whole
+// dashboard down. An error body isn't JSON, so calling res.json() on it throws
+// "Unexpected end of JSON input" — returns null instead, and the caller carries on.
+async function getJson(url, key, label) {
+  try {
+    const res = await fetch(url, { headers: { 'x-functions-key': key } });
+    if (!res.ok) {
+      console.error(`Dashboard: ${label} failed (${res.status} ${res.statusText})`);
+      return null;
+    }
+    return await res.json();
+  } catch (err) {
+    console.error(`Dashboard: ${label} failed`, err);
+    return null;
+  }
+}
+
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -220,6 +237,7 @@ export default function DashboardPage() {
         // keys and accept either response shape.
         body: JSON.stringify({ message: promptText, prompt: promptText, userId }),
       });
+      if (!res.ok) return;
       const data = await res.json();
       const text = data.reply || data.message || (typeof data === 'string' ? data : null);
       if (text) setCoachNote(text);
@@ -230,10 +248,7 @@ export default function DashboardPage() {
     try {
       const key = process.env.NEXT_PUBLIC_API_KEY || '';
 
-      const logsRes = await fetch(`${API}/gymLogs?userId=${uid}`, {
-        headers: { 'x-functions-key': key }
-      });
-      const logs = await logsRes.json();
+      const logs = await getJson(`${API}/gymLogs?userId=${uid}`, key, 'gymLogs');
       const allLogs = Array.isArray(logs) ? logs : [];
 
       const now = new Date();
@@ -279,10 +294,11 @@ export default function DashboardPage() {
       setLevelInfo(computeLevel(allLogs));
       setTimeout(() => setXpAnimated(true), 150);
 
-      const plansRes = await fetch(`${API}/workoutPlans?userId=${uid}`, {
-        headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PLANS_API_KEY || '' }
-      });
-      const plans = await plansRes.json();
+      const plans = await getJson(
+        `${API}/workoutPlans?userId=${uid}`,
+        process.env.NEXT_PUBLIC_PLANS_API_KEY || '',
+        'workoutPlans'
+      );
       if (Array.isArray(plans) && plans.length > 0) {
         const plan = plans[0];
         const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
@@ -291,10 +307,11 @@ export default function DashboardPage() {
         setTodayPlan(plans);
       }
 
-      const profileRes = await fetch(`${API}/userProfiles?userId=${uid}`, {
-        headers: { 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' }
-      });
-      const profileData = await profileRes.json();
+      const profileData = await getJson(
+        `${API}/userProfiles?userId=${uid}`,
+        process.env.NEXT_PUBLIC_PROFILES_API_KEY || '',
+        'userProfiles'
+      );
       // Find THIS user's profile — [0] could be someone else's once more users exist.
       const profile = Array.isArray(profileData)
         ? profileData.find((p) => p.userId === uid)
@@ -318,7 +335,9 @@ export default function DashboardPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_PROFILES_API_KEY || '' },
             body: JSON.stringify({ userId: uid, email: account.username }),
-          });
+          })
+            .then(r => { if (!r.ok) console.error(`Dashboard: email not saved (${r.status})`); })
+            .catch(e => console.error('Dashboard: email not saved', e));
         }
       } catch (e) {}
 
@@ -351,8 +370,10 @@ export default function DashboardPage() {
   // The active plan stays active until a new one is published, so a session from
   // a previous day shouldn't be shown as today's — only surface a plan dated today.
   const planDate = todayPlan?.date || null;
-  const todayISO = toLocalISO(today);
-  const planIsToday = planDate === todayISO;
+  // Named todayStr, not todayISO — that would shadow the imported todayISO()
+  // for the whole component, including inside loadDashboardData.
+  const todayStr = toLocalISO(today);
+  const planIsToday = planDate === todayStr;
   const effPlan       = planIsToday ? todayPlan : null;               // today's session (or none)
   const stalePlan     = todayPlan && !planIsToday ? todayPlan : null; // exists but not for today
   const sessionName   = effPlan?.name      || null;

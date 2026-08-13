@@ -40,9 +40,19 @@ async function postAI(body) {
   } finally {
     clearTimeout(timer);
   }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `AI failed (${res.status})`);
-  return data;
+  // Check the status BEFORE parsing. A timed-out or cold-starting Function App
+  // returns a non-JSON body, and res.json() on that throws "Unexpected end of
+  // JSON input" — hiding the real status behind a useless SyntaxError.
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch (e) {}
+    throw new Error(detail || `AI failed (${res.status})`);
+  }
+  try {
+    return await res.json();
+  } catch (e) {
+    throw new Error('The AI sent back something unreadable. Try again.');
+  }
 }
 
 export const aiFromText = (description) => postAI({ mode: 'text', description });
@@ -101,6 +111,67 @@ export function fileToCompressedDataUrl(file, maxDim = 800, quality = 0.72) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// ── Meals ─────────────────────────────────────────────────────────────────
+// Cereal and milk is one thing you ate, not two. A meal entry carries its
+// itemised breakdown in `components` so the day can show "Cereal & whole milk"
+// on one line and still explain itself — and so a correction has something to
+// work from. It rides inside the existing nutritionLog JSON: no new API field.
+
+const num = (v) => (isFinite(Number(v)) ? Number(v) : 0);
+
+/** Totals for a list of AI items. Summed raw, rounded once at the end. */
+export function sumItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  const t = list.reduce(
+    (a, i) => ({
+      calories: a.calories + num(i.calories),
+      protein: a.protein + num(i.protein),
+      carbs: a.carbs + num(i.carbs),
+      fat: a.fat + num(i.fat),
+      grams: a.grams + num(i.grams),
+      anyGrams: a.anyGrams || i.grams != null,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0, grams: 0, anyGrams: false }
+  );
+  const out = {
+    calories: Math.round(t.calories),
+    protein: Math.round(t.protein),
+    carbs: Math.round(t.carbs),
+    fat: Math.round(t.fat),
+  };
+  // Only claim a weight if at least one component actually had one — a partial
+  // sum would read as the weight of the whole meal, which it isn't.
+  if (t.anyGrams) out.grams = Math.round(t.grams);
+  return out;
+}
+
+/** 'Cereal & whole milk', or 'Cereal, whole milk +1' once there are three. */
+export function mealNameFrom(items) {
+  const names = (Array.isArray(items) ? items : []).map((i) => String(i.name || '').trim()).filter(Boolean);
+  if (names.length === 0) return 'Meal';
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} & ${names[1]}`;
+  return `${names[0]}, ${names[1]} +${names.length - 2}`;
+}
+
+/**
+ * Plain English for the model: what's currently logged, plus what the user says
+ * was wrong with it. Goes through the existing text mode — no new API mode.
+ */
+export function describeMealCorrection(components, correction) {
+  const parts = (Array.isArray(components) ? components : []).map((i) => {
+    const portion = i.portion || (i.grams != null ? `${i.grams} g` : null);
+    const bits = [portion, `${Math.round(num(i.calories))} kcal`, `P${Math.round(num(i.protein))} C${Math.round(num(i.carbs))} F${Math.round(num(i.fat))}`]
+      .filter(Boolean).join(', ');
+    return `${i.name} (${bits})`;
+  });
+  return [
+    `A meal of: ${parts.join('; ')}.`,
+    `Correction from the user: ${String(correction).trim()}`,
+    'Return the corrected items.',
+  ].join('\n');
 }
 
 // ── Your own foods ────────────────────────────────────────────────────────

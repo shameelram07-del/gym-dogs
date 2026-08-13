@@ -85,16 +85,24 @@ export default function OnboardingPage() {
 
   async function saveOnboarding() {
     if (!userId) return;
+    let savedOk = false;
     try {
-      await fetch(PROFILES_URL, {
+      const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
         body: JSON.stringify({ ...(profileRef || {}), userId, onboarding: answers, onboardingComplete: true }),
       });
-    } catch (e) {}
-    // Remember on this device so login never loops back to onboarding,
-    // even if the profile read is flaky.
-    try { localStorage.setItem('gd-onboarded', userId); } catch (e) {}
+      savedOk = res.ok;
+      if (!res.ok) console.error(`Onboarding: answers not saved (${res.status})`);
+    } catch (e) {
+      console.error('Onboarding: answers not saved', e);
+    }
+    // Remember on this device so login never loops back to onboarding, even if
+    // the profile READ is flaky. Only after a confirmed write, though — setting
+    // it on a failed save buries the answers with no way back to re-enter them.
+    if (savedOk) {
+      try { localStorage.setItem('gd-onboarded', userId); } catch (e) {}
+    }
   }
 
   const step = STEPS[currentStep];

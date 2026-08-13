@@ -139,12 +139,18 @@ export default function CommunityPage() {
       return { ...p, firedBy: fired ? p.firedBy.filter(u => u !== userId) : [...(p.firedBy || []), userId] };
     }));
     try {
-      await fetch(`${API}/communityPosts`, {
+      const res = await fetch(`${API}/communityPosts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': KEY || '' },
         body: JSON.stringify({ action: 'fire', postId: post.id, userId }),
       });
-    } catch (e) {}
+      if (!res.ok) throw new Error(`fire failed (${res.status})`);
+    } catch (e) {
+      // The tap already moved on screen — put the feed back the way the server
+      // has it rather than leaving a reaction that was never recorded.
+      showNotice('Could not react — try again');
+      loadFeed();
+    }
   }
 
   async function sendComment(post) {
@@ -156,12 +162,21 @@ export default function CommunityPage() {
       : p));
     setCommentText('');
     try {
-      await fetch(`${API}/communityPosts`, {
+      const res = await fetch(`${API}/communityPosts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': KEY || '' },
         body: JSON.stringify({ action: 'comment', postId: post.id, userId, name: userName, text }),
       });
-    } catch (e) {}
+      if (!res.ok) throw new Error(`comment failed (${res.status})`);
+    } catch (e) {
+      // Take the optimistic comment back out and hand the text back, so it
+      // isn't lost to a comment that only ever existed on this screen.
+      setPosts(prev => prev.map(p => p.id === post.id
+        ? { ...p, commentsList: (p.commentsList || []).filter(c => c !== comment) }
+        : p));
+      setCommentText(text);
+      showNotice('Could not comment — try again');
+    }
   }
 
   async function joinChallenge() {

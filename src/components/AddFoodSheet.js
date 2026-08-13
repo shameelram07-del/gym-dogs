@@ -13,6 +13,7 @@ import {
   lookupBarcode, searchFoods, aiFromText, aiFromPhoto, aiFromLabel,
   scaleToGrams, defaultGrams, fileToCompressedDataUrl,
   toggleFavourite, isFavourite, recentFoods, searchCustomFoods,
+  sumItems, mealNameFrom,
 } from '@/lib/food';
 
 const TABS = [
@@ -96,7 +97,9 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [fromPhoto, setFromPhoto] = useState(false); // did this result come from an image?
   const [aiAdded, setAiAdded] = useState([]);   // indices already logged
+  const [mealName, setMealName] = useState(''); // editable name for "log as one meal"
   const [perf, setPerf] = useState(null);       // which model answered, and how fast
   const fileRef = useRef();
   const labelRef = useRef();
@@ -118,8 +121,17 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 1800);
     if (navigator.vibrate) navigator.vibrate(18);
+    // Drop the photo once it has produced something logged, so it can't quietly
+    // attach itself to the next, unrelated estimate.
+    setPhotoPreview(null);
     if (close) onClose();
   }
+
+  // Pre-fill the meal name from whatever came back, but stop overwriting it the
+  // moment the user starts typing their own.
+  useEffect(() => {
+    setMealName(aiResult && aiResult.items ? mealNameFrom(aiResult.items) : '');
+  }, [aiResult]);
 
   const favourites = (profile && profile.foodFavourites) || [];
   const myFoods = searchCustomFoods((profile && profile.foodCustom) || [], q);
@@ -192,11 +204,23 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     }
   }
 
+  // One button, one action. If a photo is attached it IS the subject, and the
+  // typed text becomes the hint ("30g of this") rather than being sent alone —
+  // sending the text by itself is what produced "no specific food item was
+  // provided" while the photo sat on screen.
   async function runAiText() {
-    if (!aiText.trim()) return;
+    const hint = aiText.trim();
+    if (!hint && !photoPreview) return;
     setAiBusy(true); setAiError(null); setAiResult(null);
     setAiAdded([]);
-    try { const r = await aiFromText(aiText.trim()); setAiResult(r); setPerf({ model: r.model, ms: r.ms }); }
+    setFromPhoto(!!photoPreview);
+    try {
+      const r = photoPreview
+        ? await aiFromPhoto(photoPreview, hint || undefined)
+        : await aiFromText(hint);
+      setAiResult(r);
+      setPerf({ model: r.model, ms: r.ms });
+    }
     catch (e) { setAiError(e.message); }
     finally { setAiBusy(false); }
   }
@@ -224,6 +248,8 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     }
   }
 
+  // Picking a photo only attaches it. Estimate is what sends it — otherwise
+  // there are two ways to start a call and the typed hint gets left behind.
   async function onPhoto(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -231,8 +257,6 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
       setPhotoPreview(dataUrl);
-      const r = await aiFromPhoto(dataUrl, aiText.trim() || undefined);
-      setAiResult(r); setPerf({ model: r.model, ms: r.ms });
     } catch (err) {
       setAiError(err.message);
     } finally {
@@ -467,7 +491,10 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                 <input value={aiText} onChange={(e) => setAiText(e.target.value)}
                   placeholder="e.g. chicken rice bowl and a flat white" style={field} />
                 <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                  <button onClick={runAiText} disabled={!aiText.trim() || aiBusy} style={{ ...primaryBtn(!!aiText.trim() && !aiBusy), flex: 1 }}>Estimate</button>
+                  <button onClick={runAiText} disabled={(!aiText.trim() && !photoPreview) || aiBusy}
+                    style={{ ...primaryBtn((!!aiText.trim() || !!photoPreview) && !aiBusy), flex: 1 }}>
+                    {photoPreview ? 'Estimate photo' : 'Estimate'}
+                  </button>
                   <button onClick={() => fileRef.current && fileRef.current.click()} disabled={aiBusy} style={{
                     padding: '14px 18px', borderRadius: 14, border: '1px solid var(--line)', background: 'var(--soft)',
                     color: 'var(--ink-2)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
@@ -475,7 +502,16 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{ display: 'none' }} />
 
-                {photoPreview && <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 16, marginTop: 14, maxHeight: 200, objectFit: 'cover' }} />}
+                {photoPreview && (
+                  <div style={{ position: 'relative', marginTop: 14 }}>
+                    <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 16, maxHeight: 200, objectFit: 'cover', display: 'block' }} />
+                    <button onClick={() => setPhotoPreview(null)} aria-label="Remove photo" style={{
+                      position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: '50%', border: 'none',
+                      background: 'rgba(0,0,0,0.62)', color: '#fff', fontSize: 17, lineHeight: 1, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>×</button>
+                  </div>
+                )}
                 {aiBusy && <Spinner label="Working it out…" />}
                 {aiError && <p style={{ margin: '14px 0 0', fontSize: 13.5, color: 'var(--orange-ink)', lineHeight: 1.5 }}>{aiError}</p>}
 
@@ -523,12 +559,51 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                             );
                           })}
                         </div>
-                        <button onClick={() => {
-                          aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
-                          onClose(); // adding a whole meal means you're done
-                        }} style={{ ...primaryBtn(true), width: '100%', marginTop: 12 }}>
-                          Add {aiAdded.length ? 'the rest' : `all ${aiResult.items.length}`} and close
-                        </button>
+                        {aiResult.items.length >= 2 ? (
+                          <>
+                            {/* One line in the day, with the breakdown kept inside it. */}
+                            <div style={{ marginTop: 14 }}>
+                              <p style={{ ...eyebrow, marginBottom: 7 }}>Call this meal</p>
+                              <input value={mealName} onChange={(e) => setMealName(e.target.value)}
+                                placeholder={mealNameFrom(aiResult.items)} style={field} />
+                            </div>
+                            <button onClick={() => {
+                              const totals = sumItems(aiResult.items);
+                              commit({
+                                id: Date.now(),
+                                name: mealName.trim() || mealNameFrom(aiResult.items),
+                                ...totals,
+                                components: aiResult.items,
+                              }, { close: true });
+                            }} style={{ ...primaryBtn(true), width: '100%', marginTop: 10 }}>
+                              Log as one meal &middot; {sumItems(aiResult.items).calories} kcal
+                            </button>
+                            <button onClick={() => {
+                              aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
+                              onClose();
+                            }} style={{
+                              display: 'block', margin: '10px auto 0', background: 'none', border: 'none', padding: 4,
+                              color: 'var(--ink-3)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline',
+                            }}>
+                              Add as {aiResult.items.length} separate items
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => {
+                            aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
+                            onClose(); // adding a whole meal means you're done
+                          }} style={{ ...primaryBtn(true), width: '100%', marginTop: 12 }}>
+                            Add {aiAdded.length ? 'the rest' : `all ${aiResult.items.length}`} and close
+                          </button>
+                        )}
+                        {/* A photo the model struggled with is often a nutrition
+                            panel, which has a far better path. Point at it —
+                            don't reroute, the guess might be right. */}
+                        {fromPhoto && aiResult.confidence === 'low' && (
+                          <p style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                            Was that a nutrition label? <strong>Scan &rarr; Photograph the label</strong> reads the panel properly.
+                          </p>
+                        )}
                         <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
                           {aiResult.note ? `${aiResult.note} ` : ''}These are estimates &mdash; tap anything in your day to correct it, and I&rsquo;ll remember.
                           {aiResult.reconciled > 0 && ` I corrected the calorie figure on ${aiResult.reconciled} of these to match their own macros.`}

@@ -170,6 +170,7 @@ export default function ProgressPage() {
   const [wiInput, setWiInput] = useState('');
   const [savingGoal, setSavingGoal] = useState(false);
   const [savingWi, setSavingWi] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (!loading) {
@@ -218,34 +219,42 @@ export default function ProgressPage() {
     const updated = { ...sorenessLevels, [areaId]: next };
     setSorenessLevels(updated);
     setSavingSoreness(true);
+    setSaveError('');
     try {
-      await fetch(PROFILES_URL, {
+      const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
         body: JSON.stringify({ ...(profileRef || {}), userId, soreness: updated, readiness: calcRecoveryScore(updated) }),
       });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
       setSorenessSaved(true);
       setTimeout(() => setSorenessSaved(false), 1500);
-    } catch (e) {}
+    } catch (e) { setSaveError('Could not save — check your connection.'); }
     finally { setSavingSoreness(false); }
   };
 
+  // Throws on a failed write so callers can say so — the screen updates
+  // optimistically, and silently swallowing a 500 leaves the number on screen
+  // looking saved when the server never took it.
   const saveProfile = async (patch) => {
     const merged = { ...(profileRef || {}), userId, ...patch };
     setProfileRef(merged);
-    await fetch(PROFILES_URL, {
+    const res = await fetch(PROFILES_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
       body: JSON.stringify(merged),
     });
+    if (!res.ok) throw new Error(`Save failed (${res.status})`);
   };
 
   const saveGoal = async () => {
     const g = parseFloat(goalInput);
     if (!g) return;
     setSavingGoal(true);
+    setSaveError('');
     setGoalWeight(String(g));
-    try { await saveProfile({ goalWeight: g }); } catch (e) {}
+    try { await saveProfile({ goalWeight: g }); }
+    catch (e) { setSaveError('Could not save your goal — check your connection.'); }
     finally { setSavingGoal(false); setGoalInput(''); }
   };
 
@@ -257,7 +266,9 @@ export default function ProgressPage() {
     setWeighIns(next);
     setWiInput('');
     setSavingWi(true);
-    try { await saveProfile({ weighIns: next, weight: kg }); } catch (e) {}
+    setSaveError('');
+    try { await saveProfile({ weighIns: next, weight: kg }); }
+    catch (e) { setSaveError('Could not save your weigh-in — check your connection.'); }
     finally { setSavingWi(false); }
   };
 
@@ -378,6 +389,12 @@ export default function ProgressPage() {
                 <button onClick={logWeighIn} disabled={savingWi || !wiInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingWi || !wiInput ? 0.5 : 1 }}>{savingWi ? '…' : 'Log'}</button>
               </div>
 
+              {saveError && (
+                <div style={{ background: 'var(--red-tint)', borderRadius: 12, padding: '9px 12px', marginTop: 10 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--red-ink)' }}>&#9888; {saveError}</p>
+                </div>
+              )}
+
               {wiChart.length >= 2 && (
                 <div style={{ marginTop: 14 }}>
                   <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: 70, display: 'block' }}>
@@ -481,8 +498,8 @@ export default function ProgressPage() {
               <p style={eyebrow}>Soreness check-in</p>
               <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>Tap a muscle to update</p>
             </div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: sorenessSaved ? 'var(--accent-strong)' : 'var(--ink-3)' }}>
-              {savingSoreness ? 'Saving…' : sorenessSaved ? '✓ Saved' : ''}
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textAlign: 'right', color: saveError ? 'var(--red-ink)' : sorenessSaved ? 'var(--accent-strong)' : 'var(--ink-3)' }}>
+              {savingSoreness ? 'Saving…' : saveError ? '⚠ Not saved' : sorenessSaved ? '✓ Saved' : ''}
             </p>
           </div>
 

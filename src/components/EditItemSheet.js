@@ -6,7 +6,8 @@
 // This is the honest answer to AI estimates: the model gets you close in one tap,
 // and the one time you know better, your correction becomes the new truth.
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { aiFromText, sumItems, mealNameFrom, describeMealCorrection } from '@/lib/food';
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const field = {
@@ -28,6 +29,54 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
   const [remember, setRemember] = useState(true);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
 
+  // ── Meal correction ──
+  // An entry logged as one meal carries its ingredients. Rather than editing
+  // five numbers, say what was wrong and let the model redo the arithmetic.
+  const [components, setComponents] = useState(
+    Array.isArray(item.components) ? item.components : null
+  );
+  const [correction, setCorrection] = useState('');
+  const [fixBusy, setFixBusy] = useState(false);
+  const [fixError, setFixError] = useState(null);
+  const [wasKcal, setWasKcal] = useState(null); // old total, shown struck through
+  const wasTimer = useRef();
+  useEffect(() => () => clearTimeout(wasTimer.current), []);
+
+  async function runCorrection() {
+    const text = correction.trim();
+    if (!text || fixBusy) return;
+    setFixBusy(true); setFixError(null);
+    const before = Math.round(n(f.calories));
+    try {
+      const r = await aiFromText(describeMealCorrection(components, text));
+      const next = (r && Array.isArray(r.items)) ? r.items : [];
+      if (next.length === 0) throw new Error(r && r.note ? r.note : 'I could not work that out — try wording it differently.');
+      const totals = sumItems(next);
+      // Only re-derive the name if it was still the auto-generated one. If he
+      // typed his own name for this meal, his correction was about the food.
+      const autoNamed = f.name.trim() === mealNameFrom(components);
+      setComponents(next);
+      setF((s) => ({
+        ...s,
+        name: autoNamed ? mealNameFrom(next) : s.name,
+        grams: totals.grams != null ? String(totals.grams) : '',
+        calories: String(totals.calories),
+        protein: String(totals.protein),
+        carbs: String(totals.carbs),
+        fat: String(totals.fat),
+      }));
+      setCorrection('');
+      setWasKcal(before);
+      clearTimeout(wasTimer.current);
+      wasTimer.current = setTimeout(() => setWasKcal(null), 6000);
+    } catch (e) {
+      // Never wipe a logged meal on a failed call — leave it exactly as it was.
+      setFixError(e.message || 'That did not work. Try again.');
+    } finally {
+      setFixBusy(false);
+    }
+  }
+
   const fromMacros = Math.round(n(f.protein) * 4 + n(f.carbs) * 4 + n(f.fat) * 9);
   const stated = Math.round(n(f.calories));
   const drift = stated && fromMacros ? Math.abs(stated - fromMacros) / Math.max(stated, fromMacros) : 0;
@@ -44,6 +93,9 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
       fat: Math.round(n(f.fat)),
       corrected: true,   // stops the estimate badge reappearing
     };
+    // id and at come through the spread untouched, so a corrected meal keeps
+    // its place in the day rather than jumping to the end.
+    if (components) next.components = components;
     // Only worth remembering as a reusable food if we know what it weighed —
     // without grams there's nothing to scale a future portion from.
     onSave(next, remember && grams > 0);
@@ -65,6 +117,43 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
 
         <p style={{ ...eyebrow, marginBottom: 7 }}>What was it?</p>
         <input value={f.name} onChange={set('name')} style={{ ...field, marginBottom: 14 }} />
+
+        {/* ── TELL ME WHAT TO CHANGE (meals only) ── */}
+        {components && components.length > 0 && (
+          <div style={{ background: 'var(--soft)', borderRadius: 16, padding: 14, marginBottom: 16 }}>
+            <p style={{ ...eyebrow, marginBottom: 7 }}>Tell me what to change</p>
+            <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              {components.map((c) => c.name).join(' · ')}
+            </p>
+            <input
+              value={correction}
+              onChange={(e) => setCorrection(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runCorrection(); }}
+              placeholder="it was 3 handfuls of cereal, no milk"
+              disabled={fixBusy}
+              style={{ ...field, background: 'var(--card)' }}
+            />
+            <button onClick={runCorrection} disabled={!correction.trim() || fixBusy} style={{
+              width: '100%', marginTop: 10, padding: '12px 16px', borderRadius: 12, border: 'none',
+              background: correction.trim() && !fixBusy ? 'var(--accent)' : 'var(--line)',
+              color: correction.trim() && !fixBusy ? 'var(--on-accent)' : 'var(--ink-3)',
+              fontSize: 14, fontWeight: 800, cursor: correction.trim() && !fixBusy ? 'pointer' : 'not-allowed',
+            }}>{fixBusy ? 'Working it out…' : 'Redo the numbers'}</button>
+            {fixError && (
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--orange-ink)', lineHeight: 1.5 }}>
+                {fixError} Your meal is unchanged.
+              </p>
+            )}
+            {wasKcal != null && (
+              <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--ink-2)', fontWeight: 600 }}>
+                <span style={{ textDecoration: 'line-through', color: 'var(--ink-3)' }}>{wasKcal} kcal</span>
+                {' → '}
+                <span style={{ color: 'var(--accent-strong)', fontWeight: 800 }}>{Math.round(n(f.calories))} kcal</span>
+                <span style={{ color: 'var(--ink-3)', fontWeight: 600 }}> · tap Save to keep it</span>
+              </p>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>

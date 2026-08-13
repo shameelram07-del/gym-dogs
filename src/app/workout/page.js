@@ -1,5 +1,5 @@
 'use client';
-import { todayISO, toLocalISO } from '@/lib/day';
+import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -17,7 +17,6 @@ const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
-const TODAY = todayISO();
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 // Localhost-only preview data so the screen can be reviewed without sign-in.
@@ -174,10 +173,17 @@ export default function WorkoutPage() {
   const startRef = useRef(Date.now());
   const activeCardRef = useRef(null);
   const saveTimer = useRef(null);
-  const [autoSaveStatus, setAutoSaveStatus] = useState(''); // '' | 'saving' | 'saved'
+  const [autoSaveStatus, setAutoSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'unsaved'
   const [restTrigger, setRestTrigger] = useState(0); // bump to auto-start rest timer
   const [toast, setToast] = useState('');
   const toastRef = useRef(null);
+
+  // Held in state, never cached at module scope: a phone left open overnight
+  // would otherwise keep saving sets under yesterday's date. On rollover the
+  // existing activePlan.date guards below correctly stop saving to the old day.
+  const [TODAY, setTODAY] = useState(todayISO());
+
+  useEffect(() => onDayChange(TODAY, setTODAY), [TODAY]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -311,7 +317,7 @@ export default function WorkoutPage() {
         planId: activePlan.id, date: TODAY, exercises, logs, activeExIdx, startedAt: startRef.current,
       }));
     } catch (e) {}
-  }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId]);
+  }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId, TODAY]);
 
   // Push a single exercise's sets to the server (upsert — safe to call repeatedly).
   const postLog = (idx, ex, rows) => {
@@ -320,7 +326,9 @@ export default function WorkoutPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
       body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(rows || []) }),
-    }).catch(() => {});
+    })
+      .then(res => { if (!res.ok) throw new Error(`autosave failed (${res.status})`); })
+      .catch(() => { throw new Error('autosave failed'); });
   };
 
   // Live auto-save: ~1.2s after you stop changing anything, upsert every exercise
@@ -336,14 +344,20 @@ export default function WorkoutPage() {
     setAutoSaveStatus('saving');
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await Promise.all(exercises.map((ex, idx) => {
-        const rows = logs[idx] || [];
-        return rows.some(isLogged) ? postLog(idx, ex, rows) : null;
-      }).filter(Boolean));
-      setAutoSaveStatus('saved');
+      try {
+        await Promise.all(exercises.map((ex, idx) => {
+          const rows = logs[idx] || [];
+          return rows.some(isLogged) ? postLog(idx, ex, rows) : null;
+        }).filter(Boolean));
+        setAutoSaveStatus('saved');
+      } catch (e) {
+        // Don't show "saved" over a write that never landed. Finish still
+        // retries every exercise, so the session isn't lost.
+        setAutoSaveStatus('unsaved');
+      }
     }, 1200);
     return () => clearTimeout(saveTimer.current);
-  }, [logs, exercises, activePlan, planLoading, showComplete, userId]);
+  }, [logs, exercises, activePlan, planLoading, showComplete, userId, TODAY]);
 
   // Bring the expanded exercise into view when it changes (tap or auto-advance),
   // so "opening" an exercise happens where you can see it.
@@ -469,17 +483,27 @@ export default function WorkoutPage() {
     if (userId === 'demo') { setSaved(true); setFinishQuote(randomQuote()); setTimeout(() => setSaved(false), 3000); return; }
     setSaving(true); setError(null);
     try {
-      await Promise.all(exercises.map((ex, idx) =>
+      // fetch only rejects on a network error, so a 500 would sail through
+      // Promise.all — and the localStorage clear below would then throw away
+      // the session that never reached the server. Check every response.
+      const results = await Promise.all(exercises.map((ex, idx) =>
         fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
           body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(logs[idx] || []) })
         })
       ));
+      const failed = results.filter(r => !r.ok);
+      if (failed.length) throw new Error(`${failed.length} of ${results.length} exercises failed to save (${failed[0].status})`);
       setSaved(true);
       try { localStorage.removeItem('gd-workout-progress'); } catch (e) {}
       // Mark today's session complete for this user so the dashboard shows it done.
-      try { fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: TODAY }) }); } catch (e) {}
+      // The sets are already saved by this point, so a failure here isn't worth
+      // failing the finish over — but it's the reason "done today" goes missing,
+      // so it must not fail silently.
+      fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: TODAY }) })
+        .then(r => { if (!r.ok) console.error(`Workout: lastWorkoutDate not saved (${r.status}) — dashboard won't show today as done`); })
+        .catch(e => console.error('Workout: lastWorkoutDate not saved', e));
       setFinishQuote(randomQuote());
 
       // PR detection: today's heaviest set vs last session's, per exercise
@@ -498,7 +522,7 @@ export default function WorkoutPage() {
       }).filter(Boolean).join('. ');
       if (summary) getAICoachNote(summary);
       setTimeout(() => setSaved(false), 3000);
-    } catch { setError('Failed to save. Please try again.'); }
+    } catch (e) { setError(e.message || 'Failed to save. Please try again.'); }
     finally { setSaving(false); }
   };
 
@@ -613,8 +637,8 @@ export default function WorkoutPage() {
           <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
           <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', fontWeight: 600 }}>DURATION</p>
           {autoSaveStatus && (
-            <p style={{ margin: '5px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: autoSaveStatus === 'saved' ? 'var(--accent-strong)' : 'var(--ink-3)' }}>
-              {autoSaveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
+            <p style={{ margin: '5px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: autoSaveStatus === 'saved' ? 'var(--accent-strong)' : autoSaveStatus === 'unsaved' ? 'var(--red-ink)' : 'var(--ink-3)' }}>
+              {autoSaveStatus === 'saving' ? 'Saving…' : autoSaveStatus === 'unsaved' ? '⚠ Not saved' : '✓ Saved'}
             </p>
           )}
         </div>

@@ -84,6 +84,7 @@ export default function NutritionPage() {
   const [adding, setAdding] = useState(false);
   const [editingWater, setEditingWater] = useState(false);
   const [editing, setEditing] = useState(null);   // the logged item being corrected
+  const [saveError, setSaveError] = useState('');
   // Recomputed, never cached at module scope: a phone that sat on this page all
   // night must roll over to the new day rather than keep yesterday's total.
   const [TODAY, setTODAY] = useState(todayISO());
@@ -141,12 +142,18 @@ export default function NutritionPage() {
     const next = { ...(profileRef || {}), userId, ...patch };
     setProfileRef(next);
     try {
-      await fetch(PROFILES_URL, {
+      const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
         body: JSON.stringify(next),
       });
-    } catch (e) {}
+      // The screen already shows the food as logged. If the write failed, say
+      // so — otherwise it silently disappears on the next reload.
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      setSaveError('');
+    } catch (e) {
+      setSaveError("Today's food isn't saved — check your connection.");
+    }
   }
 
   // Saving a meal also files the day's totals into nutritionLog — that history
@@ -237,6 +244,12 @@ export default function NutritionPage() {
       </div>
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {saveError && (
+          <div style={{ background: 'var(--red-tint)', borderRadius: 12, padding: '10px 12px' }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--red-ink)' }}>&#9888; {saveError}</p>
+          </div>
+        )}
 
         {/* ── SET UP YOUR TARGETS ── */}
         {!targets && (
@@ -462,6 +475,12 @@ export default function NutritionPage() {
                           </span>
                         )}
                       </div>
+                      {/* A meal logged as one line still says what was in it. */}
+                      {Array.isArray(item.components) && item.components.length > 0 && (
+                        <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.components.map((c) => c.name).join(' · ')}
+                        </p>
+                      )}
                       <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <MacroLine item={item} />
                         {item.at && <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{timeOf(item.at)}</span>}

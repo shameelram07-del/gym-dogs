@@ -34,8 +34,17 @@ export default function EmailCapture() {
       headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' },
       body: JSON.stringify({ userId: uid, email }),
     })
-      .then(() => { try { sessionStorage.setItem(key, email); } catch (e) {} })
-      .catch(() => {});
+      .then((res) => {
+        // Only mark it done on a confirmed write. Setting the de-dupe key after
+        // a failed save means no retry for the rest of the session, and the
+        // coach silently has no email for that client.
+        if (!res.ok) {
+          console.error(`EmailCapture: email not saved for ${uid} (${res.status})`);
+          return;
+        }
+        try { sessionStorage.setItem(key, email); } catch (e) {}
+      })
+      .catch((e) => console.error('EmailCapture: email not saved', e));
   }, [accounts, inProgress]);
   return null;
 }
