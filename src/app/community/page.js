@@ -10,18 +10,18 @@ const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsit
 const KEY = process.env.NEXT_PUBLIC_API_KEY;
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
-const MEDAL = ['#F7B500', '#B0B7C3', '#CD7F32'];
+const MEDAL = ['var(--gold)', 'var(--silver)', 'var(--bronze)'];
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 function Avatar({ initial, size = 38 }) {
   return (
-    <div style={{
+    <div className="gd-disp" style={{
       width: size, height: size, borderRadius: '50%',
-      background: 'linear-gradient(135deg, var(--violet), var(--blue))',
+      background: 'var(--grad)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.4, fontWeight: 700, color: '#fff', flexShrink: 0,
+      fontSize: size * 0.4, fontWeight: 700, color: 'var(--on-accent)', flexShrink: 0,
     }}>{initial}</div>
   );
 }
@@ -213,7 +213,7 @@ export default function CommunityPage() {
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Community</h1>
+          <h1 className="gd-disp" style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>Community</h1>
           <p style={{ margin: '2px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>
             Gym Dogs{members ? ` · ${members} member${members === 1 ? '' : 's'}` : ''}
           </p>
@@ -230,7 +230,7 @@ export default function CommunityPage() {
           <Reveal>
           <div className="gd-shine" style={{
             background: 'linear-gradient(180deg, var(--card-2), var(--card))',
-            border: '1px solid var(--gold-tint)', borderRadius: 22, padding: 18,
+            border: '1px solid var(--gold-tint)', borderRadius: 26, padding: 18,
             boxShadow: 'var(--shadow-card)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -241,7 +241,7 @@ export default function CommunityPage() {
                 {chDaysLeft} day{chDaysLeft === 1 ? '' : 's'} left
               </span>
             </div>
-            <p style={{ margin: '6px 0 2px', fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em' }}>{challenge.name}</p>
+            <p className="gd-disp" style={{ margin: '6px 0 2px', fontSize: 21, fontWeight: 700 }}>{challenge.name}</p>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>
               First to {challenge.targetKg.toLocaleString()} kg takes it home
             </p>
@@ -249,7 +249,7 @@ export default function CommunityPage() {
             {challenge.winnerName ? (
               <div style={{ marginTop: 14, background: 'var(--gold-tint)', border: '1px solid var(--gold)', borderRadius: 14, padding: '12px 14px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /></svg>
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{challenge.winnerName} takes the creatine!</p>
+                <p className="gd-disp" style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{challenge.winnerName} takes the creatine!</p>
               </div>
             ) : chJoined ? (
               <>
@@ -257,7 +257,7 @@ export default function CommunityPage() {
                   <div style={{ background: 'var(--soft)', borderRadius: 999, height: 9, overflow: 'hidden' }}>
                     <div className="gd-shimbar" style={{
                       height: '100%', width: `${chPct}%`, borderRadius: 999,
-                      background: 'linear-gradient(90deg, #B8860B, var(--gold))',
+                      background: 'linear-gradient(90deg, var(--gold-deep), var(--gold))',
                       transition: 'width 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
                     }} />
                   </div>
@@ -289,7 +289,7 @@ export default function CommunityPage() {
             ) : (
               <button onClick={joinChallenge} disabled={joining} style={{
                 marginTop: 14, border: 'none', borderRadius: 14,
-                background: 'linear-gradient(180deg, #FFD97A, var(--gold))', color: '#2A1D00',
+                background: 'linear-gradient(180deg, var(--gold-soft), var(--gold))', color: 'var(--on-gold)',
                 padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer',
                 opacity: joining ? 0.6 : 1, boxShadow: '0 8px 24px var(--gold-tint)',
               }}>
@@ -331,8 +331,8 @@ export default function CommunityPage() {
                         <div style={{
                           width: 44, height: 44, borderRadius: '50%', margin: '0 auto',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 800, fontSize: 14, color: '#fff',
-                          background: 'linear-gradient(135deg, var(--violet), var(--blue))',
+                          fontWeight: 800, fontSize: 14, color: 'var(--on-accent)',
+                          background: 'var(--grad)',
                           border: first ? '2px solid var(--gold)' : '2px solid transparent',
                           boxShadow: first ? '0 0 20px var(--gold-tint)' : 'none',
                         }}>
@@ -360,7 +360,7 @@ export default function CommunityPage() {
                     ...(me ? { background: 'var(--accent-tint)', margin: '0 -10px', padding: '11px 10px', borderRadius: 12 } : {}),
                   }}>
                     {rank <= 3 ? (
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[rank - 1], color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{rank}</div>
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: MEDAL[rank - 1], color: 'var(--on-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{rank}</div>
                     ) : (
                       <div style={{ width: 26, textAlign: 'center', fontWeight: 800, color: 'var(--ink-3)', fontSize: 14 }}>{rank}</div>
                     )}
@@ -480,7 +480,7 @@ export default function CommunityPage() {
       </div>
 
       {notice && (
-        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 150, background: 'var(--ai-card-1)', color: '#fff', fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 999 }}>
+        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 150, background: 'var(--ai-card-1)', color: 'var(--on-dark)', fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 999 }}>
           {notice}
         </div>
       )}

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import Reveal from '@/components/Reveal';
 import { randomQuote } from '@/lib/quotes';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 
@@ -18,6 +19,9 @@ const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.az
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
+
+const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
+const CARD_R = 26;
 
 // Localhost-only preview data so the screen can be reviewed without sign-in.
 // On the live site this never triggers (hostname is not "localhost").
@@ -624,25 +628,29 @@ export default function WorkoutPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}>
 
-      {/* ── HEADER ── */}
-      <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* ── HEADER ──
+          Reveal wraps only the static chrome. The exercise cards are NOT wrapped
+          individually: a card swaps between <button> (collapsed) and <div>
+          (expanded) under the same key, so React remounts it on every tap and a
+          per-card Reveal would fade the whole thing in each time you log a set. */}
+      <Reveal delay={0} style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Active session</p>
+            <p style={eyebrow}>Active session</p>
             <p className="gd-disp" style={{ margin: '1px 0 0', fontSize: 18, fontWeight: 700 }}>{activePlan.name}</p>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
-          <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', fontWeight: 600 }}>DURATION</p>
+          <p style={{ ...eyebrow, fontSize: 9 }}>Duration</p>
           {autoSaveStatus && (
             <p style={{ margin: '5px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: autoSaveStatus === 'saved' ? 'var(--accent-strong)' : autoSaveStatus === 'unsaved' ? 'var(--red-ink)' : 'var(--ink-3)' }}>
               {autoSaveStatus === 'saving' ? 'Saving…' : autoSaveStatus === 'unsaved' ? '⚠ Not saved' : '✓ Saved'}
             </p>
           )}
         </div>
-      </div>
+      </Reveal>
 
       <div style={{ padding: '0 20px' }}>
 
@@ -661,7 +669,7 @@ export default function WorkoutPage() {
         </div>
 
         {/* ── PROGRESS STATS ── */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
+        <Reveal delay={80} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: '14px 16px', marginBottom: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
             {[
               { label: 'Exercises', val: `${doneExercises}/${exercises.length}` },
@@ -670,30 +678,30 @@ export default function WorkoutPage() {
             ].map((s, i) => (
               <div key={i}>
                 <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{s.val}</p>
-                <p style={{ margin: '1px 0 0', fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
+                <p style={{ ...eyebrow, fontSize: 10, marginTop: 1 }}>{s.label}</p>
               </div>
             ))}
           </div>
-          <div style={{ background: 'var(--soft)', borderRadius: 4, height: 5 }}>
-            <div className="gd-shimbar" style={{ width: `${progressPct}%`, height: '100%', borderRadius: 4, background: 'var(--grad)', transition: 'width 0.3s' }} />
+          <div style={{ background: 'var(--soft)', borderRadius: 999, height: 6, overflow: 'hidden' }}>
+            <div className="gd-shimbar" style={{ width: `${progressPct}%`, height: '100%', borderRadius: 999, background: 'var(--grad)', transition: 'width 0.3s' }} />
           </div>
-        </div>
+        </Reveal>
 
         {/* ── AI COACH NOTE ── */}
         {(coachNote || coachNoteLoading) && (
-          <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 10, color: '#C9C5FF', fontWeight: 700, letterSpacing: '0.08em' }}>✨ COACH · POST SESSION</p>
+          <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: CARD_R, padding: '14px 16px', marginBottom: 14 }}>
+            <p style={{ ...eyebrow, fontSize: 10, color: 'var(--on-dark-2)', marginBottom: 4 }}>✨ Coach · post session</p>
             {coachNoteLoading
-              ? <div style={{ display: 'flex', gap: 4 }}>{[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#9B82FF' }} />)}</div>
-              : <p style={{ margin: 0, fontSize: 13, color: '#D9D9E3', lineHeight: 1.5 }}>{coachNote}</p>
+              ? <div style={{ display: 'flex', gap: 4 }}>{[0,1,2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--on-dark-2)' }} />)}</div>
+              : <p style={{ margin: 0, fontSize: 13, color: 'var(--on-dark)', lineHeight: 1.5 }}>{coachNote}</p>
             }
           </div>
         )}
 
         {/* ── GYM DADDY QUOTE + SHARE (after saving) ── */}
         {finishQuote && (
-          <div style={{ background: 'var(--accent-tint)', borderRadius: 18, padding: '14px 16px', marginBottom: 14 }}>
-            <p style={{ margin: '0 0 4px', fontSize: 10, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>🐕 GYM DADDY</p>
+          <div style={{ background: 'var(--accent-tint)', borderRadius: CARD_R, padding: '14px 16px', marginBottom: 14 }}>
+            <p style={{ ...eyebrow, fontSize: 10, color: 'var(--accent-strong)', marginBottom: 4 }}>🐕 Gym Daddy</p>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.5 }}>&ldquo;{finishQuote}&rdquo;</p>
             <button onClick={shareToFeed} disabled={shared || sharing} style={{
               marginTop: 12, width: '100%', border: 'none', borderRadius: 12, padding: '11px 0',
@@ -713,8 +721,8 @@ export default function WorkoutPage() {
         )}
 
         {/* ── EXERCISES · tap any card to expand & log it in place (any order) ── */}
-        <p style={{ margin: '0 4px 9px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Exercises · tap to open</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <p style={{ ...eyebrow, margin: '0 4px 9px' }}>Exercises · tap to open</p>
+        <Reveal delay={160} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {exercises.map((ex, idx) => {
             const sets = logs[idx] || [];
             const isDone = sets.length > 0 && sets.every(s => s.done);
@@ -725,7 +733,7 @@ export default function WorkoutPage() {
               return (
                 <button key={idx} onClick={() => setActiveExIdx(idx)} style={{
                   width: '100%', background: 'var(--card)', border: '1px solid var(--line)',
-                  borderRadius: 18, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
+                  borderRadius: CARD_R, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 12,
                 }}>
                   <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${isDone ? 'var(--accent)' : 'var(--line)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isDone ? 'var(--accent)' : 'var(--ink-3)', flexShrink: 0 }}>
@@ -742,10 +750,10 @@ export default function WorkoutPage() {
             }
 
             return (
-              <div key={idx} ref={activeCardRef} style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: 22, overflow: 'hidden', scrollMarginTop: 16 }}>
+              <div key={idx} ref={activeCardRef} style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: CARD_R, overflow: 'hidden', scrollMarginTop: 16 }}>
                 <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: 11, color: 'var(--accent-strong)', fontWeight: 700, letterSpacing: '0.08em' }}>EXERCISE {idx + 1} OF {exercises.length}</p>
+                    <p style={{ ...eyebrow, color: 'var(--accent-strong)' }}>Exercise {idx + 1} of {exercises.length}</p>
                     <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ex.name}</h2>
                     {last && (
                       <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {last}</p>
@@ -835,7 +843,7 @@ export default function WorkoutPage() {
             width: '100%', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 16,
             padding: '14px 0', color: 'var(--accent-strong)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           }}>+ Add exercise</button>
-        </div>
+        </Reveal>
 
       </div>
 
@@ -871,7 +879,7 @@ export default function WorkoutPage() {
             <div key={i} style={{
               position: 'absolute', left: `${28 + ((i * 7) % 44)}%`, top: `${8 + ((i * 5) % 12)}%`,
               width: 6 + (i % 3) * 3, height: 6 + (i % 3) * 3, borderRadius: 2,
-              background: ['var(--ember)', 'var(--mag)', 'var(--vio)', 'var(--ice)', 'var(--gold)'][i % 5],
+              background: ['var(--ember)', 'var(--steel)', 'var(--vio)', 'var(--ice)', 'var(--gold)'][i % 5],
               animation: `gdfall 1.7s cubic-bezier(0.22,1,0.36,1) ${(i % 7) * 0.08}s forwards`,
               pointerEvents: 'none',
             }} />
@@ -880,7 +888,7 @@ export default function WorkoutPage() {
           <div className="gdc" style={{
             width: 74, height: 74, borderRadius: 999, background: 'var(--accent-tint)',
             border: '1.5px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', boxShadow: '0 0 36px rgba(255,46,147,0.35)',
+            margin: '0 auto 20px', boxShadow: '0 0 36px var(--accent-glow)',
           }}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
           </div>

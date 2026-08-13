@@ -20,7 +20,7 @@ export default function QuoteCard({ mode = 'daily', plain = false }) {
   }
 
   return (
-    <div style={{ background: 'var(--accent-tint)', borderRadius: 22, padding: 18 }}>
+    <div style={{ background: 'var(--accent-tint)', borderRadius: 26, padding: 18 }}>
       <div style={{ fontSize: 34, lineHeight: 0.9, color: 'var(--accent-strong)', fontWeight: 800, marginBottom: 4 }}>&ldquo;</div>
       <p style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.5 }}>{q}</p>
       <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--accent-strong)', textTransform: 'uppercase' }}>Gym Daddy</p>

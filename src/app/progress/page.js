@@ -1,5 +1,6 @@
 'use client';
 import { todayISO, toLocalISO } from '@/lib/day';
+import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -107,15 +108,14 @@ function calcHeatmap(logs) {
   const end = new Date(today);
   const dow = (today.getDay() + 6) % 7; // 0 = Monday
   end.setDate(today.getDate() + (6 - dow)); // grid ends on the coming Sunday
-  const max = Math.max(...Object.values(volByDay), 1);
+  const max = heatMax(Object.values(volByDay));
   const days = [];
   for (let i = 34; i >= 0; i--) {
     const d = new Date(end); d.setDate(end.getDate() - i);
     const iso = toLocalISO(d);
-    const v = volByDay[iso] || 0;
     days.push({
       iso,
-      level: v === 0 ? 0 : v < max * 0.5 ? 1 : v < max * 0.85 ? 2 : 3,
+      level: heatLevel(volByDay[iso] || 0, max),
       future: d > today,
     });
   }
@@ -149,7 +149,7 @@ function recoveryStatus(score) {
 }
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 export default function ProgressPage() {
   const router = useRouter();
@@ -449,7 +449,7 @@ export default function ProgressPage() {
                   <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>
                     {d.rawVolume >= 1000 ? `${(d.rawVolume/1000).toFixed(1)}k` : Math.round(d.rawVolume)}
                   </span>
-                  <div className={d.isCurrent ? 'gd-shimbar' : undefined} style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--grad)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: d.isCurrent ? '0 4px 18px rgba(255,46,147,0.3)' : 'none' }} />
+                  <div className={d.isCurrent ? 'gd-shimbar' : undefined} style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--grad)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: d.isCurrent ? '0 4px 18px var(--accent-glow)' : 'none' }} />
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{d.week}</span>
                 </div>
               ))}
@@ -472,11 +472,7 @@ export default function ProgressPage() {
               {heatDays.map((d, i) => (
                 <div key={d.iso} style={{
                   aspectRatio: '1', borderRadius: 7,
-                  background: d.level === 0 ? 'var(--soft)'
-                    : d.level === 1 ? 'rgba(255,92,57,0.28)'
-                    : d.level === 2 ? 'rgba(255,46,147,0.45)'
-                    : 'var(--grad)',
-                  boxShadow: d.level === 3 ? '0 0 10px rgba(255,46,147,0.4)' : 'none',
+                  ...heatStyle(d.level),
                   opacity: d.future ? 0.3 : 1,
                   animation: `gdCellIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${i * 18}ms both`,
                 }} />
@@ -560,12 +556,12 @@ export default function ProgressPage() {
 
         {/* ── AI RECOVERY NOTE ── */}
         <Reveal delay={190}>
-        <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 22, padding: 18 }}>
+        <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 26, padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>✨</span>
             <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Recovery Note</span>
           </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3' }}>{aiNote}</p>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>{aiNote}</p>
         </div>
         </Reveal>
 

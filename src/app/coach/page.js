@@ -58,7 +58,7 @@ const inputStyle = { width: '100%', background: 'var(--soft)', border: '1px soli
 function Avatar({ initials, size = 44, online }) {
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
-      <div style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(135deg, var(--violet), var(--blue))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.32, fontWeight: 700, color: '#fff' }}>{initials}</div>
+      <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--grad)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.32, fontWeight: 700, color: 'var(--on-accent)' }}>{initials}</div>
       {online !== undefined && (
         <div style={{ position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: '50%', background: online ? 'var(--accent)' : 'var(--orange)', border: '2px solid var(--card)' }} />
       )}
@@ -281,7 +281,7 @@ export default function CoachDashboard() {
             { value: avgReadiness, label: 'avg readiness', color: 'var(--blue-ink)' },
             { value: alerts, label: 'alerts', color: alerts > 0 ? 'var(--orange)' : 'var(--ink-3)' },
           ].map((s, i) => (
-            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: '16px 8px', textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
+            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: '16px 8px', textAlign: 'center', boxShadow: 'var(--shadow-card)' }}>
               <p className="gd-disp" style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', color: s.color }}>{s.value}</p>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
@@ -309,14 +309,14 @@ export default function CoachDashboard() {
               <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '10px 0', margin: 0 }}>Loading clients…</p>
             )}
             {!clientsLoading && clients.length === 0 && (
-              <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: 24, textAlign: 'center' }}>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 24, textAlign: 'center' }}>
                 <div style={{ fontSize: 30, marginBottom: 8 }}>🐕</div>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>No clients yet</p>
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--ink-3)' }}>They appear here as soon as your friends sign up.</p>
               </div>
             )}
             {alerts > 0 && (
-              <div style={{ background: 'var(--orange-tint)', borderRadius: 18, padding: '14px 16px' }}>
+              <div style={{ background: 'var(--orange-tint)', borderRadius: 26, padding: '14px 16px' }}>
                 <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--orange-ink)' }}>⚠️ ATTENTION NEEDED</p>
                 {clients.filter(c => c.alert).map(c => (
                   <div key={c.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
@@ -346,7 +346,7 @@ export default function CoachDashboard() {
               return (
                 <Reveal key={client.userId} delay={120 + ci * 50}>
                 <button onClick={() => setSelectedClient(open ? null : client)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
-                  <div style={{ background: 'var(--card)', border: `1px solid ${open ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 18, padding: 16 }}>
+                  <div style={{ background: 'var(--card)', border: `1px solid ${open ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 26, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <Avatar initials={client.initials} size={44} online={client.trainedToday} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -434,7 +434,7 @@ export default function CoachDashboard() {
             <p id="gd-builder-form" style={{ ...eyebrow, marginLeft: 4, scrollMarginTop: 12 }}>{draftId ? 'Editing draft' : 'Create new session'}</p>
 
             <Reveal delay={100}>
-            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <p style={fieldLabel}>Session name</p>
                 <input type="text" placeholder="e.g. Chest & Shoulders" value={planName} onChange={e => setPlanName(e.target.value)} style={inputStyle} />
@@ -498,9 +498,9 @@ export default function CoachDashboard() {
             </Reveal>
 
             <Reveal delay={140}>
-            <button onClick={generatePlan} disabled={generating} style={{
+            <button onClick={generatePlan} disabled={generating} className={generating ? 'gd-shimbar' : undefined} style={{
               width: '100%', background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`,
-              color: '#fff', border: 'none', borderRadius: 16, padding: 15, fontSize: 14, fontWeight: 700,
+              color: 'var(--on-dark)', border: 'none', borderRadius: 18, padding: 15, fontSize: 14, fontWeight: 700,
               cursor: generating ? 'wait' : 'pointer', opacity: generating ? 0.7 : 1,
             }}>
               {generating ? 'Generating…' : `✨ Generate ${planTag.toLowerCase()} plan with AI`}
@@ -510,7 +510,7 @@ export default function CoachDashboard() {
             <p style={{ ...eyebrow, marginLeft: 4 }}>Exercises</p>
 
             {exercises.map((ex, idx) => (
-              <div key={idx} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div key={idx} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--accent-strong)', fontWeight: 800, letterSpacing: '0.06em' }}>EXERCISE {idx + 1}</p>
                   {exercises.length > 1 && (
@@ -586,7 +586,7 @@ export default function CoachDashboard() {
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => handlePublish(false)} disabled={saving} style={{ flex: 1, padding: 15, background: 'var(--soft)', border: 'none', borderRadius: 14, color: 'var(--ink-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>Save draft</button>
-              <button onClick={() => handlePublish(true)} disabled={saving} style={{ flex: 1.4, padding: 15, background: 'var(--accent)', border: 'none', borderRadius: 14, color: 'var(--on-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>Publish & activate</button>
+              <button onClick={() => handlePublish(true)} disabled={saving} className="gd-disp gd-shine" style={{ flex: 1.4, padding: 15, background: 'var(--grad)', border: 'none', borderRadius: 14, color: 'var(--on-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1, boxShadow: saving ? 'none' : 'var(--glow-grad)' }}>Publish &amp; activate</button>
             </div>
           </>
         )}

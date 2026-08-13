@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import TargetsSetup from '@/components/TargetsSetup';
 import AddFoodSheet from '@/components/AddFoodSheet';
 import EditItemSheet from '@/components/EditItemSheet';
+import Reveal from '@/components/Reveal';
 import { pushRecent, toCustomFood, upsertCustomFood } from '@/lib/food';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
@@ -18,7 +19,7 @@ const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.az
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 const pillBase = { padding: '9px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--line)', background: 'var(--soft)', color: 'var(--ink-2)' };
 const pillOn = { ...pillBase, background: 'var(--accent-tint)', borderColor: 'var(--accent)', color: 'var(--accent-strong)' };
 
@@ -262,21 +263,23 @@ export default function NutritionPage() {
               You&rsquo;re looking at a generic {DEFAULT_TARGETS.calories} kcal. Answer four questions and I&rsquo;ll work out your real
               targets &mdash; then keep adjusting them as your weigh-ins come in.
             </p>
-            <button onClick={openSetup} style={{ width: '100%', padding: 14, borderRadius: 14, border: 'none', background: 'var(--grad, var(--accent))', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>
+            <button onClick={openSetup} className="gd-disp" style={{ width: '100%', padding: 14, borderRadius: 18, border: 'none', background: 'var(--grad)', color: 'var(--on-accent)', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: 'var(--glow-grad)' }}>
               Work out my targets
             </button>
           </div>
         )}
 
         {/* ── CALORIE SUMMARY ── */}
-        <div style={{ ...cardStyle, padding: 20 }}>
+        <Reveal delay={0} style={{ ...cardStyle, padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <div style={{ position: 'relative', width: 104, height: 104, flexShrink: 0 }}>
               <svg width="104" height="104" viewBox="0 0 120 120">
                 <defs>
+                  {/* The --grad run, as SVG stops — a CSS gradient can't be a stroke */}
                   <linearGradient id="calRing" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="var(--accent-strong)" />
-                    <stop offset="100%" stopColor="var(--accent)" />
+                    <stop offset="0%" stopColor="var(--ice)" />
+                    <stop offset="52%" stopColor="var(--steel)" />
+                    <stop offset="100%" stopColor="var(--steel-deep)" />
                   </linearGradient>
                 </defs>
                 <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="12" />
@@ -329,7 +332,7 @@ export default function NutritionPage() {
               );
             })}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── EXPENDITURE / HOW THESE NUMBERS ARE SET ── */}
         {targets && (
@@ -389,7 +392,7 @@ export default function NutritionPage() {
         )}
 
         {/* ── WATER ── */}
-        <div style={cardStyle}>
+        <Reveal delay={150} style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
             <p style={eyebrow}>Water</p>
             <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
@@ -430,10 +433,10 @@ export default function NutritionPage() {
               </div>
             </div>
           )}
-        </div>
+        </Reveal>
 
         {/* ── TODAY'S FOOD — grouped by part of the day ── */}
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <Reveal delay={220} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px' }}>
             <p style={eyebrow}>What you&rsquo;ve eaten</p>
             {items.length > 0 && (
@@ -507,7 +510,7 @@ export default function NutritionPage() {
           }}>
             + Add food
           </button>
-        </div>
+        </Reveal>
 
       </div>
 

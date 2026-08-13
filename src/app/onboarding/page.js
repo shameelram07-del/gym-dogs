@@ -3,9 +3,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import QuoteCard from '@/components/QuoteCard';
+import Reveal from '@/components/Reveal';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
+
+const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
+const CARD_R = 26;
 
 const STEPS = [
   {
@@ -154,13 +158,13 @@ export default function OnboardingPage() {
   if (finished) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px 40px' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.03em' }}>You are in.</div>
+        <Reveal delay={0} style={{ textAlign: 'center' }}>
+          <div className="gd-disp gd-grad-text" style={{ fontSize: 44, fontWeight: 700 }}>You are in.</div>
           <p style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 8 }}>Your plan is being built by Coach Shameel + AI.</p>
-        </div>
+        </Reveal>
 
-        <div style={{ marginTop: 28, width: '100%', maxWidth: 360, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 18 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: '0 0 8px' }}>Your plan preview</p>
+        <Reveal delay={90} style={{ marginTop: 28, width: '100%', maxWidth: 360, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 18 }}>
+          <p style={{ ...eyebrow, marginBottom: 8 }}>Your plan preview</p>
           {[
             { day: 'Monday', label: 'Push', color: 'var(--accent)' },
             { day: 'Wednesday', label: 'Pull', color: 'var(--blue)' },
@@ -174,36 +178,36 @@ export default function OnboardingPage() {
               </div>
             </div>
           ))}
-        </div>
+        </Reveal>
 
-        <div style={{ marginTop: 24, width: '100%', maxWidth: 360 }}>
+        <Reveal delay={180} style={{ marginTop: 24, width: '100%', maxWidth: 360 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12, color: 'var(--ink-2)', fontWeight: 600 }}>Building your plan…</span>
             <span style={{ fontSize: 12, color: 'var(--accent-strong)', fontWeight: 700 }}>{Math.round(buildProgress)}%</span>
           </div>
-          <div style={{ height: 6, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${buildProgress}%`, background: 'var(--accent)', borderRadius: 999, transition: 'width 0.2s ease' }} />
+          <div style={{ height: 8, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
+            <div className="gd-shimbar" style={{ height: '100%', width: `${buildProgress}%`, background: 'var(--grad)', borderRadius: 999, transition: 'width 0.2s ease' }} />
           </div>
-        </div>
+        </Reveal>
 
-        <div style={{ marginTop: 36, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', maxWidth: 360 }}>
+        <Reveal delay={270} style={{ marginTop: 36, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, width: '100%', maxWidth: 360 }}>
           {[
             { icon: '🎯', title: 'Personalised', sub: 'Tailored to your goals and experience.' },
             { icon: '⚡', title: 'Smart adaptive', sub: 'Adjusts to your schedule, gear and recovery.' },
             { icon: '🧠', title: 'AI powered', sub: 'Built with advanced coaching AI.' },
             { icon: '🛡️', title: 'Built for you', sub: 'Your results, your way, every step.' },
           ].map((b, i) => (
-            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: 14 }}>
+            <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 16 }}>
               <div style={{ fontSize: 20, marginBottom: 6 }}>{b.icon}</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-strong)', marginBottom: 4 }}>{b.title}</div>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.4 }}>{b.sub}</div>
             </div>
           ))}
-        </div>
+        </Reveal>
 
-        <div style={{ marginTop: 28, maxWidth: 320 }}>
+        <Reveal delay={360} style={{ marginTop: 28, maxWidth: 320 }}>
           <QuoteCard mode="random" plain />
-        </div>
+        </Reveal>
       </div>
     );
   }
@@ -217,14 +221,15 @@ export default function OnboardingPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', padding: '0 20px 110px', maxWidth: 480, margin: '0 auto' }}>
 
-      {/* Progress */}
+      {/* Progress — deliberately outside the per-step Reveal so the bar slides
+          between steps instead of fading out and back in. */}
       <div style={{ paddingTop: 52 }}>
-        <div style={{ height: 4, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${((currentStep + 1) / totalSteps) * 100}%`, background: 'var(--accent)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+        <div style={{ height: 6, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${((currentStep + 1) / totalSteps) * 100}%`, background: 'var(--grad)', borderRadius: 999, transition: 'width 0.4s ease' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.09em', fontWeight: 600 }}>
-            STEP {currentStep + 1} OF {totalSteps}
+          <div style={eyebrow}>
+            Step {currentStep + 1} of {totalSteps}
           </div>
           <button onClick={async () => { await saveOnboarding(); router.push('/dashboard'); }} style={{
             background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
@@ -234,36 +239,36 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Header */}
-      <div style={{ marginTop: 20, marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.2, margin: 0, letterSpacing: '-0.02em' }}>
-          {labelHead}{labelHead ? ' ' : ''}<span style={{ color: 'var(--accent-strong)' }}>{labelTail}</span>
+      {/* Header — keyed on the step so the stagger replays as you advance */}
+      <Reveal key={`h-${currentStep}`} delay={0} style={{ marginTop: 20, marginBottom: 24 }}>
+        <h1 className="gd-disp" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2, margin: 0 }}>
+          {labelHead}{labelHead ? ' ' : ''}<span className="gd-grad-text">{labelTail}</span>
         </h1>
         <p style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 6, marginBottom: 0 }}>{step.sublabel}</p>
-      </div>
+      </Reveal>
 
       {/* TEXT */}
       {step.type === 'text' && (
-        <>
+        <Reveal key={`t-${currentStep}`} delay={90}>
           <textarea
             placeholder={step.placeholder}
             value={answers[step.id] || ''}
             onChange={e => setAnswers(prev => ({ ...prev, [step.id]: e.target.value }))}
             style={{ width: '100%', minHeight: 120, background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: 16, color: 'var(--ink)', fontSize: 15, lineHeight: 1.5, resize: 'none', outline: 'none', boxSizing: 'border-box' }}
           />
-          <div style={{ display: 'flex', gap: 12, marginTop: 18, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 14, padding: 14 }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 18, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: CARD_R, padding: 16 }}>
             <span style={{ fontSize: 18 }}>✨</span>
             <div>
-              <div style={{ fontSize: 11, color: '#C9C5FF', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 4 }}>COACH SHAMEEL</div>
-              <div style={{ fontSize: 13, color: '#D9D9E3', lineHeight: 1.5 }}>Thanks — this helps me build the perfect plan for you.</div>
+              <div style={{ ...eyebrow, color: 'var(--on-dark-2)', marginBottom: 4 }}>Coach Shameel</div>
+              <div style={{ fontSize: 13, color: 'var(--on-dark)', lineHeight: 1.5 }}>Thanks — this helps me build the perfect plan for you.</div>
             </div>
           </div>
-        </>
+        </Reveal>
       )}
 
       {/* LIST */}
       {step.type !== 'text' && step.layout === 'list' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <Reveal key={`l-${currentStep}`} delay={90} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {step.options.map(opt => {
             const on = step.type === 'single' ? selectedVal === opt.id : selectedVal.includes(opt.id);
             return (
@@ -279,12 +284,12 @@ export default function OnboardingPage() {
               </button>
             );
           })}
-        </div>
+        </Reveal>
       )}
 
       {/* GRID2 */}
       {step.type !== 'text' && step.layout === 'grid2' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <Reveal key={`g-${currentStep}`} delay={90} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {step.options.map(opt => {
             const on = step.type === 'single' ? selectedVal === opt.id : selectedVal.includes(opt.id);
             return (
@@ -300,15 +305,16 @@ export default function OnboardingPage() {
               </button>
             );
           })}
-        </div>
+        </Reveal>
       )}
 
       {/* Fixed NEXT */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '16px 20px 32px', background: 'linear-gradient(to top, var(--bg) 72%, transparent)' }}>
-        <button onClick={handleNext} disabled={!canNext()} style={{
-          width: '100%', padding: 17, border: 'none', borderRadius: 16, fontSize: 16, fontWeight: 700, cursor: canNext() ? 'pointer' : 'not-allowed',
-          background: canNext() ? 'var(--accent)' : 'var(--soft)',
+        <button onClick={handleNext} disabled={!canNext()} className="gd-disp" style={{
+          width: '100%', padding: 17, border: 'none', borderRadius: 18, fontSize: 16, fontWeight: 700, cursor: canNext() ? 'pointer' : 'not-allowed',
+          background: canNext() ? 'var(--grad)' : 'var(--soft)',
           color: canNext() ? 'var(--on-accent)' : 'var(--ink-3)',
+          boxShadow: canNext() ? 'var(--glow-grad)' : 'none',
         }}>
           {currentStep === totalSteps - 1 ? 'Build my plan →' : 'Next →'}
         </button>

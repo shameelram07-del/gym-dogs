@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
+import Reveal from '@/components/Reveal';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -90,7 +91,7 @@ function calcTotalVolume(logs) {
 }
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22, padding: 18 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 // Same XP math as the dashboard so the level shown here always matches.
 const LEVEL_TITLES = ['Pup', 'Young Dog', 'Trainee', 'Working Dog', 'Strong Dog', 'Beast', 'Big Dog', 'Alpha', 'Top Dog', 'Legend'];
@@ -234,12 +235,12 @@ export default function ProfilePage() {
   const levelInfo = computeLevel(totalSessions, totalVolume);
   const myGoals = goalChips(profileRef?.onboarding);
 
-  // IGNITE trophy coins — SVG icons on gradient coins, shine when earned
+  // Trophy coins — SVG icons on gradient coins, shine when earned
   const ACHIEVEMENTS = [
-    { icon: 'medal',    label: 'First PR',      earned: prCount >= 1,       coin: 'var(--grad)',                              glow: 'rgba(255,46,147,0.4)' },
-    { icon: 'trophy',   label: '5 PRs set',     earned: prCount >= 5,       coin: 'linear-gradient(135deg, #8A6A14, #FFD166)', glow: 'rgba(255,209,102,0.35)' },
-    { icon: 'dumbbell', label: '10 tonnes',     earned: totalVolume >= 10000, coin: 'linear-gradient(135deg, #164B5E, #2AA8C9)', glow: 'rgba(110,231,249,0.3)' },
-    { icon: 'flame',    label: '14-day streak', earned: streak >= 14,       coin: 'linear-gradient(135deg, #7A2E1B, #FF5C39)', glow: 'rgba(255,92,57,0.35)' },
+    { icon: 'medal',    label: 'First PR',      earned: prCount >= 1,         coin: 'var(--grad)',       glow: 'var(--accent-glow)' },
+    { icon: 'trophy',   label: '5 PRs set',     earned: prCount >= 5,         coin: 'var(--coin-gold)',  glow: 'var(--coin-gold-glow)' },
+    { icon: 'dumbbell', label: '10 tonnes',     earned: totalVolume >= 10000, coin: 'var(--coin-ice)',   glow: 'var(--coin-ice-glow)' },
+    { icon: 'flame',    label: '14-day streak', earned: streak >= 14,         coin: 'var(--coin-ember)', glow: 'var(--coin-ember-glow)' },
   ];
   const COIN_ICONS = {
     medal:    <><circle cx="12" cy="8" r="6" /><path d="M8.2 13.9 7 22l5-3 5 3-1.2-8.1" /></>,
@@ -261,7 +262,7 @@ export default function ProfilePage() {
       <div style={{ textAlign: 'center', padding: '52px 20px 8px' }}>
         <div style={{
           width: 96, height: 96, borderRadius: '50%', margin: '0 auto 12px', padding: 3.5,
-          background: 'conic-gradient(from 210deg, var(--ember), var(--mag), var(--vio), var(--ember))',
+          background: 'conic-gradient(from 210deg, var(--ice), var(--steel), var(--vio), var(--ice))',
           animation: 'gdSpin 10s linear infinite',
         }}>
           <div className="gd-disp" style={{
@@ -294,18 +295,20 @@ export default function ProfilePage() {
       <div style={{ padding: '8px 20px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── STATS ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <Reveal delay={0} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {[
-            { value: statsLoading ? '—' : totalSessions, label: 'workouts', color: 'var(--ink)' },
-            { value: statsLoading ? '—' : streak, label: 'day streak', color: 'var(--orange)' },
-            { value: statsLoading ? '—' : prCount, label: 'PRs set', color: 'var(--accent-strong)' },
+            { value: statsLoading ? '—' : totalSessions, label: 'workouts' },
+            { value: statsLoading ? '—' : streak, label: 'day streak' },
+            { value: statsLoading ? '—' : prCount, label: 'PRs set' },
           ].map((s, i) => (
             <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
-              <p className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</p>
+              {/* Gradient numbers — the three read as one set rather than three
+                  unrelated colours. The label underneath carries the meaning. */}
+              <p className="gd-disp gd-grad-text" style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{s.value}</p>
               <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{s.label}</p>
             </div>
           ))}
-        </div>
+        </Reveal>
 
         {/* ── MY GOALS (from onboarding answers) ── */}
         <div>
@@ -331,7 +334,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── BODY STATS ── */}
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <Reveal delay={80} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px 12px' }}>
             <p style={eyebrow}>Body stats</p>
             {!editingStats ? (
@@ -362,10 +365,10 @@ export default function ProfilePage() {
               )}
             </div>
           ))}
-        </div>
+        </Reveal>
 
         {/* ── ACHIEVEMENTS ── */}
-        <div style={cardStyle}>
+        <Reveal delay={160} style={cardStyle}>
           <p style={{ ...eyebrow, marginBottom: 12 }}>Achievements</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 9 }}>
             {ACHIEVEMENTS.map((a, i) => (
@@ -385,10 +388,10 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── ACCOUNT ── */}
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <Reveal delay={240} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <p style={{ ...eyebrow, padding: '16px 18px 10px' }}>Account</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -413,7 +416,7 @@ export default function ProfilePage() {
               <span style={{ fontSize: 18, color: 'var(--ink-3)' }}>›</span>
             </button>
           ))}
-        </div>
+        </Reveal>
 
         {/* ── SIGN OUT ── */}
         <button onClick={handleSignOut} style={{
@@ -435,7 +438,7 @@ export default function ProfilePage() {
       {/* ── EDIT NAME MODAL ── */}
       {editingName && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px', background: 'rgba(0,0,0,0.5)' }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 24, padding: 24, width: '100%', maxWidth: 360 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 24, width: '100%', maxWidth: 360 }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 6px', color: 'var(--ink)' }}>Display name</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 18px' }}>This is how you appear in the app and on the leaderboard.</p>
             <input type="text" value={tempName} onChange={e => setTempName(e.target.value)} placeholder="e.g. Shameel" autoFocus

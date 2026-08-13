@@ -55,6 +55,16 @@ function Spinner({ label }) {
   );
 }
 
+// An AI estimate can take most of a minute on a cold Function App. A bar that
+// is visibly moving says "still working" in a way a static spinner doesn't.
+function EstimateBar() {
+  return (
+    <div style={{ height: 6, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden', marginTop: 4 }}>
+      <div className="gd-shimbar" style={{ height: '100%', width: '100%', background: 'var(--grad-soft)', borderRadius: 999 }} />
+    </div>
+  );
+}
+
 // Row for a database result — tap to choose a portion.
 function FoodRow({ item, onPick }) {
   const p = item.per100g || {};
@@ -512,7 +522,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                     }}>×</button>
                   </div>
                 )}
-                {aiBusy && <Spinner label="Working it out…" />}
+                {aiBusy && <><Spinner label="Working it out…" /><EstimateBar /></>}
                 {aiError && <p style={{ margin: '14px 0 0', fontSize: 13.5, color: 'var(--orange-ink)', lineHeight: 1.5 }}>{aiError}</p>}
 
                 {aiResult && (

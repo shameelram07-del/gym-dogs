@@ -123,7 +123,7 @@ function TypeText({ text }) {
       {text?.slice(0, n)}
       {!doneTyping && (
         <span style={{
-          display: 'inline-block', width: 2, height: 14, background: '#C9C5FF',
+          display: 'inline-block', width: 2, height: 14, background: 'var(--on-dark-2)',
           marginLeft: 2, verticalAlign: '-2px', animation: 'gdBlink 1s steps(1) infinite',
         }} />
       )}
@@ -139,7 +139,7 @@ function Avatar({ name, size = 42, fontSize = 15, onClick }) {
       onClick={onClick}
       style={{
         width: size + 6, height: size + 6, borderRadius: '50%', padding: 3,
-        background: 'conic-gradient(from 210deg, var(--ember), var(--mag), var(--vio), var(--ember))',
+        background: 'conic-gradient(from 210deg, var(--ice), var(--steel), var(--vio), var(--ice))',
         animation: 'gdSpin 9s linear infinite',
         flexShrink: 0, cursor: onClick ? 'pointer' : 'default',
       }}
@@ -159,7 +159,7 @@ function Avatar({ name, size = 42, fontSize = 15, onClick }) {
 const card = {
   background: 'var(--card)',
   border: '1px solid var(--line)',
-  borderRadius: 22,
+  borderRadius: 26,
   padding: 18,
   marginBottom: 14,
   boxShadow: 'var(--shadow-card)',
@@ -179,7 +179,7 @@ const Icon = {
   flame: (c = 'var(--orange)') => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px' }}><path d="M12 22c4 0 7-2.7 7-7 0-3-2-5.5-3.5-7C15 10 14 11 13 11c0-3-1-6-4-8 .5 3-1 5-2.5 7C5 11.7 5 13 5 15c0 4.3 3 7 7 7z" /></svg>
   ),
-  sparkle: (c = '#C9C5FF') => (
+  sparkle: (c = 'var(--on-dark-2)') => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" /><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" /></svg>
   ),
 };
@@ -415,10 +415,10 @@ export default function DashboardPage() {
             {weekStats.streak > 0 && (
               <span style={{
                 position: 'absolute', bottom: -4, right: -6,
-                background: 'linear-gradient(135deg, var(--ember), var(--mag))',
+                background: 'linear-gradient(135deg, var(--ember), var(--steel))',
                 borderRadius: 99, padding: '2px 7px', fontSize: 10, fontWeight: 800,
-                color: '#fff', border: '2px solid var(--bg)',
-                boxShadow: '0 4px 14px rgba(255,92,57,0.5)',
+                color: 'var(--on-accent)', border: '2px solid var(--bg)',
+                boxShadow: '0 4px 14px var(--orange-tint)',
                 animation: 'gdFlick 2.2s ease-in-out infinite',
               }}>
                 {weekStats.streak}
@@ -535,17 +535,14 @@ export default function DashboardPage() {
         </div>
         </Reveal>
 
-        {/* ── TODAY'S SESSION — IGNITE mesh hero ── */}
+        {/* ── TODAY'S SESSION — SLATE mesh hero ── */}
         <Reveal delay={140}>
         <div style={{
           borderRadius: 26, padding: 0, overflow: 'hidden', marginBottom: 14,
-          background: `radial-gradient(120% 160% at 10% 0%, rgba(255,92,57,0.5), transparent 52%),
-                       radial-gradient(130% 150% at 95% 20%, rgba(139,92,246,0.55), transparent 58%),
-                       radial-gradient(120% 180% at 60% 110%, rgba(255,46,147,0.5), transparent 55%),
-                       #17102B`,
-          border: '1px solid rgba(255,255,255,0.14)',
-          boxShadow: '0 24px 60px rgba(139,46,147,0.25)',
-          color: '#fff',
+          background: 'var(--hero-mesh)',
+          border: '1px solid var(--hero-line)',
+          boxShadow: 'var(--hero-glow)',
+          color: 'var(--on-dark)',
         }}>
           <div
             onClick={() => effPlan?.exercises?.length && setSessionOpen(o => !o)}
@@ -566,7 +563,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {Icon.dumbbell('#fff')}
+                {Icon.dumbbell('var(--on-dark)')}
               </div>
             </div>
             {sessionName && (
@@ -601,7 +598,7 @@ export default function DashboardPage() {
           {effPlan ? (
             <div style={{ padding: '0 20px 20px' }}>
               {doneToday ? (
-                <div style={{ width: '100%', borderRadius: 17, background: 'rgba(255,255,255,0.16)', color: '#fff', padding: 15, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+                <div style={{ width: '100%', borderRadius: 17, background: 'var(--on-dark-soft)', color: 'var(--on-dark)', padding: 15, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
                   Completed today
                 </div>
@@ -609,11 +606,11 @@ export default function DashboardPage() {
                 /* mockup: white pill button on the mesh card */
                 <button onClick={() => router.push('/workout')} className="gd-disp" style={{
                   width: '100%', border: 'none', borderRadius: 17,
-                  background: '#fff', color: '#140E24', padding: 15, fontSize: 16, fontWeight: 700,
+                  background: 'var(--hero-btn)', color: 'var(--hero-btn-ink)', padding: 15, fontSize: 16, fontWeight: 700,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                   boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
                 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E24"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--hero-btn-ink)"><polygon points="6 3 20 12 6 21 6 3" /></svg>
                   START WORKOUT
                 </button>
               )}
@@ -645,20 +642,20 @@ export default function DashboardPage() {
 
         {/* ── AI COACH ── */}
         <Reveal delay={220}>
-        <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 22, padding: 18, marginBottom: 14 }}>
+        <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 26, padding: 18, marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             {Icon.sparkle()}
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Coach</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#C9C5FF', background: 'rgba(122,90,248,0.25)', borderRadius: 6, padding: '2px 7px', letterSpacing: '0.06em' }}>BETA</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--on-dark)' }}>AI Coach</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--on-dark-2)', background: 'var(--on-dark-soft)', borderRadius: 6, padding: '2px 7px', letterSpacing: '0.06em' }}>BETA</span>
           </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: '#D9D9E3', minHeight: 22 }}>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)', minHeight: 22 }}>
             {coachLoading
               ? 'Thinking…'
               : <TypeText text={coachNote || 'Ready to optimise your performance? Start a session and I will track your progress.'} />}
           </p>
           {coachNote && !askedWhy && (
             <button onClick={handleAskWhy} style={{
-              marginTop: 10, background: 'rgba(122,90,248,0.25)', border: 'none', color: '#C9C5FF',
+              marginTop: 10, background: 'var(--on-dark-soft)', border: 'none', color: 'var(--on-dark-2)',
               borderRadius: 10, padding: '7px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
             }}>
               Ask why →

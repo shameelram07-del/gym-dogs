@@ -112,17 +112,33 @@ If a frontend change needs a new field saved on a profile, that field must be ad
 
 - **Dark is the default theme**; light via the toggle (`data-theme` on `<html>`, persisted to
   `localStorage` key `gd-theme`).
-- Current look is **IGNITE**: ink-violet background `#0A0714`, magenta accent `#FF2E93`, ember
-  `#FF5C39`, ice `#6EE7F9`, gradient `--grad`.
-- **Use the CSS variables from `globals.css`** — `--bg --card --ink --accent --grad --ember --ice`
-  and friends. Never hardcode a hex in a component.
+- Current look is **SLATE**: cool slate background `#080B11`, steel accent `#6C8CB8`, ice highlight
+  `#6EE7F9`, ember `#FF7A45`, gradient `--grad` running ice → steel → deep steel.
+  History worth knowing: the app was **IGNITE** (ink-violet + magenta `#FF2E93`) until commit
+  `9dcbd28` swapped the gradient to steel and left the background violet. SLATE finishes that
+  migration. Both `--mag` and every raw magenta are now **gone** — if one reappears it's a
+  regression, not a leftover. The token is `--steel`.
+- **Use the CSS variables from `globals.css`** — `--bg --card --ink --accent --grad --ember --ice
+  --steel` and friends. Never hardcode a hex in a component. Composite values are tokens too:
+  `--hero-mesh` (dashboard session hero), `--heat-1/--heat-2` (consistency heatmap ramp, shared by
+  progress and history), `--coin-gold/-ice/-ember` + matching `-glow` (trophy coins).
+- **The gradient is defined twice.** `--grad --grad-soft --hero-glow --heat-1 --heat-2` have a
+  light-mode override in `globals.css` keyed to `[data-theme="light"]`, because the dark run starts
+  at ice `#8DE9F8` — about 1.3:1 on a white page, unreadable as `.gd-grad-text`. **Change the
+  gradient and you must change both**, or light mode silently loses its headings.
+- Every screen should carry the same five signals: `.gd-disp` headings, `Reveal` entrance stagger,
+  eyebrow labels, `var(--grad)` for brand fills, and 26px card radius. A screen missing these has
+  only inherited the tokens and hasn't been finished.
 - Utilities: `.gd-disp` (Space Grotesk display font), `.gd-grad-text` (gradient text),
   `.gd-shine`, `.gd-shimbar`.
 - App is capped to a **centred 480px column** (`.app-shell`). `BottomNav` is shared by every screen
   except login and workout.
 - **Performance:** no infinite full-screen animations. A drifting blurred background caused
-  app-wide scroll jank on phones; animations are now frozen or capped and respect
-  `prefers-reduced-motion`. Don't reintroduce one.
+  app-wide scroll jank on phones; the aurora orbs are frozen and animations are capped. Don't
+  reintroduce one. Pages declare motion as **inline** `animation` styles, which no CSS selector can
+  override — so `prefers-reduced-motion` is enforced by a blanket
+  `*, *::before, *::after { animation-iteration-count: 1 !important }` reset in `globals.css`.
+  That is the only thing that reaches inline styles; don't replace it with targeted rules.
 - `computeLevel()` exists in **both** `dashboard/page.js` and `profile/page.js` — if you change the
   XP maths, change both.
 

@@ -2,8 +2,9 @@
 
 /* ============================================================
    GYM DOGS — design tokens
-   Light is the default. Dark is applied via
-   <html data-theme="dark"> (set by the theme toggle).
+   Dark is the default: layout.js stamps <html data-theme="dark"> before paint
+   and only swaps to "light" if the toggle has stored that choice. The block
+   below is still written light-first because it also seeds :root.
    Every screen should reference these vars, never raw hex,
    so both themes stay in sync.
    ============================================================ */
@@ -61,33 +62,33 @@
 }
 
 [data-theme="dark"] {
-  /* IGNITE palette — matches gymdogs-ignite-mockup.html */
-  --bg:        #0A0714;
-  --card:      #140F23;
-  --soft:      #1E1734;
-  --shell-1:   #171129;
-  --shell-2:   #0D0918;
+  /* SLATE palette */
+  --bg:        #080B11;
+  --card:      #111823;
+  --soft:      #1A2331;
+  --shell-1:   #131C28;
+  --shell-2:   #060910;
 
-  --ink:       #F5F2FC;
-  --ink-2:     #968FAD;
-  --ink-3:     #6B6484;
+  --ink:       #EEF3FA;
+  --ink-2:     #8C9AAF;
+  --ink-3:     #5E6C80;
 
-  --line:      rgba(255,255,255,0.09);
-  --line-2:    rgba(255,255,255,0.05);
+  --line:      rgba(255,255,255,0.08);
+  --line-2:    rgba(255,255,255,0.045);
 
-  --accent:        #7B90B4;
-  --accent-strong: #B9C8E4;
-  --accent-tint:   rgba(123,144,180,0.16);
-  --accent-glow:   rgba(123,144,180,0.34);
+  --accent:        #6C8CB8;
+  --accent-strong: #A9C6E4;
+  --accent-tint:   rgba(108,140,184,0.16);
+  --accent-glow:   rgba(108,140,184,0.34);
   --on-accent:     #FFFFFF;
 
   --gold:      #FFD166;
   --gold-tint: rgba(255,209,102,0.12);
-  --card-2:    #171129;
+  --card-2:    #131C28;
 
-  --orange:      #FF5C39;
-  --orange-ink:  #FFB49E;
-  --orange-tint: rgba(255,92,57,0.16);
+  --orange:      #FF7A45;
+  --orange-ink:  #FFC0A3;
+  --orange-tint: rgba(255,122,69,0.16);
 
   --blue:      #6EE7F9;
   --blue-ink:  #9FF0FF;
@@ -98,23 +99,86 @@
   --red-ink:   #FF9F93;
   --red-tint:  rgba(240,68,56,0.18);
 
-  --nav-bg:    rgba(10,7,20,0.78);
-  --ai-card-1: #191233;
-  --ai-card-2: #241A4D;
+  --nav-bg:    rgba(8,11,17,0.78);
+  --ai-card-1: #101823;
+  --ai-card-2: #1B2738;
 
   --shadow-card:  0 1px 2px rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.50);
   --shadow-float: 0 18px 52px rgba(0,0,0,0.65);
 }
 
-/* IGNITE brand gradient + helpers — available in BOTH themes */
+/* SLATE brand gradient + helpers — available in BOTH themes.
+   --steel was called --mag until this palette landed; it has meant steel blue
+   since commit 9dcbd28, so the old name only misled. No alias is kept. */
 :root, [data-theme="light"], [data-theme="dark"] {
-  --ember: #FF5C39;
-  --mag:   #7B90B4;
-  --vio:   #8B5CF6;
+  --ember: #FF7A45;
+  --steel: #6C8CB8;
   --ice:   #6EE7F9;
-  --grad:      linear-gradient(135deg, #9BA1AE 0%, #7B90B4 50%, #4C5D7A 100%);
-  --grad-soft: linear-gradient(135deg, rgba(155,161,174,0.16), rgba(123,144,180,0.14) 52%, rgba(76,93,122,0.16));
-  --glow-grad: 0 8px 32px rgba(123,144,180,0.32);
+  --vio:   #8B5CF6;
+  /* The dark end of --grad, named so the logo tile can sit on the same run. */
+  --steel-deep: #3E5273;
+  /* Cutouts on the logo tile. Fixed in both themes — the tile is always dark. */
+  --logo-ink:   #08121C;
+  --grad:      linear-gradient(135deg, #8DE9F8 0%, #6C8CB8 52%, #3E5273 100%);
+  --grad-soft: linear-gradient(135deg, rgba(141,233,248,0.14), rgba(108,140,184,0.13) 52%, rgba(62,82,115,0.16));
+  --glow-grad: 0 8px 32px rgba(108,140,184,0.34);
+
+  /* The dashboard "today's session" hero: a dark mesh panel that stays dark in
+     both themes (its text is white), so it lives here rather than per-theme. */
+  --hero-mesh: radial-gradient(120% 160% at 10% 0%, rgba(110,231,249,0.30), transparent 52%),
+               radial-gradient(130% 150% at 95% 20%, rgba(108,140,184,0.52), transparent 58%),
+               radial-gradient(120% 180% at 60% 110%, rgba(62,82,115,0.62), transparent 55%),
+               #0E1622;
+  --hero-line: rgba(255,255,255,0.14);
+
+  /* Text on the always-dark panels (--ai-card-*, --hero-mesh). Fixed in both
+     themes: --ink flips to near-black in light and would vanish on them. */
+  --on-dark:      #E7EEF9;
+  --on-dark-2:    #A9C6E4;
+  --on-dark-soft: rgba(169,198,228,0.18);   /* chips/buttons on those panels */
+
+  /* The hero's inverse "Start workout" pill: light plate, dark ink, on a panel
+     that is dark in both themes — so neither --card nor --ink can serve. */
+  --hero-btn:     #F2F7FF;
+  --hero-btn-ink: #0E1622;
+  --hero-glow: 0 24px 60px rgba(8,11,17,0.55);
+
+  /* Consistency heatmap intensity ramp — one hue climbing into the gradient.
+     Used by progress; history should read from these too rather than inventing
+     a second scale. */
+  --heat-1: rgba(108,140,184,0.22);
+  --heat-2: rgba(108,140,184,0.52);
+
+  /* Trophy coins. Deliberately their own hues — a shelf of identical steel
+     discs reads as one award, not four. Kept as tokens so the ember coin
+     tracks --ember instead of drifting to whatever the palette used to be. */
+  --coin-gold:       linear-gradient(135deg, #8A6A14, #FFD166);
+  --coin-gold-glow:  rgba(255,209,102,0.35);
+  --coin-ice:        linear-gradient(135deg, #164B5E, #2AA8C9);
+  --coin-ice-glow:   rgba(110,231,249,0.30);
+  --coin-ember:      linear-gradient(135deg, #7A3418, #FF7A45);
+  --coin-ember-glow: rgba(255,122,69,0.35);
+
+  /* Podium metals. --gold already exists; these are its companions, plus the
+     two shades the challenge bar and Join button need. */
+  --silver:    #B0B7C3;
+  --bronze:    #CD7F32;
+  --gold-deep: #B8860B;
+  --gold-soft: #FFD97A;
+  --on-gold:   #2A1D00;
+}
+
+/* Same hues, darker run, for light mode only. `.gd-grad-text` paints headings
+   and PR numbers with --grad; the dark theme's ice end sits at roughly 1.3:1 on
+   a white page, which is unreadable. Scoped so dark keeps the brief's values.
+   Keyed to the explicit attribute: dark is the default, so no attribute must
+   keep the dark run rather than briefly flashing the light one. */
+[data-theme="light"] {
+  --grad:      linear-gradient(135deg, #1F8AA6 0%, #4C6E9B 52%, #2B3A52 100%);
+  --grad-soft: linear-gradient(135deg, rgba(31,138,166,0.12), rgba(76,110,155,0.11) 52%, rgba(43,58,82,0.13));
+  --hero-glow: 0 24px 60px rgba(16,24,40,0.18);
+  --heat-1:    rgba(63,81,112,0.18);
+  --heat-2:    rgba(63,81,112,0.45);
 }
 
 /* display face for headings + hero numbers */
@@ -229,19 +293,27 @@ input[type="number"] {
   /* Static (no drift animation) — a continuously-animating full-screen
      blur was killing scroll performance on phones. Same look, no motion. */
 }
+/* Ice top-right, deep steel bottom-left — the gradient's two ends, kept faint
+   so they read as depth rather than colour. */
 [data-theme="dark"] body::before {
-  width: 380px; height: 380px; top: -140px; left: calc(50% - 320px);
-  background: radial-gradient(circle, rgba(123,144,180,0.22), transparent 70%);
+  width: 380px; height: 380px; top: -150px; left: calc(50% + 40px);
+  background: radial-gradient(circle, rgba(110,231,249,0.13), transparent 70%);
 }
 [data-theme="dark"] body::after {
-  width: 340px; height: 340px; bottom: -130px; left: calc(50% + 10px);
-  background: radial-gradient(circle, rgba(123,144,180,0.16), transparent 70%),
-              radial-gradient(circle at 30% 70%, rgba(90,110,140,0.12), transparent 60%);
+  width: 360px; height: 360px; bottom: -140px; left: calc(50% - 330px);
+  background: radial-gradient(circle, rgba(62,82,115,0.30), transparent 70%),
+              radial-gradient(circle at 30% 70%, rgba(108,140,184,0.14), transparent 60%);
 }
+/* Pages declare most of their motion as inline styles, which a targeted CSS
+   rule can never reach — an inline `animation` beats any selector. This blanket
+   reset is the only thing that actually holds for them, infinite ones included. */
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="dark"] body::before,
-  [data-theme="dark"] body::after { animation: none; }
-  .gd-shine::after, .gd-shimbar::after { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* shared motion vocabulary (used via inline styles on pages) */
@@ -256,6 +328,7 @@ input[type="number"] {
 @keyframes gdBlink { 50% { opacity: 0; } }
 @keyframes gdGrow  { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes gdCellIn { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes gdBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
 /* trophy shine sweep — add className="gd-shine" to a card */
 @keyframes gdSweep { 0%,55% { left: -40%; } 85%,100% { left: 130%; } }

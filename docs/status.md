@@ -56,6 +56,63 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-13 — workout, profile, coach + radii sweep (ui-slate.md, phase 4 of 4) — **SLATE COMPLETE**
+Built by: Claude Code
+Shipped: workout gained the `Reveal` stagger and eyebrow labels — applied to the header, stats card
+and exercise-list *container*, deliberately not per card (see brief notes). Profile got its stagger
+and gradient stat numbers; coach got `var(--grad)`, `.gd-shine` on Publish, `.gd-shimbar` while the
+AI generates, and 26px cards. Shameel extended scope to the 22px radii on dashboard and progress,
+which pulled in their leftover violet-era hexes (`#C9C5FF`, `#D9D9E3`, `rgba(122,90,248,…)`,
+`#140E24`) — all now `--on-dark`, `--on-dark-2`, `--on-dark-soft`, `--hero-btn`, `--hero-btn-ink`.
+Touched: workout, profile, coach, dashboard, progress, `components/TargetsSetup.js`,
+`components/QuoteCard.js`, `globals.css`
+Still needed: frontend push. No API redeploy across all four phases.
+**End state, verified by grep:** zero raw brand hex outside `globals.css`, zero card radii under
+26px, zero `--mag` or magenta anywhere. All eleven screens carry `.gd-disp`, `Reveal` and eyebrow
+labels; every screen except history carries `var(--grad)` directly (history gets it via `heatStyle`).
+
+### 2026-08-13 — exercise, history, community, nutrition (ui-slate.md, phase 3 of 4)
+Built by: Claude Code
+Shipped: new `src/lib/heat.js` — one intensity ramp (`heatLevel`/`heatMax`/`heatStyle`) now shared by
+the progress heatmap and the history calendar, which previously disagreed about what a trained day
+looks like. History's flat dot is gone; days are shaded by volume with a Less→More legend.
+Exercise: 26px cards, display heading, ice/ember/quiet chip vocabulary, `Reveal`. Community: the
+`.gd-disp` gap closed, avatars and podium on `var(--grad)`, medals moved to new `--silver`,
+`--bronze`, `--gold-deep`, `--gold-soft`, `--on-gold` tokens. Nutrition: `Reveal` on every card,
+the calorie ring now runs the `--grad` stops, and an estimate shimmer bar while the AI is thinking.
+Touched: `lib/heat.js` (new), `globals.css`, exercise, history, community, nutrition, progress,
+`components/AddFoodSheet.js`
+Still needed: frontend push. No API redeploy. **Phase 4 not started.**
+Deviation: macro bars kept their three distinct hues rather than all becoming `var(--grad)` — the
+P/C/F letters in `MacroLine` are colour-matched to them, and one gradient for all three breaks that.
+
+### 2026-08-13 — login + onboarding (ui-slate.md, phase 2 of 4)
+Built by: Claude Code
+Shipped: login is off the old green/teal brand entirely — the logo tile now runs the same
+ice→steel→deep-steel as `--grad` (SVG stops read CSS vars), the paw uses `--logo-ink`, the glows are
+slate, the wordmark is `.gd-disp .gd-grad-text`, and the hand-rolled `gd-rise-1..4` `<style>` block
+is gone in favour of `Reveal`. Onboarding gained `.gd-disp` headings, gradient headline tail,
+`var(--grad)` on both progress bars and the Next button, `.gd-shimbar` on "Building your plan…",
+26px cards and a per-step `Reveal` stagger. No raw hex left on either screen.
+Touched: `login/page.js`, `onboarding/page.js`, `components/Reveal.js`, `globals.css`
+Still needed: frontend push. No API redeploy. **Phases 3-4 not started.**
+Note: `Reveal` now takes an optional `style` prop — it renders a real div, and wrapping a flex child
+without passing width/flex down collapses the layout. Additive; existing callers unaffected.
+
+### 2026-08-13 — SLATE palette (ui-slate.md, phase 1 of 4)
+Built by: Claude Code
+Shipped: dark token block replaced with SLATE; shared gradient now ice → steel → deep steel.
+`--mag` renamed to `--steel` with no alias (4 call sites). All six raw magenta orphans gone — the
+dashboard hero mesh, heatmap ramp and trophy coins became tokens (`--hero-mesh`, `--heat-1/2`,
+`--coin-*`) rather than being re-inlined. Aurora orbs retuned to ice/deep-steel, still frozen.
+`gdbounce` moved out of exercise's inline `<style>` into `globals.css` as `gdBounce`; login's logo
+float capped at 3 iterations. Reduced-motion is now a blanket reset — the old targeted rules could
+never reach the inline `animation` styles the pages actually use.
+Touched: `globals.css`, dashboard, profile, progress, workout, exercise, login, `CLAUDE.md`
+Still needed: frontend push. No API redeploy. **Phases 2-4 not started.**
+Watch: **light mode**. The dark gradient starts at ice `#8DE9F8`, unreadable as text on white, so
+`--grad` now has a `[data-theme="light"]` override. Both need changing together from here on.
+
 ### 2026-08-13 — whole-meal logging + Estimate ignoring the photo
 Built by: Claude Code
 Shipped: brief `docs/briefs/meal-logging.md`, both parts. (1) Estimate now sends the attached photo

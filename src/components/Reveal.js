@@ -5,7 +5,11 @@ import { useEffect, useRef, useState } from 'react';
 // Apple-style reveal: children fade in and rise as they enter the viewport.
 // Usage: <Reveal delay={80}> ... </Reveal>  (delay in ms, staggers siblings)
 // Respects the user's reduced-motion preference.
-export default function Reveal({ children, delay = 0, y = 20 }) {
+//
+// `style` merges into the wrapper. It exists because this renders a real div:
+// wrapping a flex child without passing its width/flex down collapses the
+// layout. Optional — every existing caller is unaffected.
+export default function Reveal({ children, delay = 0, y = 20, style }) {
   const ref = useRef(null);
   const [on, setOn] = useState(false);
 
@@ -38,6 +42,7 @@ export default function Reveal({ children, delay = 0, y = 20 }) {
         transform: on ? 'none' : `translateY(${y}px)`,
         transition: `opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms, transform 0.75s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`,
         willChange: 'opacity, transform',
+        ...style,
       }}
     >
       {children}

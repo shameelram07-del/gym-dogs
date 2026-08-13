@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import Reveal from '@/components/Reveal';
 
 const exercises = [
   {
@@ -57,7 +58,14 @@ const exercises = [
 ];
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 22 };
+const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26 };
+
+// Chip vocabulary, shared with the rest of the app: ice for neutral facts,
+// ember for anything the lifter should be careful about.
+const chipBase = { fontSize: 11, fontWeight: 700, padding: '5px 12px', borderRadius: 999, border: '1px solid' };
+const chipIce = { ...chipBase, background: 'var(--blue-tint)', color: 'var(--blue-ink)', borderColor: 'var(--blue-tint)' };
+const chipEmber = { ...chipBase, background: 'var(--orange-tint)', color: 'var(--orange-ink)', borderColor: 'var(--orange-tint)' };
+const chipQuiet = { ...chipBase, background: 'var(--soft)', color: 'var(--ink-2)', borderColor: 'var(--line)' };
 
 export default function ExercisePage() {
   const router = useRouter();
@@ -87,11 +95,11 @@ export default function ExercisePage() {
       <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => router.push('/workout')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>‹</button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>{selected.name}</h1>
+          <h1 className="gd-disp" style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{selected.name}</h1>
           <p style={{ margin: '1px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{selected.muscle}</p>
         </div>
         {selected.safe && (
-          <span style={{ background: 'var(--accent-tint)', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999, flexShrink: 0 }}>Safe</span>
+          <span style={{ ...chipIce, flexShrink: 0 }}>Safe</span>
         )}
       </div>
 
@@ -115,17 +123,19 @@ export default function ExercisePage() {
         </div>
 
         {/* ── ANIMATION STAGE ── */}
-        <div style={{ ...cardStyle, overflow: 'hidden', position: 'relative' }}>
+        <Reveal delay={0} style={{ ...cardStyle, overflow: 'hidden', position: 'relative' }}>
           <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2 }}>
-            <span style={{ background: 'linear-gradient(135deg, var(--violet), var(--blue))', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{selected.category}</span>
+            <span style={{ ...chipBase, background: 'var(--grad)', color: 'var(--on-accent)', borderColor: 'transparent' }}>{selected.category}</span>
           </div>
           <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>
-            <span style={{ background: 'var(--soft)', color: 'var(--ink-2)', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 999 }}>{selected.difficulty}</span>
+            <span style={chipQuiet}>{selected.difficulty}</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px 0 16px', background: 'var(--soft)' }}>
-            <div style={{ fontSize: 84, marginBottom: 8, display: 'inline-block', animation: playing ? 'gdbounce 1.5s ease-in-out infinite' : 'none' }}>🏋️</div>
-            <style>{`@keyframes gdbounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}`}</style>
+            {/* gdBounce lives in globals.css. It loops while playing because the
+                user drives it with the button below; prefers-reduced-motion
+                stops it at one cycle. */}
+            <div style={{ fontSize: 84, marginBottom: 8, display: 'inline-block', animation: playing ? 'gdBounce 1.5s ease-in-out infinite' : 'none' }}>🏋️</div>
             <button onClick={() => setPlaying(!playing)} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 999, padding: '7px 16px', fontSize: 12, fontWeight: 700, color: 'var(--ink-2)', cursor: 'pointer' }}>
               {playing ? '⏸ Pause' : '▶ Play'}
             </button>
@@ -146,10 +156,10 @@ export default function ExercisePage() {
               }} />
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── FORM STEPS ── */}
-        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+        <Reveal delay={90} style={{ ...cardStyle, overflow: 'hidden' }}>
           <div style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--line-2)' }}>
             <p style={eyebrow}>Form steps</p>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>{activeStep + 1} of {selected.steps.length}</p>
@@ -182,12 +192,12 @@ export default function ExercisePage() {
           </div>
           <div style={{ padding: '0 12px 14px', display: 'flex', gap: 10 }}>
             <button onClick={prevStep} disabled={activeStep === 0} style={{ flex: 1, padding: 12, borderRadius: 14, background: 'var(--soft)', border: 'none', fontSize: 14, fontWeight: 700, color: 'var(--ink-2)', cursor: 'pointer', opacity: activeStep === 0 ? 0.4 : 1 }}>‹ Previous</button>
-            <button onClick={nextStep} disabled={activeStep === selected.steps.length - 1} style={{ flex: 1, padding: 12, borderRadius: 14, background: 'var(--accent)', border: 'none', fontSize: 14, fontWeight: 700, color: 'var(--on-accent)', cursor: 'pointer', opacity: activeStep === selected.steps.length - 1 ? 0.4 : 1 }}>Next ›</button>
+            <button onClick={nextStep} disabled={activeStep === selected.steps.length - 1} style={{ flex: 1, padding: 12, borderRadius: 14, background: 'var(--grad)', border: 'none', fontSize: 14, fontWeight: 700, color: 'var(--on-accent)', cursor: 'pointer', opacity: activeStep === selected.steps.length - 1 ? 0.4 : 1 }}>Next ›</button>
           </div>
-        </div>
+        </Reveal>
 
         {/* ── MUSCLES ── */}
-        <div style={{ ...cardStyle, padding: 18 }}>
+        <Reveal delay={180} style={{ ...cardStyle, padding: 18 }}>
           <p style={{ ...eyebrow, marginBottom: 12 }}>Muscles targeted</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {selected.muscles_primary.map((m) => (
@@ -197,11 +207,11 @@ export default function ExercisePage() {
               <span key={m} style={{ background: 'var(--soft)', color: 'var(--ink-2)', fontSize: 12, fontWeight: 500, padding: '6px 12px', borderRadius: 999 }}>{m}</span>
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── WARNING ── */}
         {selected.warning && (
-          <div style={{ background: 'var(--orange-tint)', borderRadius: 22, padding: 16, display: 'flex', gap: 12 }}>
+          <div style={{ background: 'var(--orange-tint)', borderRadius: 26, padding: 16, display: 'flex', gap: 12 }}>
             <span style={{ fontSize: 20 }}>⚠️</span>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--orange-ink)', lineHeight: 1.5 }}>{selected.warning}</p>
           </div>

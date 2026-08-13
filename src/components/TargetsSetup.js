@@ -263,13 +263,13 @@ export default function TargetsSetup({ initial, profile, onSave, onCancel }) {
             {/* The bit that makes this more than a calculator */}
             <div style={{
               marginTop: 14, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`,
-              borderRadius: 20, padding: 18, display: 'flex', gap: 12,
+              borderRadius: 26, padding: 18, display: 'flex', gap: 12,
               animation: 'gdRise .45s .38s ease both',
             }}>
               <span style={{ fontSize: 18, animation: 'gdFloat 4s ease-in-out infinite' }}>✨</span>
               <div>
-                <div style={{ fontSize: 11, color: '#C9C5FF', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 6 }}>GYM DADDY</div>
-                <div style={{ fontSize: 13.5, color: '#D9D9E3', lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: 'var(--on-dark-2)', fontWeight: 700, letterSpacing: '0.06em', marginBottom: 6 }}>GYM DADDY</div>
+                <div style={{ fontSize: 13.5, color: 'var(--on-dark)', lineHeight: 1.6 }}>
                   {preview.floored
                     ? <>That&rsquo;s the lowest I&rsquo;ll take you. Under it you lose muscle, not fat.</>
                     : preview.rateCapped

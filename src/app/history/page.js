@@ -5,12 +5,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
+import Reveal from '@/components/Reveal';
+import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
+const CARD_R = 26;
 
 function setsOf(sets_data) {
   try { return JSON.parse(sets_data || '[]'); } catch { return []; }
@@ -86,6 +91,9 @@ export default function HistoryPage() {
 
   if (!userId) return null;
 
+  // Same intensity ramp the progress heatmap uses, measured across the whole
+  // history so a heavy day stays a heavy day as you page between months.
+  const volMax = heatMax(Object.values(byDate).map((d) => d.vol));
   const todayIso = todayISO();
   const sel = byDate[selected];
   const shiftMonth = (delta) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + delta, 1));
@@ -97,7 +105,7 @@ export default function HistoryPage() {
       <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
         <div>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>Train history</p>
+          <p style={eyebrow}>Train history</p>
           <h1 className="gd-disp" style={{ margin: '1px 0 0', fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em' }}>Calendar</h1>
         </div>
       </div>
@@ -105,7 +113,7 @@ export default function HistoryPage() {
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── MONTH CALENDAR ── */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 16 }}>
+        <Reveal delay={0} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <button onClick={() => shiftMonth(-1)} aria-label="Previous month" style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--soft)', border: 'none', color: 'var(--ink)', fontSize: 16, cursor: 'pointer' }}>‹</button>
             <p className="gd-disp" style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{MONTHS[month.getMonth()]} {month.getFullYear()}</p>
@@ -122,41 +130,52 @@ export default function HistoryPage() {
             {cells.map((c, i) => {
               if (!c) return <div key={i} />;
               const day = byDate[c.iso];
-              const trained = !!day;
               const isSel = c.iso === selected;
               const isFuture = c.iso > todayIso;
+              // Intensity, not a binary dot: a light day and a heavy day should
+              // not look identical on the calendar.
+              const level = heatLevel(day ? day.vol : 0, volMax);
               return (
                 <button key={i} onClick={() => setSelected(c.iso)} disabled={isFuture} style={{
                   aspectRatio: '1', borderRadius: 12, cursor: isFuture ? 'default' : 'pointer',
-                  border: isSel ? '2px solid var(--accent)' : '1px solid var(--line)',
-                  background: trained ? 'var(--accent-tint)' : 'var(--soft)',
-                  color: isFuture ? 'var(--ink-3)' : 'var(--ink)', opacity: isFuture ? 0.4 : 1,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                  border: isSel ? '2px solid var(--accent-strong)' : '1px solid var(--line)',
+                  ...heatStyle(level),
+                  color: isFuture ? 'var(--ink-3)' : level >= 3 ? 'var(--on-accent)' : 'var(--ink)',
+                  opacity: isFuture ? 0.4 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 13, fontWeight: 700, position: 'relative',
                 }}>
                   {c.d}
-                  {trained && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)' }} />}
                 </button>
               );
             })}
           </div>
-        </div>
+
+          {/* Legend — the shading means nothing without it */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 12 }}>
+            <span style={{ ...eyebrow, fontSize: 10 }}>Less</span>
+            {[0, 1, 2, 3].map((lv) => (
+              <span key={lv} style={{ width: 12, height: 12, borderRadius: 4, ...heatStyle(lv) }} />
+            ))}
+            <span style={{ ...eyebrow, fontSize: 10 }}>More</span>
+          </div>
+        </Reveal>
 
         {/* ── SELECTED DAY DETAIL ── */}
-        <div>
-          <p style={{ margin: '0 4px 10px', fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' }}>{selLabel}</p>
+        <Reveal delay={90}>
+          <p style={{ ...eyebrow, margin: '0 4px 10px' }}>{selLabel}</p>
 
           {loading ? (
             <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '20px 0' }}>Loading…</p>
           ) : !sel ? (
-            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 20, padding: 26, textAlign: 'center' }}>
+            <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 26, textAlign: 'center' }}>
               <div style={{ fontSize: 30, marginBottom: 6 }}>🐕</div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>No workout logged</p>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--ink-3)' }}>Pick a highlighted day to see the session.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ background: 'var(--grad-soft)', border: '1px solid var(--line)', borderRadius: 20, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ background: 'var(--grad-soft)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ margin: 0, fontSize: 15, fontWeight: 800 }}>{sel.plan || 'Workout'}</p>
                   <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>{sel.exercises.length} exercise{sel.exercises.length === 1 ? '' : 's'}</p>
@@ -170,8 +189,8 @@ export default function HistoryPage() {
               {sel.exercises.map((ex, i) => {
                 const done = ex.sets.filter(s => s.kg || s.reps);
                 return (
-                  <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 18, padding: 16 }}>
-                    <p style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700 }}>{ex.name}</p>
+                  <div key={i} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: CARD_R, padding: 16 }}>
+                    <p className="gd-disp" style={{ margin: '0 0 10px', fontSize: 15, fontWeight: 700 }}>{ex.name}</p>
                     {done.length === 0 ? (
                       <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>No sets recorded</p>
                     ) : (
@@ -191,7 +210,7 @@ export default function HistoryPage() {
               })}
             </div>
           )}
-        </div>
+        </Reveal>
 
       </div>
 
