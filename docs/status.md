@@ -80,6 +80,13 @@ new `src/lib/monitoring.js`. **72 `catch` sites across 16 files were gone throug
 decode, our own 45s AI timeout). New `src/components/ErrorMonitor.js` renders inside `MsalProvider`
 and sets the user to `{ id }` only, plus a screen breadcrumb per route.
 
+The SDK is loaded with a **dynamic `import()`**, so it becomes its own chunk that is only fetched
+when a DSN is actually configured — first-load JS on `/dashboard` is 920 KB vs 915 KB before this
+brief, i.e. **+5 KB**, where a static import cost +83 KB. Because the SDK's own global handlers
+aren't installed until that chunk lands, `monitoring.js` installs its own `error` /
+`unhandledrejection` listeners synchronously and replays anything they catch once it does, then
+stands them down. Calls made during that gap are queued (bounded at 20) rather than lost.
+
 Privacy is enforced in `scrubEvent()`, which is exported and was verified directly against a
 deliberately poisoned event: **no email, name, weight, goalWeight, weighIns or nutritionLog can
 reach Sentry** — values are dropped, emails in messages redacted, `event.user` reduced to an id.

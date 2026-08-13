@@ -7,8 +7,13 @@
 //
 // Nothing in here may throw. A monitoring bug that breaks a screen is worse than
 // the bug it was trying to report, so every entry point is wrapped.
-
-import * as Sentry from '@sentry/browser';
+//
+// The SDK is loaded with a dynamic import() so it becomes its own chunk that is
+// only fetched when a DSN is actually configured — the app runs on phones on gym
+// wifi, and nobody should download ~90KB of error reporting that is switched off.
+// The cost of that is a gap: the SDK's own global handlers aren't installed until
+// the chunk lands, so this file installs its own listeners synchronously and
+// replays anything they catch once it does.
 
 const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 // Set NEXT_PUBLIC_SENTRY_LOCAL=1 to test the wiring from `npm run dev`. Without
@@ -143,43 +148,111 @@ export function scrubEvent(event, now = Date.now()) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
-let started = false;
-let enabled = false;
+let started = false;   // initMonitoring has run
+let armed = false;     // a DSN exists and this environment reports
+let Sentry = null;     // the SDK, once its chunk has landed
+
+// Anything reported between init and the chunk arriving. Bounded — if the chunk
+// never loads (offline, blocked), this must not grow for the life of the tab.
+const QUEUE_MAX = 20;
+let queue = [];
+let pendingUser;       // undefined = never set; null = signed out
+
+function enqueue(entry) {
+  if (queue.length < QUEUE_MAX) queue.push(entry);
+}
+
+// Our own handlers, installed synchronously so the window before the SDK loads
+// isn't a blind spot. Removed the moment Sentry's own take over.
+function onEarlyError(ev) {
+  // Resource load failures (a broken <img>) also fire 'error' and aren't ours.
+  if (ev.target && ev.target !== window) return;
+  const err = ev.error instanceof Error ? ev.error : (ev.message ? new Error(ev.message) : null);
+  if (err) enqueue({ kind: 'error', err, context: { action: 'window-error', earlyBoot: true } });
+}
+function onEarlyRejection(ev) {
+  const r = ev.reason;
+  const err = r instanceof Error ? r : new Error(String(r && r.message ? r.message : r));
+  enqueue({ kind: 'error', err, context: { action: 'unhandled-rejection', earlyBoot: true } });
+}
+function addEarlyHandlers() {
+  window.addEventListener('error', onEarlyError, true);
+  window.addEventListener('unhandledrejection', onEarlyRejection);
+}
+function removeEarlyHandlers() {
+  window.removeEventListener('error', onEarlyError, true);
+  window.removeEventListener('unhandledrejection', onEarlyRejection);
+}
 
 /**
- * Starts Sentry once. Safe to call from anywhere, any number of times.
- * Returns true if events will actually be sent.
+ * Arms monitoring once. Safe to call from anywhere, any number of times.
+ *
+ * Returns true if events will be reported. The SDK itself loads asynchronously,
+ * so a true return means "armed", not "already sending" — calls made in the
+ * meantime are queued and replayed, so callers never need to care.
  */
 export function initMonitoring() {
-  if (started) return enabled;
+  if (started) return armed;
   started = true;
   try {
     if (!DSN || typeof window === 'undefined') return false;
     const host = window.location.hostname;
     const isLocal = host === 'localhost' || host === '127.0.0.1';
-    // Dropped by not starting at all, so dev sessions make zero network calls.
+    // Dropped by never loading the SDK at all, so dev sessions make zero
+    // network calls and don't even download the chunk.
     if (isLocal && !ALLOW_LOCAL) return false;
 
-    Sentry.init({
-      dsn: DSN,
-      environment: isLocal ? 'local' : 'production',
-      sendDefaultPii: false,   // NON-NEGOTIABLE
-      tracesSampleRate: 0,     // errors only — no performance monitoring
-      ...(RELEASE ? { release: RELEASE } : {}),
-      beforeSend: (event) => scrubEvent(event),
-    });
-    enabled = true;
+    armed = true;
+    addEarlyHandlers();
+
+    import('@sentry/browser')
+      .then((sdk) => {
+        sdk.init({
+          dsn: DSN,
+          environment: isLocal ? 'local' : 'production',
+          sendDefaultPii: false,   // NON-NEGOTIABLE
+          tracesSampleRate: 0,     // errors only — no performance monitoring
+          ...(RELEASE ? { release: RELEASE } : {}),
+          beforeSend: (event) => scrubEvent(event),
+        });
+        Sentry = sdk;
+        // Its globalHandlers integration is live now, so stand ours down. An
+        // error landing in both during this handover is caught by the 60s
+        // duplicate filter in scrubEvent.
+        removeEarlyHandlers();
+        flush();
+      })
+      .catch(() => {
+        // The chunk didn't load. Nothing is reportable, so let the queue go
+        // rather than hold errors in memory forever.
+        armed = false;
+        queue = [];
+        removeEarlyHandlers();
+      });
+
     return true;
   } catch (e) {
-    enabled = false;
+    armed = false;
     return false;
   }
 }
 
+function flush() {
+  try {
+    if (pendingUser !== undefined) { identifyUser(pendingUser); pendingUser = undefined; }
+    const pending = queue;
+    queue = [];
+    for (const entry of pending) {
+      if (entry.kind === 'error') captureError(entry.err, entry.context);
+      else breadcrumb(entry.message, entry.data);
+    }
+  } catch (e) { /* no-op */ }
+}
+
 // Every entry point self-initialises, so ordering between modules never matters.
-function ready() {
+function active() {
   if (!started) initMonitoring();
-  return enabled;
+  return armed;
 }
 
 /**
@@ -192,7 +265,8 @@ function ready() {
  */
 export function captureError(err, context) {
   try {
-    if (!ready()) return;
+    if (!active()) return;
+    if (!Sentry) { enqueue({ kind: 'error', err, context }); return; }
     const safe = safeContext(context);
     const { screen, action, endpoint, ...extra } = safe;
     Sentry.withScope((scope) => {
@@ -211,7 +285,8 @@ export function captureError(err, context) {
  */
 export function breadcrumb(message, data) {
   try {
-    if (!ready()) return;
+    if (!active()) return;
+    if (!Sentry) { enqueue({ kind: 'crumb', message, data }); return; }
     Sentry.addBreadcrumb({ category: 'gymdogs', level: 'info', message, data: safeContext(data) });
   } catch (e) { /* no-op */ }
 }
@@ -219,7 +294,10 @@ export function breadcrumb(message, data) {
 /** The signed-in user, as an opaque id and nothing else. */
 export function identifyUser(userId) {
   try {
-    if (!ready()) return;
+    if (!active()) return;
+    // Not queued like the rest — only the latest value matters, and it must be
+    // set before any queued error is replayed.
+    if (!Sentry) { pendingUser = userId; return; }
     Sentry.setUser(userId ? { id: String(userId) } : null);
     Sentry.setTag('signedIn', !!userId);
   } catch (e) { /* no-op */ }
