@@ -105,14 +105,26 @@ export default function NutritionPage() {
   const [coachNote, setCoachNote] = useState('');
   const [coachBusy, setCoachBusy] = useState(false);
   const noteRef = useRef({ date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null });
+
+  // The live day, mirrored into refs. Anything that SAVES must read these rather
+  // than its own render's closure. The coach note fires its write up to 28
+  // seconds after the render that scheduled it (8s debounce + a 20s model call),
+  // and writing that stale snapshot back is what brought deleted food back onto
+  // the day and rolled the rest of the profile back with it.
+  const itemsRef = useRef(items);
+  const waterRef = useRef(waterMl);
+  const profileLatest = useRef(profileRef);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { waterRef.current = waterMl; }, [waterMl]);
+  useEffect(() => { profileLatest.current = profileRef; }, [profileRef]);
   // Recomputed, never cached at module scope: a phone that sat on this page all
   // night must roll over to the new day rather than keep yesterday's total.
   const [TODAY, setTODAY] = useState(todayISO());
 
   useEffect(() => onDayChange(TODAY, (next) => {
     setTODAY(next);
-    setItems([]);
-    setWaterMl(0);
+    setItems([]); itemsRef.current = [];
+    setWaterMl(0); waterRef.current = 0;
     // New day, new note — and a fresh call budget.
     noteRef.current = { date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null };
     setCoachNote('');
@@ -135,11 +147,16 @@ export default function NutritionPage() {
           const data = await res.json();
           const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
           if (p && !p.error) {
+            profileLatest.current = p;
             setProfileRef(p);
             if (p.nutrition && p.nutrition.date === todayISO()) {
               // flattenEntries covers days saved before meal buckets were dropped
-              setItems(flattenEntries(p.nutrition.items || p.nutrition.meals));
-              setWaterMl(migrateWater(p.nutrition));
+              const loaded = flattenEntries(p.nutrition.items || p.nutrition.meals);
+              const water = migrateWater(p.nutrition);
+              itemsRef.current = loaded;
+              waterRef.current = water;
+              setItems(loaded);
+              setWaterMl(water);
               // Restore today's cached note so reopening the screen spends nothing.
               const cached = p.nutrition.coachNote;
               if (cached && cached.date === todayISO()) {
@@ -179,7 +196,10 @@ export default function NutritionPage() {
 
   async function saveProfile(patch) {
     if (!userId) return;
-    const next = { ...(profileRef || {}), userId, ...patch };
+    // Merge onto the newest profile we hold, not this render's snapshot, so two
+    // saves in flight can't silently roll each other back.
+    const next = { ...(profileLatest.current || {}), userId, ...patch };
+    profileLatest.current = next;
     setProfileRef(next);
     try {
       const res = await fetch(PROFILES_URL, {
@@ -217,7 +237,7 @@ export default function NutritionPage() {
   function saveNutrition(itemsArg, waterArg) {
     saveProfile({
       nutrition: nutritionPayload(itemsArg, waterArg),
-      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
+      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
     });
   }
 
@@ -284,7 +304,13 @@ export default function NutritionPage() {
     };
     setCoachNote(text);
     setCoachBusy(false);
-    saveProfile({ nutrition: nutritionPayload(items, waterMl) });
+    // Persist the cached note against what is on the day RIGHT NOW. Reading the
+    // closure's `items`/`waterMl` here re-saved a snapshot from before the call
+    // started. And if midnight passed while the model was thinking, don't write
+    // at all — the rollover has already cleared the day this note describes.
+    if (todayISO() === TODAY) {
+      saveProfile({ nutrition: nutritionPayload(itemsRef.current, waterRef.current) });
+    }
   }
 
   useEffect(() => {
@@ -330,32 +356,38 @@ export default function NutritionPage() {
   // The sheet stays open after an add, so a whole meal goes in without reopening.
   const addItem = (item) => {
     const stamped = { ...item, at: new Date().toISOString() };
-    const next = [...items, stamped];
+    // From the ref, not `items`: the sheet stays open so a whole meal can be
+    // logged in one visit, and several adds can land before React re-renders.
+    // Reading the closure there kept only the last one.
+    const next = [...itemsRef.current, stamped];
+    itemsRef.current = next;
     setItems(next);
     saveProfile({
-      nutrition: nutritionPayload(next, waterMl),
-      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(next, TODAY)),
-      foodRecent: pushRecent((profileRef && profileRef.foodRecent) || [], item),
+      nutrition: nutritionPayload(next, waterRef.current),
+      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(next, TODAY)),
+      foodRecent: pushRecent((profileLatest.current && profileLatest.current.foodRecent) || [], item),
     });
   };
 
   const removeItem = (id) => {
-    const next = items.filter((i) => i.id !== id);
+    const next = itemsRef.current.filter((i) => i.id !== id);
+    itemsRef.current = next;
     setItems(next);
-    saveNutrition(next, waterMl);
+    saveNutrition(next, waterRef.current);
   };
 
   // Saving a correction can also mint a personal food entry, which then outranks
   // the database next time the same thing is logged.
   const saveEdit = (next, remember) => {
-    const arr = items.map((i) => (i.id === next.id ? next : i));
+    const arr = itemsRef.current.map((i) => (i.id === next.id ? next : i));
+    itemsRef.current = arr;
     setItems(arr);
     const patch = {
-      nutrition: nutritionPayload(arr, waterMl),
-      nutritionLog: upsertDay((profileRef && profileRef.nutritionLog) || [], summariseDay(arr, TODAY)),
+      nutrition: nutritionPayload(arr, waterRef.current),
+      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(arr, TODAY)),
     };
     if (remember) {
-      patch.foodCustom = upsertCustomFood((profileRef && profileRef.foodCustom) || [], toCustomFood(next));
+      patch.foodCustom = upsertCustomFood((profileLatest.current && profileLatest.current.foodCustom) || [], toCustomFood(next));
     }
     saveProfile(patch);
     setEditing(null);
@@ -363,8 +395,9 @@ export default function NutritionPage() {
 
   const setWater = (ml) => {
     const v = Math.max(0, Math.min(ml, 6000));
+    waterRef.current = v;
     setWaterMl(v);
-    saveNutrition(items, v);
+    saveNutrition(itemsRef.current, v);
   };
 
   return (

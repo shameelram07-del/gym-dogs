@@ -109,7 +109,6 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   const [aiError, setAiError] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [fromPhoto, setFromPhoto] = useState(false); // did this result come from an image?
-  const [aiAdded, setAiAdded] = useState([]);   // indices already logged
   const [mealName, setMealName] = useState(''); // editable name for "log as one meal"
   const [perf, setPerf] = useState(null);       // which model answered, and how fast
   const fileRef = useRef();
@@ -554,73 +553,51 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                             color: aiResult.confidence === 'high' ? 'var(--accent-strong)' : 'var(--ink-3)',
                           }}>{aiResult.confidence} confidence</span>
                         </div>
+                        {/* What the model saw, as a read-only breakdown. It gets
+                            logged as ONE entry — the ingredients ride inside it
+                            in `components`, so the day stays one line per meal
+                            and a correction still has something to work from. */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {aiResult.items.map((it, i) => {
-                            const on = aiAdded.includes(i);
-                            return (
-                              <div key={i} style={{
-                                display: 'flex', alignItems: 'center', gap: 12, borderRadius: 14, padding: '12px 14px',
-                                background: on ? 'var(--accent-tint)' : 'var(--card)',
-                                border: `1px solid ${on ? 'var(--accent)' : 'var(--line)'}`,
-                                transition: 'background .2s ease, border-color .2s ease',
-                              }}>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 14.5, fontWeight: 700 }}>{it.name}</div>
-                                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                                    {it.portion ? `${it.portion} · ` : ''}{macroLine(it)}
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => { if (on) return; commit({ ...it, id: Date.now() + Math.random() }); setAiAdded((a) => [...a, i]); }}
-                                  aria-label={on ? 'Added' : `Add ${it.name}`}
-                                  style={{
-                                    background: on ? 'var(--accent)' : 'none', border: 'none', borderRadius: '50%',
-                                    width: 30, height: 30, flexShrink: 0, fontSize: on ? 15 : 22,
-                                    color: on ? 'var(--on-accent)' : 'var(--accent-strong)',
-                                    cursor: on ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    animation: on ? 'gdPop .3s ease' : 'none',
-                                  }}>{on ? '✓' : '+'}</button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {aiResult.items.length >= 2 ? (
-                          <>
-                            {/* One line in the day, with the breakdown kept inside it. */}
-                            <div style={{ marginTop: 14 }}>
-                              <p style={{ ...eyebrow, marginBottom: 7 }}>Call this meal</p>
-                              <input value={mealName} onChange={(e) => setMealName(e.target.value)}
-                                placeholder={mealNameFrom(aiResult.items)} style={field} />
-                            </div>
-                            <button onClick={() => {
-                              const totals = sumItems(aiResult.items);
-                              commit({
-                                id: Date.now(),
-                                name: mealName.trim() || mealNameFrom(aiResult.items),
-                                ...totals,
-                                components: aiResult.items,
-                              }, { close: true });
-                            }} style={{ ...primaryBtn(true), width: '100%', marginTop: 10 }}>
-                              Log as one meal &middot; {sumItems(aiResult.items).calories} kcal
-                            </button>
-                            <button onClick={() => {
-                              aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
-                              onClose();
-                            }} style={{
-                              display: 'block', margin: '10px auto 0', background: 'none', border: 'none', padding: 4,
-                              color: 'var(--ink-3)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline',
+                          {aiResult.items.map((it, i) => (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', gap: 12, borderRadius: 14, padding: '12px 14px',
+                              background: 'var(--card)', border: '1px solid var(--line)',
                             }}>
-                              Add as {aiResult.items.length} separate items
-                            </button>
-                          </>
-                        ) : (
-                          <button onClick={() => {
-                            aiResult.items.forEach((it, i) => { if (!aiAdded.includes(i)) onAdd({ ...it, id: Date.now() + i, at: undefined }); });
-                            onClose(); // adding a whole meal means you're done
-                          }} style={{ ...primaryBtn(true), width: '100%', marginTop: 12 }}>
-                            Add {aiAdded.length ? 'the rest' : `all ${aiResult.items.length}`} and close
-                          </button>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 14.5, fontWeight: 700 }}>{it.name}</div>
+                                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                                  {it.portion ? `${it.portion} · ` : ''}{macroLine(it)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {aiResult.items.length >= 2 && (
+                          <div style={{ marginTop: 14 }}>
+                            <p style={{ ...eyebrow, marginBottom: 7 }}>Call this meal</p>
+                            <input value={mealName} onChange={(e) => setMealName(e.target.value)}
+                              placeholder={mealNameFrom(aiResult.items)} style={field} />
+                          </div>
                         )}
+
+                        <button onClick={() => {
+                          const totals = sumItems(aiResult.items);
+                          const single = aiResult.items.length === 1;
+                          commit({
+                            // A single item is already one line — it doesn't need
+                            // wrapping in a components array to say so.
+                            ...(single ? aiResult.items[0] : null),
+                            id: Date.now() + Math.random(),
+                            name: single
+                              ? aiResult.items[0].name
+                              : (mealName.trim() || mealNameFrom(aiResult.items)),
+                            ...totals,
+                            ...(single ? {} : { components: aiResult.items }),
+                          }, { close: true });
+                        }} style={{ ...primaryBtn(true), width: '100%', marginTop: aiResult.items.length >= 2 ? 10 : 12 }}>
+                          {aiResult.items.length >= 2 ? 'Log as one meal' : 'Log it'} &middot; {sumItems(aiResult.items).calories} kcal
+                        </button>
                         {/* A photo the model struggled with is often a nutrition
                             panel, which has a far better path. Point at it —
                             don't reroute, the guess might be right. */}
