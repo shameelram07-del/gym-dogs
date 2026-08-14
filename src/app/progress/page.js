@@ -183,8 +183,10 @@ export default function ProgressPage() {
   const [saveError, setSaveError] = useState('');
   // weighIns is read-modify-write: the new array is built from the loaded one.
   // If the profile read never landed, that array is empty and saving would
-  // replace a real weigh-in history with a single entry.
+  // replace a real weigh-in history with a single entry — so a weigh-in taken
+  // before then is held here and written the moment the history arrives.
   const profileLoaded = useRef(false);
+  const pendingWeighIn = useRef(null);
 
   useEffect(() => {
     if (!loading) {
@@ -198,6 +200,16 @@ export default function ProgressPage() {
     if (accounts.length === 0) { router.push('/login'); return; }
     const uid = accounts[0].localAccountId;
     setUserId(uid);
+    // A weigh-in taken before the history arrived has nothing safe to merge
+    // into, so it waits here. Kept inside the effect deliberately: reaching out
+    // to component-scope helpers would make this effect depend on them.
+    const dropPending = (message) => {
+      if (!pendingWeighIn.current) return;
+      pendingWeighIn.current = null;
+      setSavingWi(false);
+      setSaveError(message);
+    };
+
     const fetchProfile = async () => {
       try {
         const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
@@ -212,8 +224,43 @@ export default function ProgressPage() {
             if (profile.goalWeight) setGoalWeight(String(profile.goalWeight));
             if (Array.isArray(profile.weighIns)) setWeighIns(profile.weighIns);
           }
+
+          // Anything logged while this was in flight now has real history to
+          // merge into, so write it for real.
+          const pending = pendingWeighIn.current;
+          if (pending) {
+            pendingWeighIn.current = null;
+            const base = (profile && Array.isArray(profile.weighIns)) ? profile.weighIns : [];
+            const merged = [...base.filter((w) => w.date !== pending.date), pending]
+              .sort((a, b) => a.date.localeCompare(b.date));
+            setWeighIns(merged);
+            const patch = { weighIns: merged, weight: pending.kg };
+            try {
+              const save = await fetch(PROFILES_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
+                body: JSON.stringify({ userId: uid, ...patch }),
+              });
+              if (!save.ok) throw new Error(`Save failed (${save.status})`);
+              setProfileRef((prev) => ({ ...(prev || {}), userId: uid, ...patch }));
+              setSaveError('');
+            } catch (e) {
+              setSaveError('Could not save your weigh-in — check your connection.');
+              captureError(e, { screen: 'progress', action: 'save-weigh-in', endpoint: 'userProfiles', fields: 'weighIns,weight' });
+            } finally {
+              setSavingWi(false);
+            }
+          }
+        } else {
+          dropPending('Could not load your history, so that weigh-in was not saved. Try again.');
+          captureError(new Error(`userProfiles failed (${res.status})`), {
+            screen: 'progress', action: 'load-profile', endpoint: 'userProfiles', status: res.status,
+          });
         }
       } catch (e) {
+        // A queued weigh-in can never be merged now — say so rather than leave
+        // it spinning against a history that never arrived.
+        dropPending('Could not load your history, so that weigh-in was not saved. Try again.');
         captureError(e, { screen: 'progress', action: 'load-profile', endpoint: 'userProfiles' });
       }
     };
@@ -296,16 +343,26 @@ export default function ProgressPage() {
     finally { setSavingGoal(false); setGoalInput(''); }
   };
 
+  const withWeighIn = (list, entry) =>
+    [...(Array.isArray(list) ? list : []).filter((w) => w.date !== entry.date), entry]
+      .sort((a, b) => a.date.localeCompare(b.date));
+
   const logWeighIn = async () => {
     const kg = parseFloat(wiInput);
     if (!kg) return;
+    const today = todayISO();
     if (!profileLoaded.current) {
-      // Refuse rather than overwrite: we don't yet know what history exists.
-      setSaveError("Still loading your history — give it a second and try again.");
+      // Take it now, save it the moment the history arrives. Refusing would
+      // throw away what they typed; saving now would replace a real history
+      // with this one entry.
+      pendingWeighIn.current = { date: today, kg };
+      setWeighIns((prev) => withWeighIn(prev, { date: today, kg }));
+      setWiInput('');
+      setSavingWi(true);
+      setSaveError('');
       return;
     }
-    const today = todayISO();
-    const next = [...weighIns.filter(w => w.date !== today), { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
+    const next = withWeighIn(weighIns, { date: today, kg });
     setWeighIns(next);
     setWiInput('');
     setSavingWi(true);

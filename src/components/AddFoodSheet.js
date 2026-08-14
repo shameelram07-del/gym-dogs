@@ -151,18 +151,24 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     clearTimeout(searchTimer.current);
     if (q.trim().length < 2) { setResults(null); setSearching(false); return; }
     setSearching(true);
+    // The cleanup cancels the timer, but not a request already in flight. Without
+    // this flag a slow response for an earlier query lands after a newer one and
+    // replaces the right results with stale ones.
+    let cancelled = false;
     searchTimer.current = setTimeout(async () => {
       try {
         const data = await searchFoods(q.trim());
+        if (cancelled) return;
         setResults(data.items || []);
       } catch (e) {
+        if (cancelled) return;
         // Shows as "nothing found", which is a lie when the lookup broke.
         // The query is the user's own words, so it stays out of the report.
         setResults([]);
         captureError(e, { screen: 'food', action: 'search', endpoint: 'foodLookup' });
-      } finally { setSearching(false); }
+      } finally { if (!cancelled) setSearching(false); }
     }, 450);
-    return () => clearTimeout(searchTimer.current);
+    return () => { cancelled = true; clearTimeout(searchTimer.current); };
   }, [q]);
 
   function pick(item) {

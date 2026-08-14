@@ -84,6 +84,11 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
     }
   }
 
+  // While a correction is running, every field below is about to be replaced by
+  // the model's answer. Typing into them looked like it worked and was then
+  // silently overwritten when the reply landed, so they're held until it does.
+  const busyStyle = fixBusy ? { opacity: 0.55, cursor: 'not-allowed' } : null;
+
   const fromMacros = Math.round(n(f.protein) * 4 + n(f.carbs) * 4 + n(f.fat) * 9);
   const stated = Math.round(n(f.calories));
   const drift = stated && fromMacros ? Math.abs(stated - fromMacros) / Math.max(stated, fromMacros) : 0;
@@ -123,7 +128,7 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
         </div>
 
         <p style={{ ...eyebrow, marginBottom: 7 }}>What was it?</p>
-        <input value={f.name} onChange={set('name')} style={{ ...field, marginBottom: 14 }} />
+        <input value={f.name} onChange={set('name')} disabled={fixBusy} style={{ ...field, marginBottom: 14, ...busyStyle }} />
 
         {/* ── TELL ME WHAT TO CHANGE (meals only) ── */}
         {components && components.length > 0 && (
@@ -165,11 +170,11 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>
             <p style={{ ...eyebrow, marginBottom: 7 }}>Weight</p>
-            <input type="number" inputMode="decimal" value={f.grams} onChange={set('grams')} placeholder="g" style={field} />
+            <input type="number" inputMode="decimal" value={f.grams} onChange={set('grams')} disabled={fixBusy} placeholder="g" style={{ ...field, ...busyStyle }} />
           </div>
           <div>
             <p style={{ ...eyebrow, marginBottom: 7 }}>Calories</p>
-            <input type="number" inputMode="numeric" value={f.calories} onChange={set('calories')} placeholder="kcal" style={field} />
+            <input type="number" inputMode="numeric" value={f.calories} onChange={set('calories')} disabled={fixBusy} placeholder="kcal" style={{ ...field, ...busyStyle }} />
           </div>
         </div>
 
@@ -177,7 +182,7 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
           {[['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']].map(([k, label]) => (
             <div key={k}>
               <p style={{ ...eyebrow, marginBottom: 7 }}>{label}</p>
-              <input type="number" inputMode="decimal" value={f[k]} onChange={set(k)} placeholder="g" style={{ ...field, textAlign: 'center' }} />
+              <input type="number" inputMode="decimal" value={f[k]} onChange={set(k)} disabled={fixBusy} placeholder="g" style={{ ...field, textAlign: 'center', ...busyStyle }} />
             </div>
           ))}
         </div>
@@ -187,8 +192,9 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
           <div style={{ background: 'var(--soft)', borderRadius: 12, padding: 13, marginBottom: 14 }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
               Those macros work out to <strong>{fromMacros} kcal</strong>, not {stated}.
-              <button onClick={() => setF((s) => ({ ...s, calories: String(fromMacros) }))} style={{
-                marginLeft: 6, background: 'none', border: 'none', padding: 0, color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              <button onClick={() => setF((s) => ({ ...s, calories: String(fromMacros) }))} disabled={fixBusy} style={{
+                marginLeft: 6, background: 'none', border: 'none', padding: 0, color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700,
+                cursor: fixBusy ? 'not-allowed' : 'pointer', ...busyStyle,
               }}>Use {fromMacros}</button>
             </p>
           </div>

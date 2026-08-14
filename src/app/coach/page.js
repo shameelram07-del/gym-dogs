@@ -154,13 +154,26 @@ export default function CoachDashboard() {
   };
 
   const deleteDraft = async (d) => {
+    // Remember where it was, so a failed archive can put it back where it sat
+    // rather than leaving it deleted on screen and alive on the server.
+    const index = drafts.findIndex(x => x.id === d.id);
+    const wasEditing = draftId === d.id;
     setDrafts(prev => prev.filter(x => x.id !== d.id));
-    if (draftId === d.id) setDraftId(null);
+    if (wasEditing) setDraftId(null);
     try {
-      await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify({ ...d, archived: true, isActive: false }) });
+      const res = await fetch(PLANS_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PLANS_API_KEY }, body: JSON.stringify({ ...d, archived: true, isActive: false }) });
+      // fetch only rejects on a network error, so a 500 sailed through here and
+      // the draft looked deleted until it reappeared on the next load.
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
     } catch (e) {
-      // The draft has already vanished from the list — if the write failed it
-      // comes back on the next load with no explanation.
+      setDrafts(prev => {
+        if (prev.some(x => x.id === d.id)) return prev;
+        const restored = [...prev];
+        restored.splice(index < 0 ? restored.length : index, 0, d);
+        return restored;
+      });
+      if (wasEditing) setDraftId(d.id);
+      setSaveMsg({ type: 'error', text: 'Could not delete that draft. Try again.' });
       captureError(e, { screen: 'coach', action: 'delete-draft', endpoint: 'workoutPlans' });
     }
   };

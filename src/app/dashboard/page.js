@@ -238,7 +238,12 @@ export default function DashboardPage() {
     loadDashboardData(uid);
   }, [accounts]);
 
-  async function askCoach(promptText) {
+  // uidArg matters: the first call comes from loadDashboardData, which runs in
+  // the same tick as setUserId(uid) — so the `userId` state is still '' and this
+  // was posting an empty id, leaving the backend without a user to cost-cap or
+  // personalise against.
+  async function askCoach(promptText, uidArg) {
+    const who = uidArg || userId;
     setCoachLoading(true);
     try {
       const res = await fetch(`${API}/aiCoach`, {
@@ -246,7 +251,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json', 'x-functions-key': process.env.NEXT_PUBLIC_AI_COACH_KEY || '' },
         // The function contract is inconsistent between screens — send both
         // keys and accept either response shape.
-        body: JSON.stringify({ message: promptText, prompt: promptText, userId }),
+        body: JSON.stringify({ message: promptText, prompt: promptText, userId: who }),
       });
       if (!res.ok) {
         captureError(new Error(`aiCoach failed (${res.status})`), {
@@ -362,7 +367,7 @@ export default function DashboardPage() {
         if (!done && !dismissed) setShowSetup(true);
       } catch (e) {}
 
-      askCoach(`Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${weekSessions} sessions this week.`);
+      askCoach(`Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${weekSessions} sessions this week.`, uid);
 
     } catch (err) {
       // This catch is the reason this whole brief exists: it swallowed a

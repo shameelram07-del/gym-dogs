@@ -28,7 +28,12 @@ export default function Reveal({ children, delay = 0, y = 20, style }) {
           io.disconnect();
         }
       },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' }
+      // threshold is a fraction of the ELEMENT, so a requirement like 0.12 is
+      // unsatisfiable once the element is taller than ~8 screens — the observer
+      // never fires and the content simply stays at opacity 0. The negative
+      // bottom margin already expresses the real intent ("once it's properly on
+      // screen") in a way that doesn't depend on how tall the content grows.
+      { threshold: 0, rootMargin: '0px 0px -8% 0px' }
     );
     io.observe(el);
     return () => io.disconnect();
