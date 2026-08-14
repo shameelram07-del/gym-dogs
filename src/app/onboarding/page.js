@@ -65,30 +65,17 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { accounts } = useMsal();
   const [userId, setUserId] = useState(null);
-  const [profileRef, setProfileRef] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [finished, setFinished] = useState(false);
   const [buildProgress, setBuildProgress] = useState(0);
 
+  // The profile used to be fetched here purely to spread into the save below.
+  // Now that the save only sends the fields onboarding owns, that read has no
+  // purpose — and it was the thing that made a failed GET destructive.
   useEffect(() => {
     if (!accounts || accounts.length === 0) return;
-    const uid = accounts[0].localAccountId;
-    setUserId(uid);
-    (async () => {
-      try {
-        const res = await fetch(`${PROFILES_URL}?userId=${uid}`, { headers: { 'x-functions-key': PROFILES_KEY } });
-        if (res.ok) {
-          const data = await res.json();
-          // Find THIS user's profile — data[0] could be someone else's document.
-          const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
-          if (p && !p.error) setProfileRef(p);
-        }
-      } catch (e) {
-        // Losing the existing profile here means the save below overwrites it.
-        captureError(e, { screen: 'onboarding', action: 'load-profile', endpoint: 'userProfiles' });
-      }
-    })();
+    setUserId(accounts[0].localAccountId);
   }, [accounts]);
 
   async function saveOnboarding() {
@@ -98,7 +85,11 @@ export default function OnboardingPage() {
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({ ...(profileRef || {}), userId, onboarding: answers, onboardingComplete: true }),
+        // Only the two fields onboarding owns. This used to spread a profile
+        // fetched on mount — and if that read failed or hadn't returned, the
+        // base was `{}` and the write posted a near-empty profile over a real
+        // one, taking weigh-ins, goals and food history with it.
+        body: JSON.stringify({ userId, onboarding: answers, onboardingComplete: true }),
       });
       savedOk = res.ok;
       if (!res.ok) {

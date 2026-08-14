@@ -114,6 +114,11 @@ export default function NutritionPage() {
   const itemsRef = useRef(items);
   const waterRef = useRef(waterMl);
   const profileLatest = useRef(profileRef);
+  // nutritionLog, foodRecent, foodCustom and foodFavourites are read-modify-write:
+  // the new value is built from the stored one. Until the profile has actually
+  // come back we don't know the stored one, and building from `[]` would send a
+  // list containing only today — wiping the history the adaptive targets read.
+  const profileLoaded = useRef(false);
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { waterRef.current = waterMl; }, [waterMl]);
   useEffect(() => { profileLatest.current = profileRef; }, [profileRef]);
@@ -146,17 +151,20 @@ export default function NutritionPage() {
         if (res.ok) {
           const data = await res.json();
           const p = Array.isArray(data) ? data.find((x) => x.userId === uid) : data;
+          // The read succeeded, so we now know what is stored — even if this
+          // user has no profile document yet, in which case there is no history
+          // and building from an empty list is correct.
+          profileLoaded.current = true;
           if (p && !p.error) {
-            profileLatest.current = p;
-            setProfileRef(p);
+            profileLatest.current = { ...p, ...(profileLatest.current || {}) };
+            setProfileRef(profileLatest.current);
             if (p.nutrition && p.nutrition.date === todayISO()) {
               // flattenEntries covers days saved before meal buckets were dropped
               const loaded = flattenEntries(p.nutrition.items || p.nutrition.meals);
               const water = migrateWater(p.nutrition);
-              itemsRef.current = loaded;
-              waterRef.current = water;
-              setItems(loaded);
-              setWaterMl(water);
+              // Don't overwrite anything logged while this request was in flight.
+              if (itemsRef.current.length === 0) { itemsRef.current = loaded; setItems(loaded); }
+              if (waterRef.current === 0) { waterRef.current = water; setWaterMl(water); }
               // Restore today's cached note so reopening the screen spends nothing.
               const cached = p.nutrition.coachNote;
               if (cached && cached.date === todayISO()) {
@@ -196,16 +204,20 @@ export default function NutritionPage() {
 
   async function saveProfile(patch) {
     if (!userId) return;
-    // Merge onto the newest profile we hold, not this render's snapshot, so two
-    // saves in flight can't silently roll each other back.
+    // Keep a merged copy locally, so reads on this screen see the latest.
     const next = { ...(profileLatest.current || {}), userId, ...patch };
     profileLatest.current = next;
     setProfileRef(next);
+    // But only ever SEND what changed. The API merges by field, so posting the
+    // whole document made every write re-assert a snapshot of everything else:
+    // it silently reverted whatever another screen had saved in between, and if
+    // this ran before the profile GET came back it wrote a near-empty profile
+    // over the top of a real one.
     try {
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify(next),
+        body: JSON.stringify({ userId, ...patch }),
       });
       // The screen already shows the food as logged. If the write failed, say
       // so — otherwise it silently disappears on the next reload.
@@ -234,10 +246,21 @@ export default function NutritionPage() {
 
   // Saving a meal also files the day's totals into nutritionLog — that history
   // is what the adaptive expenditure model reads from.
+  /**
+   * The day's rollup, but only once we know what history is already stored.
+   * Before that, sending it would replace the whole log with a single day.
+   */
+  function logPatch(itemsArg) {
+    if (!profileLoaded.current) return {};
+    return {
+      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
+    };
+  }
+
   function saveNutrition(itemsArg, waterArg) {
     saveProfile({
       nutrition: nutritionPayload(itemsArg, waterArg),
-      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(itemsArg, TODAY)),
+      ...logPatch(itemsArg),
     });
   }
 
@@ -364,8 +387,10 @@ export default function NutritionPage() {
     setItems(next);
     saveProfile({
       nutrition: nutritionPayload(next, waterRef.current),
-      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(next, TODAY)),
-      foodRecent: pushRecent((profileLatest.current && profileLatest.current.foodRecent) || [], item),
+      ...logPatch(next),
+      ...(profileLoaded.current
+        ? { foodRecent: pushRecent((profileLatest.current && profileLatest.current.foodRecent) || [], item) }
+        : {}),
     });
   };
 
@@ -384,9 +409,9 @@ export default function NutritionPage() {
     setItems(arr);
     const patch = {
       nutrition: nutritionPayload(arr, waterRef.current),
-      nutritionLog: upsertDay((profileLatest.current && profileLatest.current.nutritionLog) || [], summariseDay(arr, TODAY)),
+      ...logPatch(arr),
     };
-    if (remember) {
+    if (remember && profileLoaded.current) {
       patch.foodCustom = upsertCustomFood((profileLatest.current && profileLatest.current.foodCustom) || [], toCustomFood(next));
     }
     saveProfile(patch);
@@ -719,10 +744,13 @@ export default function NutritionPage() {
 
       {/* ── ADD FOOD ── */}
       {adding && (
+        // Favourites are read-modify-write too: the sheet builds the new list
+        // from what it was given, so before the profile lands it would replace
+        // the stored favourites with a list of one.
         <AddFoodSheet
           profile={profileRef}
           onAdd={addItem}
-          onSaveFavourites={(favs) => saveProfile({ foodFavourites: favs })}
+          onSaveFavourites={(favs) => { if (profileLoaded.current) saveProfile({ foodFavourites: favs }); }}
           onClose={() => setAdding(false)}
         />
       )}

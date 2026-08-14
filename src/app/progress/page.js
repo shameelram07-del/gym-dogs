@@ -2,7 +2,7 @@
 import { todayISO, toLocalISO } from '@/lib/day';
 import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
@@ -181,6 +181,10 @@ export default function ProgressPage() {
   const [savingGoal, setSavingGoal] = useState(false);
   const [savingWi, setSavingWi] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // weighIns is read-modify-write: the new array is built from the loaded one.
+  // If the profile read never landed, that array is empty and saving would
+  // replace a real weigh-in history with a single entry.
+  const profileLoaded = useRef(false);
 
   useEffect(() => {
     if (!loading) {
@@ -200,6 +204,8 @@ export default function ProgressPage() {
         if (res.ok) {
           const data = await res.json();
           const profile = Array.isArray(data) ? data.find(p => p.userId === uid) : null;
+          // The read landed, so the weigh-in history on screen is the real one.
+          profileLoaded.current = true;
           if (profile) {
             setProfileRef(profile);
             if (profile.soreness) setSorenessLevels(profile.soreness);
@@ -235,14 +241,20 @@ export default function ProgressPage() {
   const cycleLevel = async (areaId) => {
     const next = LEVELS[(LEVELS.indexOf(sorenessLevels[areaId]) + 1) % LEVELS.length];
     const updated = { ...sorenessLevels, [areaId]: next };
+    const readiness = calcRecoveryScore(updated);
     setSorenessLevels(updated);
+    // Keep the local copy current — this used to never update it, so every
+    // later save on this screen re-sent the profile as it was at page load.
+    setProfileRef((prev) => ({ ...(prev || {}), userId, soreness: updated, readiness }));
     setSavingSoreness(true);
     setSaveError('');
     try {
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({ ...(profileRef || {}), userId, soreness: updated, readiness: calcRecoveryScore(updated) }),
+        // Only what changed. Sending the whole document re-asserted a stale
+        // weighIns / nutrition / goals snapshot over whatever was newer.
+        body: JSON.stringify({ userId, soreness: updated, readiness }),
       });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
       setSorenessSaved(true);
@@ -258,12 +270,13 @@ export default function ProgressPage() {
   // optimistically, and silently swallowing a 500 leaves the number on screen
   // looking saved when the server never took it.
   const saveProfile = async (patch) => {
-    const merged = { ...(profileRef || {}), userId, ...patch };
-    setProfileRef(merged);
+    // Merge locally for reads, but send only the changed fields — the API
+    // merges by field, so a whole-document write just rolls other screens back.
+    setProfileRef((prev) => ({ ...(prev || {}), userId, ...patch }));
     const res = await fetch(PROFILES_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-      body: JSON.stringify(merged),
+      body: JSON.stringify({ userId, ...patch }),
     });
     if (!res.ok) throw new Error(`Save failed (${res.status})`);
   };
@@ -286,6 +299,11 @@ export default function ProgressPage() {
   const logWeighIn = async () => {
     const kg = parseFloat(wiInput);
     if (!kg) return;
+    if (!profileLoaded.current) {
+      // Refuse rather than overwrite: we don't yet know what history exists.
+      setSaveError("Still loading your history — give it a second and try again.");
+      return;
+    }
     const today = todayISO();
     const next = [...weighIns.filter(w => w.date !== today), { date: today, kg }].sort((a, b) => a.date.localeCompare(b.date));
     setWeighIns(next);

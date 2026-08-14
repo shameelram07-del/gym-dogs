@@ -198,14 +198,19 @@ export default function ProfilePage() {
     setSavingName(true);
     try {
       const initials = tempName.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const name = tempName.trim();
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({ ...(profileRef || {}), userId, name: tempName.trim(), initials })
+        // Only the two fields being edited. This used to post the whole profile
+        // as it was at page load — and since profileRef was never refreshed
+        // after a save, a second save re-sent that same stale document.
+        body: JSON.stringify({ userId, name, initials })
       });
       if (res.ok) {
-        setUserName(tempName.trim());
+        setUserName(name);
         setUserInitials(initials);
+        setProfileRef((prev) => ({ ...(prev || {}), userId, name, initials }));
         setEditingName(false);
       } else {
         // The modal just sits there on a failure, which reads as a dead button.
@@ -222,17 +227,22 @@ export default function ProfilePage() {
   const handleSaveStats = async () => {
     setSavingStats(true);
     try {
+      const body = {
+        userId,
+        weight: tempStats.weight, height: tempStats.height,
+        age: tempStats.age, bodyFat: tempStats.bodyFat,
+      };
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({
-          ...(profileRef || {}), userId, name: userName,
-          weight: tempStats.weight, height: tempStats.height,
-          age: tempStats.age, bodyFat: tempStats.bodyFat,
-        })
+        // Just the four body stats. `name` is no longer re-sent from state, and
+        // the rest of the profile is left alone rather than overwritten with a
+        // page-load-old copy.
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         setStats(tempStats);
+        setProfileRef((prev) => ({ ...(prev || {}), ...body }));
         setEditingStats(false);
         setStatsSaved(true);
         setTimeout(() => setStatsSaved(false), 2000);
