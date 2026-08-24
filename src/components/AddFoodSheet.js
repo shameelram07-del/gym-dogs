@@ -235,7 +235,6 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     const hint = aiText.trim();
     if (!hint && !photoPreview) return;
     setAiBusy(true); setAiError(null); setAiResult(null);
-    setAiAdded([]);
     setFromPhoto(!!photoPreview);
     try {
       const r = photoPreview
@@ -281,7 +280,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   async function onPhoto(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    setAiBusy(true); setAiError(null); setAiResult(null); setAiAdded([]);
+    setAiBusy(true); setAiError(null); setAiResult(null);
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
       setPhotoPreview(dataUrl);
