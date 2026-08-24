@@ -15,7 +15,7 @@ leaves the user to interpret them.
 
 A new card directly **under the calorie ring card**, above "Your daily burn". Style it like the
 dashboard's AI panel — `--ai-card-1` → `--ai-card-2` gradient, `--ice` eyebrow reading
-**COACH DOG**, `--on-dark` body text. Same 26px radius as everything else.
+**GYM DADDY**, `--on-dark` body text. Same 26px radius as everything else.
 
 While it's thinking, show `.gd-shimbar` — not a spinner, and never an empty card.
 

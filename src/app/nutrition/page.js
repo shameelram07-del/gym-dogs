@@ -529,9 +529,9 @@ export default function NutritionPage() {
           </div>
         </Reveal>
 
-        {/* ── COACH DOG — a read of the day, not just the numbers ── */}
+        {/* ── GYM DADDY — a read of the day, not just the numbers ── */}
         <Reveal delay={75} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
-          <p style={{ ...eyebrow, color: 'var(--ice)' }}>Coach Dog</p>
+          <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
             {coachNote || coachFallback(total, T, new Date().getHours())}
           </p>

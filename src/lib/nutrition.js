@@ -427,7 +427,7 @@ export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expe
     : expenditureSource === 'blended' ? 'part measured, still learning' : 'measured from real intake and weight change';
 
   return [
-    'You are Coach Dog, the AI coach in a fitness app. Write 2 to 3 short sentences to the user about their eating today. Conversational, second person. No greeting, no sign-off, no markdown, no bullet points.',
+    'You are Gym Daddy, the AI coach in a fitness app. Write 2 to 3 short sentences to the user about their eating today. Conversational, second person. No greeting, no sign-off, no markdown, no bullet points.',
     '',
     `LOCAL TIME: ${time} (${phaseOfDay(hour)})`,
     `TODAY'S TARGET: ${t.calories} kcal, P${t.protein} C${t.carbs} F${t.fat}`,

@@ -33,7 +33,7 @@ breaks. `providerNote` in the response says which provider answered.
 Still open on that job: the frontend doesn't send `userId` to `foodAI`, so the per-user daily cap
 is inert. Small change in `src/lib/food.js` and its callers.
 
-### NEXT UP — Coach Dog on a timeline (Shameel's idea, 13 Aug, paused to 14 Aug)
+### NEXT UP — Gym Daddy on a timeline (Shameel's idea, 13 Aug, paused to 14 Aug)
 Replace the change-triggered coach note with **four timed slots**: morning, midday, evening, and an
 **11pm wrap** that closes the day out. One note per slot, so max four calls, naturally paced, and
 the last one is a real summary instead of another running total. Supersedes the 6-call cap in
