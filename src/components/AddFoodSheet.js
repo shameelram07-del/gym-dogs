@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import BarcodeScanner from './BarcodeScanner';
 import {
   lookupBarcode, searchFoods, aiFromText, aiFromPhoto, aiFromLabel,
-  scaleToGrams, defaultGrams, fileToCompressedDataUrl,
+  scaleToGrams, defaultGrams, fileToCompressedDataUrl, missingMacros,
   toggleFavourite, isFavourite, recentFoods, searchCustomFoods,
   sumItems, mealNameFrom,
 } from '@/lib/food';
@@ -35,7 +35,19 @@ const primaryBtn = (on = true) => ({
   fontSize: 15, fontWeight: 800, cursor: on ? 'pointer' : 'not-allowed',
 });
 
-const macroLine = (i) => `${i.calories} kcal · P${i.protein} C${i.carbs} F${i.fat}`;
+// An unknown macro reads as an em dash. Printing "P0" for something the food
+// database simply doesn't carry is the whole bug this guards against.
+const macroNum = (v) => (v === null || v === undefined ? '—' : v);
+const macroLine = (i) => `${i.calories} kcal · P${macroNum(i.protein)} C${macroNum(i.carbs)} F${macroNum(i.fat)}`;
+
+const MACRO_LABELS = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' };
+
+/** 'protein and fat', 'protein, carbs and fat' — for a sentence, not a list. */
+const macroWords = (keys) => {
+  const w = keys.map((k) => MACRO_LABELS[k].toLowerCase());
+  if (w.length <= 1) return w[0] || '';
+  return `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
+};
 
 // Shown after any AI call. Keeps model choice an observation rather than a belief.
 function Perf({ perf }) {
@@ -69,6 +81,7 @@ function EstimateBar() {
 // Row for a database result — tap to choose a portion.
 function FoodRow({ item, onPick }) {
   const p = item.per100g || {};
+  const gaps = missingMacros(item);
   return (
     <button onClick={() => onPick(item)} style={{
       display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', cursor: 'pointer',
@@ -82,6 +95,11 @@ function FoodRow({ item, onPick }) {
         <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {item.mine ? '★ Yours · ' : item.brand ? `${item.brand} · ` : ''}{Math.round(p.kcal)} kcal / 100g
         </div>
+        {gaps.length > 0 && (
+          <div style={{ fontSize: 11.5, color: 'var(--ember)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            No {macroWords(gaps)} on record
+          </div>
+        )}
       </div>
       <span style={{ fontSize: 20, color: 'var(--accent-strong)', flexShrink: 0 }}>+</span>
     </button>
@@ -101,6 +119,8 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   // portion editor
   const [picked, setPicked] = useState(null);
   const [grams, setGrams] = useState('100');
+  // Per-100g figures the user types for macros the database is missing.
+  const [macroEdits, setMacroEdits] = useState({});
 
   // ai
   const [aiText, setAiText] = useState('');
@@ -174,11 +194,13 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
   function pick(item) {
     setPicked(item);
     setGrams(String(defaultGrams(item)));
+    setMacroEdits({});   // last product's typed macros must not leak into this one
   }
 
   function confirmPortion() {
-    commit(scaleToGrams(picked, grams));
+    commit(scaleToGrams(picked, grams, macroEdits));
     setPicked(null);
+    setMacroEdits({});
   }
 
   async function onBarcode(code) {
@@ -296,6 +318,11 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
 
   const quickValid = quick.name.trim() && quick.calories !== '';
 
+  // Worked out once per render rather than four times inside the JSX, so the
+  // preview, the favourite button and what actually gets logged can't disagree.
+  const pickedGaps = picked ? missingMacros(picked) : [];
+  const preview = picked ? scaleToGrams(picked, grams, macroEdits) : null;
+
   return (
     <>
       {scanning && <BarcodeScanner onDetected={onBarcode} onLabel={onLabelShot} onClose={() => setScanning(false)} />}
@@ -406,17 +433,46 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
                   ))}
                 </div>
 
+                {/* Macros Open Food Facts doesn't carry. Editable, per 100g so
+                    they rescale with the portion, and left unknown if blank. */}
+                {pickedGaps.length > 0 && (
+                  <div style={{ border: '1px solid var(--line)', borderRadius: 16, padding: 14, marginBottom: 18 }}>
+                    <p style={{ ...eyebrow, color: 'var(--ember)', marginBottom: 4 }}>Not in the database</p>
+                    <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.45 }}>
+                      This product has no {macroWords(pickedGaps)} on record. Read it off the pack if you can &mdash;
+                      leave it blank and it stays unknown rather than counting as zero.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {pickedGaps.map((k) => (
+                        <div key={k} style={{ flex: 1, minWidth: 0 }}>
+                          <label htmlFor={`macro-${k}`} style={{ ...eyebrow, display: 'block', marginBottom: 5 }}>{MACRO_LABELS[k]}</label>
+                          <input
+                            id={`macro-${k}`}
+                            type="number"
+                            inputMode="decimal"
+                            placeholder="—"
+                            value={macroEdits[k] ?? ''}
+                            onChange={(e) => setMacroEdits((m) => ({ ...m, [k]: e.target.value }))}
+                            style={{ ...field, padding: '11px 12px', fontSize: 15 }}
+                          />
+                          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>g per 100g</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ background: 'var(--soft)', borderRadius: 16, padding: 16, marginBottom: 18, textAlign: 'center' }}>
-                  <div className="gd-disp" style={{ fontSize: 28, fontWeight: 800 }}>{scaleToGrams(picked, grams).calories}<span style={{ fontSize: 13, color: 'var(--ink-3)', marginLeft: 4 }}>kcal</span></div>
-                  <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>{macroLine(scaleToGrams(picked, grams))}</div>
+                  <div className="gd-disp" style={{ fontSize: 28, fontWeight: 800 }}>{preview.calories}<span style={{ fontSize: 13, color: 'var(--ink-3)', marginLeft: 4 }}>kcal</span></div>
+                  <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 4 }}>{macroLine(preview)}</div>
                 </div>
 
                 <Perf perf={perf} />
 
                 <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                  <button onClick={() => onSaveFavourites(toggleFavourite(favourites, scaleToGrams(picked, grams)))} style={{
+                  <button onClick={() => onSaveFavourites(toggleFavourite(favourites, preview))} style={{
                     padding: '14px 16px', borderRadius: 14, border: '1px solid var(--line)', background: 'var(--soft)',
-                    color: isFavourite(favourites, scaleToGrams(picked, grams)) ? 'var(--gold)' : 'var(--ink-2)',
+                    color: isFavourite(favourites, preview) ? 'var(--gold)' : 'var(--ink-2)',
                     fontSize: 18, cursor: 'pointer',
                   }}>★</button>
                   <button onClick={confirmPortion} style={{ ...primaryBtn(true), flex: 1 }}>Add it</button>

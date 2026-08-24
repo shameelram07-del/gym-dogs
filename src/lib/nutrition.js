@@ -287,6 +287,20 @@ export const DEFAULT_TARGETS = { calories: 2200, protein: 160, carbs: 220, fat: 
 
 // ── Daily log helpers ─────────────────────────────────────────────────────
 
+/**
+ * Which macros a set of logged items leaves genuinely unknown.
+ *
+ * A null macro means the food database had energy but no breakdown. It sums as
+ * 0 because there's nothing else to add, but a day carrying one is NOT a
+ * measured low-protein day and mustn't be read as one.
+ */
+export function unknownMacros(items) {
+  const list = flattenEntries(items);
+  return ['protein', 'carbs', 'fat'].filter((k) =>
+    list.some((i) => i && (i[k] === null || i[k] === undefined))
+  );
+}
+
 /** Roll a day's meals into the compact row stored in profile.nutritionLog. */
 export function summariseDay(entry, date) {
   const items = flattenEntries(entry);
@@ -299,7 +313,12 @@ export function summariseDay(entry, date) {
     }),
     { kcal: 0, p: 0, c: 0, f: 0 }
   );
-  return { date, kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f) };
+  const row = { date, kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f) };
+  // Only carried when there's actually a gap — these rows are kept for 180 days
+  // inside one Cosmos document, so an always-present empty array is dead weight.
+  const unknown = unknownMacros(items);
+  if (unknown.length) row.unknown = unknown;
+  return row;
 }
 
 /**
@@ -364,7 +383,7 @@ const UNDEREATING_RATIO = 0.6;
  * @param {number} hour local hour, 0-23
  * @returns {string}
  */
-export function coachFallback(eaten, targets, hour) {
+export function coachFallback(eaten, targets, hour, unknown = []) {
   const kcal = Math.round(Number(eaten?.calories) || 0);
   const goal = Math.round(Number(targets?.calories) || 0);
   const p = Math.round(Number(eaten?.protein) || 0);
@@ -379,7 +398,12 @@ export function coachFallback(eaten, targets, hour) {
   else parts.push(`${kcal} in, ${left} left of ${goal}.`);
 
   // Protein is the macro worth naming; the others follow it around.
-  if (pGoal > 0) {
+  // Unless something logged has no protein figure at all — then ${p} is a floor,
+  // and calling it "the one to watch" would be inventing a shortfall.
+  const proteinUnknown = (Array.isArray(unknown) ? unknown : []).includes('protein');
+  if (pGoal > 0 && proteinUnknown) {
+    parts.push(`Protein's at least ${p}g of ${pGoal}g — something you logged has no protein figure, so fill that in for a real read.`);
+  } else if (pGoal > 0) {
     if (p >= pGoal) parts.push(`Protein's already there at ${p}g.`);
     else if (p < pGoal * 0.7) parts.push(`Protein's the one to watch: ${p}g of ${pGoal}g.`);
     else parts.push(`Protein's close — ${p}g of ${pGoal}g.`);
@@ -408,11 +432,16 @@ export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expe
   const t = targets || {};
   const time = `${String(hour).padStart(2, '0')}:00`;
 
+  // A macro the food database doesn't have goes to the model as '?', never 0.
+  // Printing it as 0 is how the coach ended up calling a day low on protein
+  // when the truth was that one food's protein was simply unknown.
+  const m = (v) => (v === null || v === undefined ? '?' : Math.round(Number(v) || 0));
   const lines = (items || []).slice(0, 12).map((i) => {
     const at = i.at ? new Date(i.at) : null;
     const clock = at && !isNaN(at) ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '—';
-    return `  - ${i.name}, ${clock}, ${Math.round(Number(i.calories) || 0)} kcal, P${Math.round(Number(i.protein) || 0)} C${Math.round(Number(i.carbs) || 0)} F${Math.round(Number(i.fat) || 0)}`;
+    return `  - ${i.name}, ${clock}, ${Math.round(Number(i.calories) || 0)} kcal, P${m(i.protein)} C${m(i.carbs)} F${m(i.fat)}`;
   });
+  const gaps = unknownMacros(items || []);
   const more = (items || []).length > 12 ? `  - …and ${items.length - 12} more` : null;
 
   // Daily rollups only — a week of raw item lists would blow the token budget.
@@ -434,6 +463,9 @@ export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expe
     `EATEN SO FAR: ${eaten.kcal} kcal, P${eaten.p} C${eaten.c} F${eaten.f}`,
     ...lines,
     ...(more ? [more] : []),
+    gaps.length
+      ? `NOTE: a '?' above means the food database has no figure for that macro, so the ${gaps.join('/')} total is a floor, not a measurement. Do not tell the user they are short on something you cannot actually see — say the figure is missing and suggest filling it in.`
+      : null,
     `DAILY BURN: ${expenditure} kcal (${sourceLabel}); aiming for ${weeklyRate > 0 ? '+' : ''}${weeklyRate} kg per week`,
     // "Logged", not "calendar" — a gap in logging shouldn't be presented as a
     // run of consecutive days.

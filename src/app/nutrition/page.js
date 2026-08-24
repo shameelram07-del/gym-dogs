@@ -14,7 +14,7 @@ import { captureError } from '@/lib/monitoring';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
-  coachFallback, buildCoachPrompt,
+  coachFallback, buildCoachPrompt, unknownMacros,
 } from '@/lib/nutrition';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -81,7 +81,9 @@ function MacroLine({ item }) {
     <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
       <strong style={{ color: 'var(--ink-2)', fontWeight: 700 }}>{item.calories}</strong> kcal
       {bits.map((b) => (
-        <span key={b.l}> &middot; {Math.round(b.v || 0)}<span style={{ color: b.c, fontWeight: 700 }}>{b.l}</span></span>
+        <span key={b.l}> &middot; {b.v === null || b.v === undefined
+          ? <span style={{ color: 'var(--ember)' }} title="Not in the food database — tap to fill it in">?</span>
+          : Math.round(b.v)}<span style={{ color: b.c, fontWeight: 700 }}>{b.l}</span></span>
       ))}
     </span>
   );
@@ -195,12 +197,17 @@ export default function NutritionPage() {
   // Explicit override wins; otherwise the bodyweight-derived suggestion.
   const waterGoalMl = (profileRef && profileRef.waterGoalMl) || T.waterMl || 2500;
 
+  // null macros sum as 0 because there's nothing else to add — but the day is
+  // then marked, so a total that's missing a food's protein doesn't read as a
+  // measured low-protein day.
   const total = items.reduce((a, i) => ({
     calories: a.calories + (i.calories || 0),
     protein: a.protein + (i.protein || 0),
     carbs: a.carbs + (i.carbs || 0),
     fat: a.fat + (i.fat || 0),
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  const unknown = unknownMacros(items);
 
   async function saveProfile(patch) {
     if (!userId) return;
@@ -506,18 +513,19 @@ export default function NutritionPage() {
 
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
             {[
-              { label: 'Protein', letter: 'P', value: total.protein, goal: T.protein, color: 'var(--accent)' },
-              { label: 'Carbs',   letter: 'C', value: total.carbs,   goal: T.carbs,   color: 'var(--blue)' },
-              { label: 'Fat',     letter: 'F', value: total.fat,     goal: T.fat,     color: 'var(--orange)' },
+              { key: 'protein', label: 'Protein', letter: 'P', value: total.protein, goal: T.protein, color: 'var(--accent)' },
+              { key: 'carbs',   label: 'Carbs',   letter: 'C', value: total.carbs,   goal: T.carbs,   color: 'var(--blue)' },
+              { key: 'fat',     label: 'Fat',     letter: 'F', value: total.fat,     goal: T.fat,     color: 'var(--orange)' },
             ].map((m) => {
               const pct = m.goal ? Math.min((m.value / m.goal) * 100, 100) : 0;
               const over = m.value > m.goal;
+              const gap = unknown.includes(m.key);
               return (
                 <div key={m.letter} style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>{m.label}</span>
                     <span style={{ fontSize: 11.5, color: over ? 'var(--orange-ink)' : 'var(--ink-3)', fontWeight: 600 }}>
-                      {Math.round(m.value)}<span style={{ color: 'var(--ink-3)' }}>/{m.goal}g</span>
+                      {Math.round(m.value)}{gap && <span style={{ color: 'var(--ember)' }} title="At least one food today has no figure for this">+?</span>}<span style={{ color: 'var(--ink-3)' }}>/{m.goal}g</span>
                     </span>
                   </div>
                   <div style={{ height: 7, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
@@ -527,13 +535,21 @@ export default function NutritionPage() {
               );
             })}
           </div>
+
+          {unknown.length > 0 && (
+            <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.45 }}>
+              <span style={{ color: 'var(--ember)', fontWeight: 700 }}>+?</span>{' '}
+              Something you logged today has no figure for it, so the real total is higher. Tap the
+              item to fill it in.
+            </p>
+          )}
         </Reveal>
 
         {/* ── GYM DADDY — a read of the day, not just the numbers ── */}
         <Reveal delay={75} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
           <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
-            {coachNote || coachFallback(total, T, new Date().getHours())}
+            {coachNote || coachFallback(total, T, new Date().getHours(), unknown)}
           </p>
           {coachBusy && (
             <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>

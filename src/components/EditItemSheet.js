@@ -95,14 +95,18 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
 
   function save() {
     const grams = f.grams === '' ? null : Math.round(n(f.grams));
+    // Same rule as grams: blank means unknown, not zero. A food the database has
+    // no protein figure for opens with an empty box, and saving without filling
+    // it in must leave it unknown rather than logging a confident 0.
+    const macro = (v) => (v === '' ? null : Math.round(n(v)));
     const next = {
       ...item,
       name: f.name.trim() || item.name,
       grams,
       calories: Math.round(n(f.calories)),
-      protein: Math.round(n(f.protein)),
-      carbs: Math.round(n(f.carbs)),
-      fat: Math.round(n(f.fat)),
+      protein: macro(f.protein),
+      carbs: macro(f.carbs),
+      fat: macro(f.fat),
       corrected: true,   // stops the estimate badge reappearing
     };
     // id and at come through the spread untouched, so a corrected meal keeps

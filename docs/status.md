@@ -72,6 +72,40 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-24 — unknown macros stop being logged as zero
+Built by: Claude Code
+Shipped: an Open Food Facts product with calories but no macro breakdown used to log as a confident
+`0g` protein/carbs/fat with nothing on screen to say so. A macro the database doesn't have is now
+**null** end to end, and the app says which one is missing.
+
+- `scaleToGrams` preserves null instead of `(x || 0) * f`; new `missingMacros()` derives the gap
+  from the per-100g nulls, so it works **whether or not the API is redeployed**.
+- Search rows say "No protein and fat on record". The portion editor shows those macros as empty
+  editable inputs (**per 100g**, so they rescale with the portion); left blank they stay unknown.
+- Day arithmetic still treats null as 0 — there's nothing else to add — but `summariseDay` now
+  carries `unknown: ['protein', …]` on the row, the macro tiles show `+?`, and per-item lines show
+  `?` rather than `0`.
+- `buildCoachPrompt` sends `P?` and warns the model the total is a floor; `coachFallback` takes an
+  optional 4th arg and says "at least Xg" instead of inventing a shortfall. Gym Daddy was the worst
+  offender here — it read the fabricated zero as measured and told the user protein was low.
+- Also fixed the same coercion where it would have undone the above: `EditItemSheet.save()` (blank
+  macro → null, matching what `grams` already did) and `toCustomFood` (an unknown stayed unknown
+  rather than being baked into one of your own foods as 0).
+
+Verified: `npm run build` passes; 38 ad-hoc checks over the pure functions in `src/lib` (scratch
+script, not committed — there's still no test runner here). **Untested in the browser.**
+
+Touched: `src/lib/food.js`, `src/lib/nutrition.js`, `src/components/AddFoodSheet.js`,
+`src/components/EditItemSheet.js`, `src/app/nutrition/page.js`
+
+Still needed: frontend push, **plus an API zip redeploy** — `gymdogs-api-v2` is changed on disk and
+not yet deployed. `foodLookup/index.js` now returns a `missing` array, and `foodAI` label mode
+returned `0` for a macro it couldn't read, which is the same bug at the API layer; it now returns
+null and its own `missing` array. **No `FIELDS` change** — the nulls ride inside the existing
+`nutrition` object. The frontend degrades cleanly until that deploy happens.
+
+---
+
 ### 2026-08-14 — error monitoring + the catch sweep (error-monitoring.md)
 Built by: Claude Code
 Shipped: `@sentry/browser` (not `@sentry/nextjs` — no server half to instrument), wired through a

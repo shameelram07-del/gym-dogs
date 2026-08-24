@@ -74,20 +74,54 @@ export const aiFromLabel = (image) => postAI({ mode: 'label', image });
 
 // ── Portions ──────────────────────────────────────────────────────────────
 
-// Database entries are per 100g. Turn one into an actual logged item.
-export function scaleToGrams(dbItem, grams) {
+export const MACROS = ['protein', 'carbs', 'fat'];
+
+/**
+ * Which macros this database entry genuinely doesn't have.
+ *
+ * The API sends a `missing` array, but the per-100g nulls are the underlying
+ * truth and predate it — deriving from them as a fallback means this works
+ * against an API that hasn't been redeployed yet.
+ */
+export function missingMacros(dbItem) {
+  if (!dbItem) return [];
+  if (Array.isArray(dbItem.missing)) return dbItem.missing.filter((k) => MACROS.includes(k));
+  const p = dbItem.per100g || {};
+  return MACROS.filter((k) => p[k] === null || p[k] === undefined);
+}
+
+/**
+ * Database entries are per 100g. Turn one into an actual logged item.
+ *
+ * A macro the database doesn't have stays **null**, not 0 — `(x || 0) * f` was
+ * turning "we don't know" into a confident zero that the day then summed and
+ * the adaptive engine read as a measured low-protein day.
+ *
+ * `overrides` holds per-100g figures the user typed for the macros we're missing
+ * (per 100g, not per portion, so they rescale with the portion like everything
+ * else here). Blank entries are ignored and stay unknown.
+ */
+export function scaleToGrams(dbItem, grams, overrides = {}) {
   const g = Number(grams) || 0;
   const f = g / 100;
   const p = dbItem.per100g || {};
+  // null/undefined in -> null out. A real 0 in the database is still a real 0.
+  const scale = (v) => (v === null || v === undefined ? null : Math.round(Number(v) * f));
+  const macro = (k) => {
+    const typed = overrides[k];
+    if (typed === '' || typed === null || typed === undefined) return scale(p[k]);
+    const n = Number(typed);
+    return isFinite(n) && n >= 0 ? Math.round(n * f) : scale(p[k]);
+  };
   return {
     id: Date.now() + Math.random(),
     name: dbItem.brand ? `${dbItem.name} (${dbItem.brand})` : dbItem.name,
     grams: Math.round(g),
     barcode: dbItem.barcode || null,
-    calories: Math.round((p.kcal || 0) * f),
-    protein: Math.round((p.protein || 0) * f),
-    carbs: Math.round((p.carbs || 0) * f),
-    fat: Math.round((p.fat || 0) * f),
+    calories: scale(p.kcal) ?? 0,
+    protein: macro('protein'),
+    carbs: macro('carbs'),
+    fat: macro('fat'),
   };
 }
 
@@ -191,7 +225,9 @@ export function describeMealCorrection(components, correction) {
 export function toCustomFood(item) {
   const g = Number(item.grams);
   if (!isFinite(g) || g <= 0) return null;
-  const per = (v) => Math.round(((Number(v) || 0) / g) * 100 * 10) / 10;
+  // An unknown macro stays unknown when it becomes one of your own foods —
+  // baking it in as 0 would make the gap permanent and invisible.
+  const per = (v) => (v === null || v === undefined ? null : Math.round(((Number(v) || 0) / g) * 100 * 10) / 10);
   return {
     id: `mine-${String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     barcode: item.barcode || null,
