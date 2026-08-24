@@ -545,122 +545,8 @@ export default function NutritionPage() {
           )}
         </Reveal>
 
-        {/* ── GYM DADDY — a read of the day, not just the numbers ── */}
-        <Reveal delay={75} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
-          <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
-          <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
-            {coachNote || coachFallback(total, T, new Date().getHours(), unknown)}
-          </p>
-          {coachBusy && (
-            <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>
-              <div className="gd-shimbar" style={{ height: '100%', width: '100%', background: 'var(--grad-soft)', borderRadius: 999 }} />
-            </div>
-          )}
-        </Reveal>
-
-        {/* ── EXPENDITURE / HOW THESE NUMBERS ARE SET ── */}
-        {targets && (
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <p style={eyebrow}>Your daily burn</p>
-                <p className="gd-disp" style={{ margin: '6px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {targets.expenditure}<span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-3)', marginLeft: 4 }}>kcal</span>
-                </p>
-              </div>
-              <span style={{
-                ...pillBase, padding: '5px 10px', fontSize: 11, cursor: 'default',
-                ...(targets.expenditureSource === 'measured' ? { background: 'var(--accent-tint)', borderColor: 'var(--accent)', color: 'var(--accent-strong)' } : {}),
-              }}>
-                {targets.expenditureSource === 'measured' ? 'Measured' : targets.expenditureSource === 'blended' ? 'Learning' : 'Estimated'}
-              </span>
-            </div>
-
-            <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)' }}>
-              {targets.expenditureSource === 'formula'
-                ? <>Starting estimate from your height, weight, age and training. Log your food and weigh in weekly and I&rsquo;ll replace this with your <strong>actual</strong> burn.</>
-                : <>Worked out from what you really ate and how your weight actually moved &mdash; not a formula. {targets.stats && `${targets.stats.loggedDays} days logged over ${targets.stats.spanDays}.`}</>}
-            </p>
-
-            {targets.weeklyRate !== 0 && (
-              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>
-                Aiming for <strong>{targets.weeklyRate > 0 ? '+' : ''}{targets.weeklyRate} kg</strong> a week
-                {targets.rateCapped && <span style={{ color: 'var(--orange-ink)' }}> (capped to a safe pace)</span>}.
-              </p>
-            )}
-            {targets.floored && (
-              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--orange-ink)' }}>
-                Held at a safe minimum &mdash; going lower isn&rsquo;t worth it.
-              </p>
-            )}
-
-            <button onClick={() => setShowMaths(!showMaths)} style={{ marginTop: 12, background: 'none', border: 'none', padding: 0, color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              {showMaths ? 'Hide the maths' : 'Show the maths'}
-            </button>
-            {showMaths && (
-              <div style={{ marginTop: 10, padding: 12, background: 'var(--soft)', borderRadius: 12, fontSize: 12.5, lineHeight: 1.6, color: 'var(--ink-2)' }}>
-                <div>Formula estimate: <strong>{targets.formulaExpenditure} kcal</strong></div>
-                {targets.measuredExpenditure !== null
-                  ? <>
-                      <div>Measured from your data: <strong>{targets.measuredExpenditure} kcal</strong></div>
-                      <div>Confidence in the measurement: <strong>{Math.round(targets.confidence * 100)}%</strong></div>
-                      <div style={{ marginTop: 6 }}>Trend weight: <strong>{targets.currentWeight} kg</strong></div>
-                    </>
-                  : <div style={{ marginTop: 6 }}>No measurement yet &mdash; {targets.reason}.</div>}
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--line)', color: 'var(--ink-3)' }}>
-                  Estimates, not medical advice. Adjust if the scale disagrees for a fortnight.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── WATER ── */}
-        <Reveal delay={150} style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-            <p style={eyebrow}>Water</p>
-            <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
-              <strong className="gd-disp" style={{ fontSize: 17, color: 'var(--ink)' }}>{(waterMl / 1000).toFixed(2).replace(/\.?0+$/, '')}</strong>
-              {' / '}{(waterGoalMl / 1000).toFixed(1)} L
-            </button>
-          </div>
-
-          <div style={{ height: 10, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden', marginBottom: 12 }}>
-            <div style={{ width: `${Math.min((waterMl / waterGoalMl) * 100, 100)}%`, height: '100%', background: 'var(--blue)', borderRadius: 999, transition: 'width .3s ease' }} />
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[250, 500, 1000].map((ml) => (
-              <button key={ml} onClick={() => setWater(waterMl + ml)} style={{
-                flex: 1, padding: '11px 6px', borderRadius: 12, cursor: 'pointer', border: '1px solid var(--line)',
-                background: 'var(--soft)', color: 'var(--ink-2)', fontSize: 13.5, fontWeight: 700,
-              }}>+{ml < 1000 ? `${ml}ml` : '1L'}</button>
-            ))}
-            <button onClick={() => setWater(waterMl - 250)} disabled={waterMl <= 0} aria-label="Undo a glass" style={{
-              padding: '11px 15px', borderRadius: 12, cursor: waterMl > 0 ? 'pointer' : 'not-allowed', border: '1px solid var(--line)',
-              background: 'var(--soft)', color: 'var(--ink-3)', fontSize: 15, fontWeight: 700,
-            }}>&minus;</button>
-          </div>
-
-          {editingWater && (
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line-2)' }}>
-              <p style={{ ...eyebrow, marginBottom: 9 }}>Daily goal</p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {[1500, 2000, 2500, 3000, 3500, 4000].map((g) => (
-                  <button key={g} onClick={() => { saveProfile({ waterGoalMl: g }); setEditingWater(false); }} style={{
-                    padding: '8px 13px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                    border: `1px solid ${g === waterGoalMl ? 'var(--accent)' : 'var(--line)'}`,
-                    background: g === waterGoalMl ? 'var(--accent-tint)' : 'var(--soft)',
-                    color: g === waterGoalMl ? 'var(--accent-strong)' : 'var(--ink-2)',
-                  }}>{(g / 1000).toFixed(1)} L</button>
-                ))}
-              </div>
-            </div>
-          )}
-        </Reveal>
-
         {/* ── TODAY'S FOOD — grouped by part of the day ── */}
-        <Reveal delay={220} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <Reveal delay={75} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 14px' }}>
             <p style={eyebrow}>What you&rsquo;ve eaten</p>
             {items.length > 0 && (
@@ -735,6 +621,120 @@ export default function NutritionPage() {
             + Add food
           </button>
         </Reveal>
+
+        {/* ── GYM DADDY — a read of the day, not just the numbers ── */}
+        <Reveal delay={150} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
+          <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
+          <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
+            {coachNote || coachFallback(total, T, new Date().getHours(), unknown)}
+          </p>
+          {coachBusy && (
+            <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>
+              <div className="gd-shimbar" style={{ height: '100%', width: '100%', background: 'var(--grad-soft)', borderRadius: 999 }} />
+            </div>
+          )}
+        </Reveal>
+
+        {/* ── WATER ── */}
+        <Reveal delay={220} style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+            <p style={eyebrow}>Water</p>
+            <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
+              <strong className="gd-disp" style={{ fontSize: 17, color: 'var(--ink)' }}>{(waterMl / 1000).toFixed(2).replace(/\.?0+$/, '')}</strong>
+              {' / '}{(waterGoalMl / 1000).toFixed(1)} L
+            </button>
+          </div>
+
+          <div style={{ height: 10, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ width: `${Math.min((waterMl / waterGoalMl) * 100, 100)}%`, height: '100%', background: 'var(--blue)', borderRadius: 999, transition: 'width .3s ease' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[250, 500, 1000].map((ml) => (
+              <button key={ml} onClick={() => setWater(waterMl + ml)} style={{
+                flex: 1, padding: '11px 6px', borderRadius: 12, cursor: 'pointer', border: '1px solid var(--line)',
+                background: 'var(--soft)', color: 'var(--ink-2)', fontSize: 13.5, fontWeight: 700,
+              }}>+{ml < 1000 ? `${ml}ml` : '1L'}</button>
+            ))}
+            <button onClick={() => setWater(waterMl - 250)} disabled={waterMl <= 0} aria-label="Undo a glass" style={{
+              padding: '11px 15px', borderRadius: 12, cursor: waterMl > 0 ? 'pointer' : 'not-allowed', border: '1px solid var(--line)',
+              background: 'var(--soft)', color: 'var(--ink-3)', fontSize: 15, fontWeight: 700,
+            }}>&minus;</button>
+          </div>
+
+          {editingWater && (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line-2)' }}>
+              <p style={{ ...eyebrow, marginBottom: 9 }}>Daily goal</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[1500, 2000, 2500, 3000, 3500, 4000].map((g) => (
+                  <button key={g} onClick={() => { saveProfile({ waterGoalMl: g }); setEditingWater(false); }} style={{
+                    padding: '8px 13px', borderRadius: 999, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    border: `1px solid ${g === waterGoalMl ? 'var(--accent)' : 'var(--line)'}`,
+                    background: g === waterGoalMl ? 'var(--accent-tint)' : 'var(--soft)',
+                    color: g === waterGoalMl ? 'var(--accent-strong)' : 'var(--ink-2)',
+                  }}>{(g / 1000).toFixed(1)} L</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </Reveal>
+
+        {/* ── EXPENDITURE / HOW THESE NUMBERS ARE SET ── */}
+        {targets && (
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={eyebrow}>Your daily burn</p>
+                <p className="gd-disp" style={{ margin: '6px 0 0', fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  {targets.expenditure}<span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-3)', marginLeft: 4 }}>kcal</span>
+                </p>
+              </div>
+              <span style={{
+                ...pillBase, padding: '5px 10px', fontSize: 11, cursor: 'default',
+                ...(targets.expenditureSource === 'measured' ? { background: 'var(--accent-tint)', borderColor: 'var(--accent)', color: 'var(--accent-strong)' } : {}),
+              }}>
+                {targets.expenditureSource === 'measured' ? 'Measured' : targets.expenditureSource === 'blended' ? 'Learning' : 'Estimated'}
+              </span>
+            </div>
+
+            <p style={{ margin: '10px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)' }}>
+              {targets.expenditureSource === 'formula'
+                ? <>Starting estimate from your height, weight, age and training. Log your food and weigh in weekly and I&rsquo;ll replace this with your <strong>actual</strong> burn.</>
+                : <>Worked out from what you really ate and how your weight actually moved &mdash; not a formula. {targets.stats && `${targets.stats.loggedDays} days logged over ${targets.stats.spanDays}.`}</>}
+            </p>
+
+            {targets.weeklyRate !== 0 && (
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>
+                Aiming for <strong>{targets.weeklyRate > 0 ? '+' : ''}{targets.weeklyRate} kg</strong> a week
+                {targets.rateCapped && <span style={{ color: 'var(--orange-ink)' }}> (capped to a safe pace)</span>}.
+              </p>
+            )}
+            {targets.floored && (
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--orange-ink)' }}>
+                Held at a safe minimum &mdash; going lower isn&rsquo;t worth it.
+              </p>
+            )}
+
+            <button onClick={() => setShowMaths(!showMaths)} style={{ marginTop: 12, background: 'none', border: 'none', padding: 0, color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              {showMaths ? 'Hide the maths' : 'Show the maths'}
+            </button>
+            {showMaths && (
+              <div style={{ marginTop: 10, padding: 12, background: 'var(--soft)', borderRadius: 12, fontSize: 12.5, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+                <div>Formula estimate: <strong>{targets.formulaExpenditure} kcal</strong></div>
+                {targets.measuredExpenditure !== null
+                  ? <>
+                      <div>Measured from your data: <strong>{targets.measuredExpenditure} kcal</strong></div>
+                      <div>Confidence in the measurement: <strong>{Math.round(targets.confidence * 100)}%</strong></div>
+                      <div style={{ marginTop: 6 }}>Trend weight: <strong>{targets.currentWeight} kg</strong></div>
+                    </>
+                  : <div style={{ marginTop: 6 }}>No measurement yet &mdash; {targets.reason}.</div>}
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--line)', color: 'var(--ink-3)' }}>
+                  Estimates, not medical advice. Adjust if the scale disagrees for a fortnight.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 
