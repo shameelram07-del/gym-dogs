@@ -15,6 +15,7 @@ import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
   coachFallback, buildCoachPrompt, unknownMacros,
+  slotFor, readCoachNotes, latestSlotNote,
 } from '@/lib/nutrition';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -22,12 +23,11 @@ const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
-// Cost control. This card is the first thing in the app that could actually
-// spend money, so every one of these exists to stop it calling the model more
-// than the day's eating genuinely warrants.
-const COACH_DEBOUNCE_MS = 8000;   // adding three things to a meal is one call
-const COACH_KCAL_DELTA  = 150;    // smaller than this isn't worth a new read
-const COACH_MAX_CALLS   = 6;      // hard ceiling per user per day
+// Cost control. The slot is now the gate: Gym Daddy speaks once per slot per
+// day, so three calls a user a day is the ceiling and it falls out of the clock
+// rather than a counter. The debounce stays so adding three things to a meal in
+// a row is still one call, not three.
+const COACH_DEBOUNCE_MS = 8000;
 const COACH_TIMEOUT_MS  = 20000;
 
 const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
@@ -104,9 +104,13 @@ export default function NutritionPage() {
   // Coach note. The text lives in state for rendering; the whole cached object
   // lives in a ref so the save helpers below always write the current one
   // without needing it in their dependency lists.
+  //
+  // One entry per slot — morning, midday, evening — because a slot that has
+  // already spoken must not speak again, even after a reload. The card shows the
+  // most recent one.
   const [coachNote, setCoachNote] = useState('');
   const [coachBusy, setCoachBusy] = useState(false);
-  const noteRef = useRef({ date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null });
+  const noteRef = useRef({ date: '', slots: {} });
 
   // The live day, mirrored into refs. Anything that SAVES must read these rather
   // than its own render's closure. The coach note fires its write up to 28
@@ -132,8 +136,8 @@ export default function NutritionPage() {
     setTODAY(next);
     setItems([]); itemsRef.current = [];
     setWaterMl(0); waterRef.current = 0;
-    // New day, new note — and a fresh call budget.
-    noteRef.current = { date: '', text: '', itemCount: 0, kcal: 0, calls: 0, generatedAt: null };
+    // New day, new slots — all three are unspent again.
+    noteRef.current = { date: '', slots: {} };
     setCoachNote('');
   }), [TODAY]);
 
@@ -167,11 +171,13 @@ export default function NutritionPage() {
               // Don't overwrite anything logged while this request was in flight.
               if (itemsRef.current.length === 0) { itemsRef.current = loaded; setItems(loaded); }
               if (waterRef.current === 0) { waterRef.current = water; setWaterMl(water); }
-              // Restore today's cached note so reopening the screen spends nothing.
-              const cached = p.nutrition.coachNote;
-              if (cached && cached.date === todayISO()) {
+              // Restore today's cached slot notes so reopening the screen spends
+              // nothing, and a slot that has already spoken stays spent.
+              const cached = readCoachNotes(p.nutrition, todayISO());
+              if (Object.keys(cached.slots).length) {
                 noteRef.current = cached;
-                setCoachNote(cached.text || '');
+                const latest = latestSlotNote(cached);
+                setCoachNote((latest && latest.text) || '');
               }
             }
           }
@@ -242,12 +248,18 @@ export default function NutritionPage() {
   }
 
   // Every write to profile.nutrition goes through this. Building the object by
-  // hand at each call site is how the cached coachNote would get silently
+  // hand at each call site is how the cached slot notes would get silently
   // dropped the next time an item was logged — and a dropped cache is a paid
   // model call.
   function nutritionPayload(itemsArg, waterArg) {
     const out = { date: TODAY, items: itemsArg, waterMl: waterArg };
-    if (noteRef.current.date === TODAY) out.coachNote = noteRef.current;
+    if (noteRef.current.date === TODAY) out.coachNotes = noteRef.current;
+    // A snapshot of the targets this day was judged against. The nightly wrap
+    // email is a timer function with no React and no adaptive-TDEE engine, so
+    // without this it would have to re-derive `calculateTargets` server-side and
+    // the two would drift. Written here rather than as a top-level profile field
+    // because `nutrition` is already in the API's FIELDS allowlist.
+    if (targets) out.targets = { calories: T.calories, protein: T.protein, carbs: T.carbs, fat: T.fat };
     return out;
   }
 
@@ -272,7 +284,7 @@ export default function NutritionPage() {
   }
 
   // ── Coach note ───────────────────────────────────────────────────────
-  async function generateCoachNote(kcal, count) {
+  async function generateCoachNote(slot, kcal, count) {
     setCoachBusy(true);
     let text = '';
     const controller = new AbortController();
@@ -290,6 +302,7 @@ export default function NutritionPage() {
         latestWeighIn: trend.length ? trend[trend.length - 1].kg : null,
         hour: new Date().getHours(),
         today: TODAY,
+        slot,
       });
       const res = await fetch(AI_COACH_URL, {
         method: 'POST',
@@ -320,17 +333,16 @@ export default function NutritionPage() {
       clearTimeout(timer);
     }
 
-    // The call is recorded even when it failed, so a broken endpoint can't be
-    // retried six times a minute. An empty `text` renders the deterministic
-    // fallback instead — the card never shows an error.
+    // The slot is marked spent even when the call failed, so a broken endpoint
+    // can't be retried on every keystroke. An empty `text` renders the
+    // deterministic fallback instead — the card never shows an error.
     const prev = noteRef.current;
     noteRef.current = {
       date: TODAY,
-      text,
-      itemCount: count,
-      kcal,
-      calls: (prev.date === TODAY ? prev.calls : 0) + 1,
-      generatedAt: new Date().toISOString(),
+      slots: {
+        ...(prev.date === TODAY ? prev.slots : {}),
+        [slot]: { slot, text, itemCount: count, kcal, generatedAt: new Date().toISOString() },
+      },
     };
     setCoachNote(text);
     setCoachBusy(false);
@@ -350,18 +362,22 @@ export default function NutritionPage() {
     // No targets set yet: a model call would only describe generic numbers.
     if (!userId || !targets) { setCoachBusy(false); return; }
 
-    const kcal = Math.round(total.calories);
     const n = noteRef.current;
-    const freshToday = n.date === TODAY;
+    const cached = latestSlotNote(n.date === TODAY ? n : null);
+    // Whatever this slot decides, the card keeps showing the latest note it has.
+    const show = () => setCoachNote((cached && cached.text) || '');
 
-    // Water moves none of these, so filling a glass never triggers a call.
-    const unchanged = freshToday && n.itemCount === items.length && Math.abs(kcal - n.kcal) <= COACH_KCAL_DELTA;
-    if (unchanged || (freshToday && n.calls >= COACH_MAX_CALLS)) {
-      setCoachNote(n.text || '');
-      return;
-    }
+    // Which moment of the day is this? Before 05:00 there is no slot — those
+    // hours belong to the evening that just finished, so nothing new is written
+    // and nothing is back-filled later.
+    const slot = slotFor(new Date().getHours());
+    if (!slot) { show(); return; }
 
-    const id = setTimeout(() => generateCoachNote(kcal, items.length), COACH_DEBOUNCE_MS);
+    // A spent slot has already had its one call. Adding more food does not buy
+    // another one; the next note comes when the next slot opens.
+    if (n.date === TODAY && n.slots[slot]) { show(); return; }
+
+    const id = setTimeout(() => generateCoachNote(slot, Math.round(total.calories), items.length), COACH_DEBOUNCE_MS);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, userId, TODAY, total.calories, !!targets]);
@@ -378,6 +394,10 @@ export default function NutritionPage() {
   }
 
   if (!userId) return null;
+
+  // Read once per render so the fallback text and the slot it is written for
+  // can't straddle a slot boundary.
+  const coachHour = new Date().getHours();
 
   const remaining = Math.max(T.calories - total.calories, 0);
   const calPct = Math.min(total.calories / T.calories, 1);
@@ -626,7 +646,7 @@ export default function NutritionPage() {
         <Reveal delay={150} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
           <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
-            {coachNote || coachFallback(total, T, new Date().getHours(), unknown)}
+            {coachNote || coachFallback(total, T, coachHour, unknown, slotFor(coachHour))}
           </p>
           {coachBusy && (
             <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>

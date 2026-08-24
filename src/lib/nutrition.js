@@ -372,6 +372,75 @@ const MEAL_PHASES = [
 ];
 export const phaseOfDay = (hour) => (MEAL_PHASES.find((p) => hour < p.until) || { phase: 'late night' }).phase;
 
+// ── Slots ─────────────────────────────────────────────────────────────────
+// Gym Daddy speaks at set moments rather than every time the day changes, so a
+// note reads like a moment in the day instead of another running total. Three
+// in-app slots, one note each, at most three model calls a day.
+const SLOTS = [
+  { from: 5,  until: 11, slot: 'morning' },
+  { from: 11, until: 17, slot: 'midday' },
+  { from: 17, until: 24, slot: 'evening' },
+];
+export const SLOT_ORDER = SLOTS.map((s) => s.slot);
+
+/**
+ * Which slot a local hour falls in, or null before 05:00 — those hours belong
+ * to the evening that just finished, and generating a fourth note there would
+ * describe yesterday's eating against today's blank day.
+ * @param {number} hour local hour, 0-23
+ * @returns {'morning'|'midday'|'evening'|null}
+ */
+export function slotFor(hour) {
+  const h = Number(hour);
+  if (!Number.isFinite(h)) return null;
+  const found = SLOTS.find((s) => h >= s.from && h < s.until);
+  return found ? found.slot : null;
+}
+
+/**
+ * Today's cached slot notes, read tolerantly.
+ *
+ * Days cached before the slots existed stored one `coachNote` object for the
+ * whole day. That is filed under the slot it was generated in rather than
+ * thrown away, so nobody pays for a fresh call on their first load after this
+ * ships.
+ */
+export function readCoachNotes(nutrition, today) {
+  const n = nutrition || {};
+  const notes = n.coachNotes;
+  if (notes && notes.date === today && notes.slots && typeof notes.slots === 'object') {
+    return { date: today, slots: { ...notes.slots } };
+  }
+  const single = n.coachNote;
+  if (single && single.date === today) {
+    const at = new Date(single.generatedAt || `${today}T12:00:00`);
+    const slot = (!isNaN(at) && slotFor(at.getHours())) || 'evening';
+    return { date: today, slots: { [slot]: { ...single, slot } } };
+  }
+  return { date: today, slots: {} };
+}
+
+/**
+ * The most recent slot recorded today. A slot whose call failed is still a
+ * recorded slot with empty text — the card then renders the deterministic
+ * fallback for right now, which beats re-showing this morning's note at 8pm.
+ */
+export function latestSlotNote(notes) {
+  const slots = (notes && notes.slots) || {};
+  for (let i = SLOT_ORDER.length - 1; i >= 0; i--) {
+    if (slots[SLOT_ORDER[i]]) return slots[SLOT_ORDER[i]];
+  }
+  return null;
+}
+
+// One line each, not three prompt builders. The slot changes the angle; the
+// numbers, the history and the rules underneath it are identical.
+const SLOT_BRIEF = {
+  morning: 'THIS IS THE MORNING NOTE. The day has barely started, so look forward, not back: what the targets leave them to play with and what a good first move is. Do not summarise the day or judge it — there is not a day yet.',
+  midday: 'THIS IS THE MIDDAY NOTE. A mid-course check: where they stand against the target with the afternoon and evening still to come, and whether anything needs steering now rather than at 9pm.',
+  evening: 'THIS IS THE EVENING NOTE. The day is nearly done: what is left, and what would finish it well. If the numbers are already met, say the day is done and point at tomorrow instead of suggesting more food.',
+};
+
 // A day this far under target is worth flagging kindly, not celebrating.
 const UNDEREATING_RATIO = 0.6;
 
@@ -381,20 +450,27 @@ const UNDEREATING_RATIO = 0.6;
  * @param {{calories:number,protein:number,carbs:number,fat:number}} eaten
  * @param {{calories:number,protein:number}} targets
  * @param {number} hour local hour, 0-23
+ * @param {string[]} unknown macros the day has no figure for
+ * @param {'morning'|'midday'|'evening'|null} [slot] defaults to the slot `hour` falls in
  * @returns {string}
  */
-export function coachFallback(eaten, targets, hour, unknown = []) {
+export function coachFallback(eaten, targets, hour, unknown = [], slot) {
   const kcal = Math.round(Number(eaten?.calories) || 0);
   const goal = Math.round(Number(targets?.calories) || 0);
   const p = Math.round(Number(eaten?.protein) || 0);
   const pGoal = Math.round(Number(targets?.protein) || 0);
+  // Before 05:00 there is no slot; the evening wording is the closest fit.
+  const moment = slot || slotFor(hour) || 'evening';
 
   if (kcal <= 0) return "Nothing logged yet. Add breakfast and I'll tell you how the day's shaping up.";
 
   const left = goal - kcal;
   const parts = [];
 
+  // Same numbers, framed for the moment they're being read in.
   if (left < 0) parts.push(`${kcal} in — that's ${Math.abs(left)} over today's ${goal}.`);
+  else if (moment === 'morning') parts.push(`${kcal} in, ${left} of ${goal} still to play with today.`);
+  else if (moment === 'evening') parts.push(`${kcal} in, ${left} left of ${goal} to finish the day.`);
   else parts.push(`${kcal} in, ${left} left of ${goal}.`);
 
   // Protein is the macro worth naming; the others follow it around.
@@ -427,7 +503,7 @@ export function coachFallback(eaten, targets, hour, unknown = []) {
  * budget is easy to see: the item list is capped and history is daily totals
  * only, never raw items.
  */
-export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expenditureSource, log, goalWeight, latestWeighIn, hour, today }) {
+export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expenditureSource, log, goalWeight, latestWeighIn, hour, today, slot }) {
   const eaten = summariseDay(items || [], today);
   const t = targets || {};
   const time = `${String(hour).padStart(2, '0')}:00`;
@@ -458,6 +534,8 @@ export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expe
   return [
     'You are Gym Daddy, the AI coach in a fitness app. Write 2 to 3 short sentences to the user about their eating today. Conversational, second person. No greeting, no sign-off, no markdown, no bullet points.',
     '',
+    SLOT_BRIEF[slot || slotFor(hour) || 'evening'],
+    '',
     `LOCAL TIME: ${time} (${phaseOfDay(hour)})`,
     `TODAY'S TARGET: ${t.calories} kcal, P${t.protein} C${t.carbs} F${t.fat}`,
     `EATEN SO FAR: ${eaten.kcal} kcal, P${eaten.p} C${eaten.c} F${eaten.f}`,
@@ -476,7 +554,6 @@ export function buildCoachPrompt({ items, targets, expenditure, weeklyRate, expe
     '1. Read today against the target — what is on track, what is short, what is over. Protein is usually the interesting one.',
     '2. Put it in context of the last 7 days: a normal day, a light day, or a big one.',
     '3. Say one concrete, small thing that would help. "A yoghurt and you\'re there", not a lecture.',
-    'If it is late and the day looks finished, summarise it and point at tomorrow instead of suggesting more food.',
     '',
     'Rules you must follow:',
     '- Never invent or prescribe calorie or macro targets beyond the ones given above. Describe what the numbers already say.',

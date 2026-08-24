@@ -55,9 +55,9 @@ Azure Cloud Shell, then
 az functionapp deployment source config-zip -g gym-dogs-playground -n gymdogs-api --src gymdogs-api-v2.zip
 ```
 
-Verify afterwards — there should be **12** functions:
-`aiCoach, clients, communityPosts, costReport, costTest, foodAI, foodLookup, gymLogs, keepWarm,
-userProfiles, weighInReminder, workoutPlans`.
+Verify afterwards — there should be **13** functions:
+`aiCoach, clients, communityPosts, costReport, costTest, dayWrap, foodAI, foodLookup, gymLogs,
+keepWarm, userProfiles, weighInReminder, workoutPlans`.
 
 If a frontend change needs a new field saved on a profile, that field must be added to the
 `FIELDS` allowlist in `userProfiles/index.js` **and the API redeployed**, or it silently vanishes.

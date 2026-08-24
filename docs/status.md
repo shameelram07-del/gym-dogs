@@ -33,16 +33,10 @@ breaks. `providerNote` in the response says which provider answered.
 Still open on that job: the frontend doesn't send `userId` to `foodAI`, so the per-user daily cap
 is inert. Small change in `src/lib/food.js` and its callers.
 
-### NEXT UP — Gym Daddy on a timeline (Shameel's idea, 13 Aug, paused to 14 Aug)
-Replace the change-triggered coach note with **four timed slots**: morning, midday, evening, and an
-**11pm wrap** that closes the day out. One note per slot, so max four calls, naturally paced, and
-the last one is a real summary instead of another running total. Supersedes the 6-call cap in
-`docs/briefs/nutrition-coach-card.md`.
-
-The catch he needs to decide on: this is a static web app with no push, so an 11pm note **only
-appears if someone opens the app before midnight**. Making it land means emailing it from a timer
-function — same shape as `weighInReminder` — which is an API change and a zip redeploy.
-**Undecided: client-side slots only, or slots plus the emailed wrap.** Ask him before building.
+### Gym Daddy on a timeline — **BUILT 25 Aug, waiting on the API redeploy**
+Slots plus the emailed wrap, both built (see the entry below). The frontend half is inert until the
+API half ships: `dayWrap` has to be zipped and deployed, and `wrapEmail` has to reach the `FIELDS`
+allowlist. **Nothing here is live until Shameel runs the zip deploy.**
 
 ### Other open items
 - **Test runner.** `CLAUDE.md` claimed `src/lib/nutrition.js` was unit-tested; it isn't — no jest,
@@ -69,6 +63,26 @@ Shipped: <one or two lines>
 Touched: <files>
 Still needed: <frontend push / API zip redeploy / app setting / nothing>
 ```
+
+---
+
+### 2026-08-25 — Gym Daddy on a timeline (gym-daddy-timeline.md)
+Built by: Claude Code
+Shipped: the coach note is now gated by the time of day, not by change. Three in-app slots —
+morning 05:00–11:00, midday 11:00–17:00, evening 17:00–23:59 — one note each, at most three model
+calls a day, down from six. `COACH_KCAL_DELTA` and `COACH_MAX_CALLS` are gone; the 8s debounce
+stays. Before 05:00 generates nothing. The cache moved from `nutrition.coachNote` to
+`nutrition.coachNotes { date, slots }` and reads the old single-object shape as a spent slot, so
+nobody pays for a fresh call on their first load. New `dayWrap` timer function emails the
+end-of-day wrap at `0 0 10 * * *` (UTC — 22:00 NZST / 23:00 NZDT, deliberately not 11, which lands
+at midnight in daylight saving and would describe the wrong day). It skips anyone with no email,
+`wrapEmail === false`, or an empty day, falls back to a deterministic summary if the model call
+fails, and heartbeats itself so `costTest` can see it ran.
+Touched: `src/lib/nutrition.js`, `src/app/nutrition/page.js`, `CLAUDE.md`,
+`gymdogs-api-v2/dayWrap/{index.js,function.json}` (new), `gymdogs-api-v2/userProfiles/index.js`
+Still needed: **frontend push AND an API zip redeploy** — the zip must now contain **13** function
+folders. Without the redeploy, `wrapEmail` is silently dropped and no wrap email is ever sent.
+**Untested against real data — Shameel to run `npm run dev`.**
 
 ---
 
