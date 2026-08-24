@@ -164,6 +164,16 @@ async function main() {
     cases.push({ doc, correct, newId });
   }
 
+  // Which moves land on a doc that already exists. Worth knowing before the
+  // fact, not just as it happens: the oldest logs key their id on the exercise
+  // INDEX (`…_0`, `…_1`) rather than its name, and index 2 on one day is not
+  // necessarily the same exercise as index 2 on the next.
+  const byId = new Map(all.map((d) => [d.id, d]));
+  for (const c of cases) {
+    c.target = byId.get(c.newId) || null;
+    c.sameExercise = !c.target || (c.target.exName || '') === (c.doc.exName || '');
+  }
+
   // ── Report ──────────────────────────────────────────────────────────────
 
   console.log(`Log docs:            ${all.length}`);
@@ -182,6 +192,18 @@ async function main() {
   const users = new Set(cases.map((c) => c.doc.userId));
   console.log(`Date range affected: ${wrongDates[0]} to ${wrongDates[wrongDates.length - 1]}`);
   console.log(`Distinct users:      ${users.size}`);
+
+  const merges = cases.filter((c) => c.target);
+  const conflicts = merges.filter((c) => !c.sameExercise);
+  console.log(`Will merge:          ${merges.length} (a doc already exists at the corrected id)`);
+  for (const c of merges) {
+    console.log(`  ${c.doc.id}`);
+    console.log(`    -> ${c.newId}  ${JSON.stringify(c.doc.exName)} into ${JSON.stringify(c.target.exName)}${c.sameExercise ? '' : '  *** DIFFERENT EXERCISE ***'}`);
+  }
+  if (conflicts.length) {
+    console.log(`\n${conflicts.length} of those merge a DIFFERENT exercise and will be SKIPPED, not merged.`);
+    console.log('Sort them by hand, or they stay on the wrong day.');
+  }
 
   console.log('\nSample:');
   for (const c of cases.slice(0, 5)) {
@@ -222,6 +244,15 @@ async function main() {
 
       let next;
       if (existing) {
+        // The oldest ids key on exercise index, not name, so a corrected date
+        // can land on a slot holding a different exercise. Merging those would
+        // pour one lift's sets into another; leave it for a human instead.
+        if ((existing.exName || '') !== (doc.exName || '')) {
+          console.log(`  SKIP  ${doc.id} — ${JSON.stringify(doc.exName)} would merge into ${JSON.stringify(existing.exName)} at ${newId}`);
+          console.log('        different exercise, not merging — sort this one by hand');
+          skipped++;
+          continue;
+        }
         const targetSets = parseSets(existing.sets_data);
         if (targetSets === null) {
           console.log(`  SKIP  ${doc.id} — target ${newId} has unreadable sets_data, not risking a merge`);
