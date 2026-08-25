@@ -66,6 +66,27 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-25 — retired sessions were showing up as saved drafts
+Built by: Claude Code
+Shipped: `workoutPlans` listed drafts as "isActive = false and not archived", but publishing a plan
+deactivates the one it supersedes — so all twelve retired sessions back to 13 July came back as
+drafts. The POST handler now writes `published: true` whenever a plan goes live and never unsets it
+(it survives deactivation and a client that omits it); the drafts query excludes published plans.
+Also fixed `createdAt` being restamped on every upsert, which reset a draft's age each time it was
+edited — it is now written only for a genuinely new doc, with `updatedAt` for the rest.
+Added `scripts/mark-published-plans.js` to backfill docs written before the flag existed. **Nothing
+inside the `plans` container separates a draft from a retired session** — all twelve carried an
+identical field set. The script reads the two traces the publish path leaves elsewhere instead: the
+`posts` announcement ("New session published: …") and `Workouts` rows carrying `planId`. Dry run
+against production: 12 of 12 matched (all 12 announced, 8 also logged), **zero genuine drafts**.
+`--before=YYYY-MM-DD` is there as a cutoff fallback if the traces are ever not trusted.
+Touched: `gymdogs-api-v2/workoutPlans/index.js`, `scripts/mark-published-plans.js` (new)
+Still needed: **API zip redeploy** (13 function folders, unchanged count) — until then the drafts
+list stays full. Then run `node scripts/mark-published-plans.js` (dry run) and `--apply`. Not run
+yet. Not pushed.
+
+---
+
 ### 2026-08-25 — pick the muscle groups, then generate (ai-session-generator.md)
 Built by: Claude Code
 Shipped: the Coach screen now has a TARGET picker above the generate button — five day presets
