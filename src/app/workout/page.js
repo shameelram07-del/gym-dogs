@@ -1,7 +1,7 @@
 'use client';
 import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
@@ -782,10 +782,20 @@ export default function WorkoutPage() {
             const isDone = sets.length > 0 && sets.every(s => s.done);
             const open = idx === activeExIdx;
             const last = formatLast(idx);
+            // Labels only. A paired session is logged exactly like any other —
+            // the letter just tells you who you're alternating with.
+            const blockStarts = ex.block && (idx === 0 || exercises[idx - 1]?.block !== ex.block);
+            const blockHeader = blockStarts ? (
+              <p style={{ ...eyebrow, color: 'var(--blue-ink)', margin: '6px 4px 0' }}>
+                Superset {ex.block} &mdash; alternate with your partner
+              </p>
+            ) : null;
 
             if (!open) {
               return (
-                <button key={idx} onClick={() => setActiveExIdx(idx)} style={{
+                <Fragment key={idx}>
+                {blockHeader}
+                <button onClick={() => setActiveExIdx(idx)} style={{
                   width: '100%', background: 'var(--card)', border: '1px solid var(--line)',
                   borderRadius: CARD_R, padding: '14px 16px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 12,
@@ -796,18 +806,25 @@ export default function WorkoutPage() {
                   <ExercisePhoto name={ex.name} size={44} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{ex.name}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>{ex.sets} sets · {ex.reps} reps</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-3)' }}>
+                      {ex.sets} sets · {ex.reps} reps{ex.block ? ` · Block ${ex.block}` : ''}
+                    </p>
                   </div>
                   <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
                 </button>
+                </Fragment>
               );
             }
 
             return (
-              <div key={idx} ref={activeCardRef} style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: CARD_R, overflow: 'hidden', scrollMarginTop: 16 }}>
+              <Fragment key={idx}>
+              {blockHeader}
+              <div ref={activeCardRef} style={{ background: 'var(--card)', border: '1px solid var(--accent)', borderRadius: CARD_R, overflow: 'hidden', scrollMarginTop: 16 }}>
                 <div style={{ padding: '16px 18px 4px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ flex: 1 }}>
-                    <p style={{ ...eyebrow, color: 'var(--accent-strong)' }}>Exercise {idx + 1} of {exercises.length}</p>
+                    <p style={{ ...eyebrow, color: 'var(--accent-strong)' }}>
+                      Exercise {idx + 1} of {exercises.length}{ex.block ? ` · Block ${ex.block}` : ''}
+                    </p>
                     <h2 className="gd-disp" style={{ margin: '5px 0 0', fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{ex.name}</h2>
                     {last && (
                       <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Last time: {last}</p>
@@ -890,6 +907,7 @@ export default function WorkoutPage() {
                   )}
                 </div>
               </div>
+              </Fragment>
             );
           })}
 

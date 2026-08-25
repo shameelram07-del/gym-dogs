@@ -66,6 +66,34 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-25 — pick the muscle groups, then generate (ai-session-generator.md)
+Built by: Claude Code
+Shipped: the Coach screen now has a TARGET picker above the generate button — five day presets
+(Push/Pull/Legs/Upper/Full body) that fill a multi-select row of the 8 muscle groups, which is the
+source of truth. Generate is disabled until something is picked. The prompt sends only the chosen
+groups' exercises with their equipment tags instead of the whole catalogue, so "back day" finally
+means back day. A SESSION row adds minutes (drives the exercise count, ~10 min each, overridable
+4–8) and people. With 2+ people the session comes back in lettered paired blocks where the two
+exercises never need the same station — the model is asked to follow that rule and then **verified
+in code**, with an illegal pairing silently repaired. A derived one-line run note ("6 people, 3
+blocks — pair up and alternate…") shows under the draft and is merged into the plan's `notes` at
+publish. Member side gets block letters and a "Superset A" header only — logging is untouched. The
+offline template was rebuilt to follow the selection and to pair up too. Model stays on
+`gpt-4o-mini` as the brief instructs; both output flaws it names are handled in code — `sets` is
+coerced with `Number()` and `reps` validated (gpt-5 returns `"4"` as a string), extras are trimmed
+and a **short** answer is topped up from the selected groups rather than publishing a session that
+doesn't match what was asked for. Pairing is most-constrained-first, not front-to-back: the greedy
+version wasted partners and left two people idle on a six-exercise pull day when a clean three-pair
+answer existed.
+Touched: `src/lib/session.js` (**new** — all the pure logic), `src/app/coach/page.js`,
+`src/app/workout/page.js`
+Still needed: **frontend push.** No API change, nothing stored. ⚠️ **`src/lib/exercises.js` has
+uncommitted changes in the working tree** (the 25 Aug catalogue cleanup) — this feature reads the
+`equipment` tag on every entry, so that file must ship with it. **Untested — Shameel to run
+`npm run dev`.**
+
+---
+
 ### 2026-08-25 — Gym Daddy on a timeline (gym-daddy-timeline.md)
 Built by: Claude Code
 Shipped: the coach note is now gated by the time of day, not by change. Three in-app slots —
