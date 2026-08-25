@@ -504,7 +504,9 @@ export default function WorkoutPage() {
         body: JSON.stringify({ message: p, prompt: p, userId })
       });
       if (res.ok) { const data = await res.json(); setCoachNote(data.reply || data.message); }
-      else captureError(new Error(`aiCoach failed (${res.status})`), { screen: 'workout', action: 'coach-note', endpoint: 'aiCoach', status: res.status });
+      // 429 is the AI budget refusing. The note is a nice-to-have after a
+      // session, so it simply doesn't appear — no error, and none reported.
+      else if (res.status !== 429) captureError(new Error(`aiCoach failed (${res.status})`), { screen: 'workout', action: 'coach-note', endpoint: 'aiCoach', status: res.status });
     } catch (e) {
       captureError(e, { screen: 'workout', action: 'coach-note', endpoint: 'aiCoach' });
     } finally { setCoachNoteLoading(false); }

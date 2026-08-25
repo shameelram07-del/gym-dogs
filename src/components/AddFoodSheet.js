@@ -106,7 +106,7 @@ function FoodRow({ item, onPick }) {
   );
 }
 
-export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose }) {
+export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites, onClose }) {
   const [tab, setTab] = useState('search');
   const [scanning, setScanning] = useState(false);
 
@@ -233,7 +233,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     setAiError(null);
     setSearching(true);
     try {
-      const data = await aiFromLabel(dataUrl);
+      const data = await aiFromLabel(dataUrl, userId);
       setSearching(false);
       setPerf(data.item ? { model: data.item.model, ms: data.item.ms } : null);
       if (data.found) {
@@ -260,8 +260,8 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     setFromPhoto(!!photoPreview);
     try {
       const r = photoPreview
-        ? await aiFromPhoto(photoPreview, hint || undefined)
-        : await aiFromText(hint);
+        ? await aiFromPhoto(photoPreview, hint || undefined, userId)
+        : await aiFromText(hint, userId);
       setAiResult(r);
       setPerf({ model: r.model, ms: r.ms });
     }
@@ -280,7 +280,7 @@ export default function AddFoodSheet({ profile, onAdd, onSaveFavourites, onClose
     try {
       // Bigger than a meal photo: nutrition print is small and needs the pixels.
       const dataUrl = await fileToCompressedDataUrl(file, 1100, 0.8);
-      const data = await aiFromLabel(dataUrl);
+      const data = await aiFromLabel(dataUrl, userId);
       setPerf(data.item ? { model: data.item.model, ms: data.item.ms } : null);
       if (data.found) {
         pick(data.item);

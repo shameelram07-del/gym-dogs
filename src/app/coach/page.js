@@ -430,13 +430,23 @@ export default function CoachDashboard() {
       ].filter(l => l !== null && l !== undefined).join('\n');
 
       let text = '';
+      let capped = false;
       try {
         const res = await fetch(AI_COACH_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-functions-key': AI_COACH_KEY },
-          body: JSON.stringify({ message: prompt, prompt }),
+          // userId matters here beyond personalisation: without it the backend
+          // costs the call to the shared "_anon" bucket, so one generator run
+          // eats an allowance the whole gym is sharing.
+          body: JSON.stringify({ message: prompt, prompt, userId }),
         });
         if (res.ok) { const d = await res.json(); text = d.reply || d.message || (typeof d === 'string' ? d : ''); }
+        else if (res.status === 429) {
+          // The AI budget said no. That is a limit doing its job, not a fault —
+          // the template below is the answer and the draft says so, so there is
+          // nothing to report.
+          capped = true;
+        }
         else captureError(new Error(`aiCoach failed (${res.status})`), {
           screen: 'coach', action: 'generate-plan', endpoint: 'aiCoach', status: res.status,
         });
@@ -490,7 +500,14 @@ export default function CoachDashboard() {
       setExercises(built);
       setRunNote(runNoteFor(heads, built));
       if (!planName.trim()) setPlanName(suggestName(groups));
-      setSaveMsg({ type: 'success', text: usedAI ? 'AI draft ready — review and publish.' : 'Draft built from template — review and publish.' });
+      setSaveMsg({
+        type: 'success',
+        text: usedAI
+          ? 'AI draft ready — review and publish.'
+          : capped
+            ? 'AI is done for today, so this is a template draft — review and publish.'
+            : 'Draft built from template — review and publish.',
+      });
     } catch (e) {
       const built = templateSession(groups, count, heads);
       setExercises(built);

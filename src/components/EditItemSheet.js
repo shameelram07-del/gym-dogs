@@ -18,7 +18,7 @@ const field = {
 
 const n = (v) => { const x = parseFloat(v); return isFinite(x) && x >= 0 ? x : 0; };
 
-export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
+export default function EditItemSheet({ item, userId, onSave, onDelete, onClose }) {
   const [f, setF] = useState({
     name: item.name || '',
     grams: item.grams != null ? String(item.grams) : '',
@@ -49,7 +49,7 @@ export default function EditItemSheet({ item, onSave, onDelete, onClose }) {
     setFixBusy(true); setFixError(null);
     const before = Math.round(n(f.calories));
     try {
-      const r = await aiFromText(describeMealCorrection(components, text));
+      const r = await aiFromText(describeMealCorrection(components, text), userId);
       const next = (r && Array.isArray(r.items)) ? r.items : [];
       if (next.length === 0) throw new Error(r && r.note ? r.note : 'I could not work that out — try wording it differently.');
       const totals = sumItems(next);

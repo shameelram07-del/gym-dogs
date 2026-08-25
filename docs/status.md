@@ -11,6 +11,41 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-26 — cost cap on aiCoach and dayWrap
+Built by: Claude Code
+Shipped: brief `docs/briefs/aicoach-cost-cap.md`. `lib/aiBudget` is now wired into **aiCoach** and
+**dayWrap**, so every model call in the app is counted and gated. aiCoach checks the budget before
+it builds the member snapshot (three Cosmos queries not worth paying for on a refused call) and
+records the real `usage` token counts afterwards. A refusal returns **429** with
+`{ capped: 'monthly' | 'daily', reply, providerNote }` — the body carries a friendly line in Gym
+Daddy's voice, and the status is what makes every existing caller take its deterministic fallback
+without changes. dayWrap gates per user inside `aiWrap()`; a refusal returns `''`, which already
+means `deterministicWrap()`.
+Frontend: the session generator on Coach now sends `userId` (it was posting none) and says
+"AI is done for today, so this is a template draft" on a 429. Nutrition, dashboard and workout
+notes treat a 429 as a quiet fallback and **no longer report it to monitoring** — a cap doing its
+job is not an incident. `lib/food.js` now takes `userId` on `aiFromText` / `aiFromPhoto` /
+`aiFromLabel`, threaded from `nutrition/page.js` through `AddFoodSheet` and `EditItemSheet`.
+`aiBudget` buckets an unattributed call as **`_anon`** rather than letting it through uncounted, so
+there is no longer an uncapped path.
+Touched: API — `aiCoach/index.js`, `dayWrap/index.js`, `lib/aiBudget.js`. Frontend —
+`app/coach/page.js`, `app/nutrition/page.js`, `app/dashboard/page.js`, `app/workout/page.js`,
+`lib/food.js`, `components/AddFoodSheet.js`, `components/EditItemSheet.js`.
+Still needed: **API zip redeploy** (13 functions) *and* the frontend push. No `FIELDS` change — the
+spend doc is `aispend_<month>` in `users` with a matching `userId`, so `userProfiles` never sees it.
+Deploy the API first: an old frontend reads the 429 as a plain failure and still falls back
+correctly, whereas a new frontend against the old API simply never sees a 429.
+Notes back to Cowork: the brief lists "Gym Daddy's chat on the Coach screen" as a caller — **there
+is no chat UI in the app**. Nothing in `src/` matches `chat`, and Coach's only aiCoach call is the
+session generator. The four real callers are the session generator, the nutrition slot note, the
+dashboard note and the post-session note on workout — all ambient. The friendly refusal is
+implemented and returned, but nothing currently displays it. Also: `foodAI`'s OpenAI fallback is
+still deliberately uncapped (it records but does not gate) so the cap can only make food estimates
+cheaper, never remove them — that predates this brief and was left alone.
+**Untested — Shameel to run `npm run dev`.**
+
+---
+
 ## Waiting on Shameel — pick these up when he's ready
 
 ### Move the AI to Claude — **PAUSED, his call, revisit from Fri 14 Aug 2026**

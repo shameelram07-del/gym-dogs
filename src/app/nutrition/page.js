@@ -316,6 +316,12 @@ export default function NutritionPage() {
         const d = await res.json();
         const reply = d.reply || d.message || (typeof d === 'string' ? d : '');
         if (reply && String(reply).trim()) text = String(reply).trim();
+      } else if (res.status === 429) {
+        // The AI budget said no. This card is ambient — nobody asked for it —
+        // so it stays quiet and shows the deterministic read below. Deliberately
+        // NOT captureError'd: a cap doing its job is not an incident, and the
+        // backend's refusal message is not shown here either.
+        console.info('Nutrition coach: AI capped, using the deterministic read');
       } else {
         console.error(`Nutrition coach: aiCoach failed (${res.status})`);
         captureError(new Error(`aiCoach failed (${res.status})`), {
@@ -772,6 +778,7 @@ export default function NutritionPage() {
       {editing && (
         <EditItemSheet
           item={editing}
+          userId={userId}
           onSave={saveEdit}
           onDelete={(id) => { removeItem(id); setEditing(null); }}
           onClose={() => setEditing(null)}
@@ -785,6 +792,7 @@ export default function NutritionPage() {
         // the stored favourites with a list of one.
         <AddFoodSheet
           profile={profileRef}
+          userId={userId}
           onAdd={addItem}
           onSaveFavourites={(favs) => { if (profileLoaded.current) saveProfile({ foodFavourites: favs }); }}
           onClose={() => setAdding(false)}

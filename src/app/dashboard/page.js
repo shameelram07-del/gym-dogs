@@ -254,11 +254,18 @@ export default function DashboardPage() {
         body: JSON.stringify({ message: promptText, prompt: promptText, userId: who }),
       });
       if (!res.ok) {
-        captureError(new Error(`aiCoach failed (${res.status})`), {
-          screen: 'dashboard', action: 'coach-note', endpoint: 'aiCoach', status: res.status,
-        });
+        // 429 is the AI budget refusing, not a fault. The card just keeps
+        // whatever it had — an ambient note nobody asked for should never turn
+        // into an error, and it should not repeat the backend's refusal either.
+        if (res.status !== 429) {
+          captureError(new Error(`aiCoach failed (${res.status})`), {
+            screen: 'dashboard', action: 'coach-note', endpoint: 'aiCoach', status: res.status,
+          });
+        }
         return;
       }
+      // Deliberate: only reached on a 2xx, so a non-JSON error body can't land
+      // here as a SyntaxError.
       const data = await res.json();
       const text = data.reply || data.message || (typeof data === 'string' ? data : null);
       if (text) setCoachNote(text);

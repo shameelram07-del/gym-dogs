@@ -65,12 +65,16 @@ async function postAI(body) {
   }
 }
 
-export const aiFromText = (description) => postAI({ mode: 'text', description });
-export const aiFromPhoto = (image, hint) => postAI({ mode: 'photo', image, hint });
+// `userId` is not optional in spirit, only in signature: the backend costs an
+// unattributed call to a shared "_anon" bucket, so leaving it off means the
+// whole gym competes for one person's daily allowance. Pass it from wherever
+// you have it.
+export const aiFromText = (description, userId) => postAI({ mode: 'text', description, userId });
+export const aiFromPhoto = (image, hint, userId) => postAI({ mode: 'photo', image, hint, userId });
 
 // Reads a nutrition information panel and returns a per-100g item, same shape as
 // a barcode hit — so it flows into the identical portion editor.
-export const aiFromLabel = (image) => postAI({ mode: 'label', image });
+export const aiFromLabel = (image, userId) => postAI({ mode: 'label', image, userId });
 
 // ── Portions ──────────────────────────────────────────────────────────────
 
