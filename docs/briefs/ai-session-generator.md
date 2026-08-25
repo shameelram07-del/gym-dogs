@@ -213,10 +213,14 @@ separate job before more people use it.
    fetch; `session.js` holds everything that decides what a valid session looks like, and it is
    pure and argument-driven so the pairing rule can be checked without a browser.
 
-2. **`src/lib/exercises.js` has uncommitted changes in the working tree.** The catalogue cleanup
-   the brief mentions ("cleaned up on 25 Aug") is sitting unstaged — not in any commit, not shipped.
-   This whole feature reads the `equipment` tag on every entry, so **that file has to go out with
-   this work or the pairing rule has nothing to check.** I did not touch it or commit it.
+2. **The catalogue cleanup shipped alongside this** (resolved 25 Aug). It was sitting unstaged
+   while this was built. Final count is **92**, from 77 committed — 15 removed (the duplicate
+   "Hammer Strength" naming, mostly) and 30 added. Worth knowing that removing names is not free:
+   published plans and logged history reference exercises by name, and a plan holding a removed
+   name still renders and logs correctly, but the coach builder's Exercise dropdown has no matching
+   option for it, so **an old draft reopened for editing shows that row's dropdown blank**. The
+   name is still on the plan and still publishes; it just looks unset. Nothing crashes — every
+   library lookup in the app uses optional chaining with a fallback.
 
 3. **Greedy pairing was leaving people idle, so the matching is now most-constrained-first.** This
    is the one thing worth reading. Pairing front-to-back looks correct and quietly wastes partners:

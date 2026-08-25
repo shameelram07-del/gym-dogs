@@ -87,10 +87,8 @@ version wasted partners and left two people idle on a six-exercise pull day when
 answer existed.
 Touched: `src/lib/session.js` (**new** — all the pure logic), `src/app/coach/page.js`,
 `src/app/workout/page.js`
-Still needed: **frontend push.** No API change, nothing stored. ⚠️ **`src/lib/exercises.js` has
-uncommitted changes in the working tree** (the 25 Aug catalogue cleanup) — this feature reads the
-`equipment` tag on every entry, so that file must ship with it. **Untested — Shameel to run
-`npm run dev`.**
+Still needed: nothing — pushed 25 Aug. No API change, nothing stored. The 25 Aug catalogue cleanup
+in `src/lib/exercises.js` shipped alongside it.
 
 ---
 
