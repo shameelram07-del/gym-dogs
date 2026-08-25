@@ -18,6 +18,7 @@ const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 
+const COMMUNITY_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts';
 const CLIENTS_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/clients';
 const CLIENTS_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
@@ -73,6 +74,13 @@ const chipStyle = (on) => ({
 });
 const hintStyle = { margin: '8px 0 0', fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.5 };
 
+// Same shortening the Community screen uses, so a figure quoted here reads the
+// same way it does on the card the pack sees.
+function fmtKg(kg) {
+  const n = Math.round(Number(kg) || 0);
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+}
+
 function Avatar({ initials, size = 44, online }) {
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -112,6 +120,16 @@ export default function CoachDashboard() {
   const [runNote, setRunNote] = useState('');
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [draftsAll, setDraftsAll] = useState(false);
+  // Challenges. `chForm` being non-null is what opens the form — null means
+  // closed, an object means starting or editing.
+  const [chLoading, setChLoading] = useState(true);
+  const [chActive, setChActive] = useState(null);
+  const [chPast, setChPast] = useState([]);
+  const [chSuggestion, setChSuggestion] = useState(null);
+  const [chForm, setChForm] = useState(null);
+  const [chEditingId, setChEditingId] = useState(null);
+  const [chSaving, setChSaving] = useState(false);
+  const [chMsg, setChMsg] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [assignedTo, setAssignedTo] = useState([]); // empty = everyone
@@ -165,6 +183,120 @@ export default function CoachDashboard() {
       if (res.ok) { const d = await res.json(); setDrafts(Array.isArray(d) ? d : []); }
     } catch (e) {
       captureError(e, { screen: 'coach', action: 'load-drafts', endpoint: 'workoutPlans' });
+    }
+  };
+
+  const fetchChallenges = async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${COMMUNITY_URL}?challenges=true&userId=${encodeURIComponent(userId)}`, {
+        headers: { 'x-functions-key': CLIENTS_KEY || '' },
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setChActive(d.active || null);
+        setChPast(Array.isArray(d.past) ? d.past : []);
+        setChSuggestion(d.suggestion || null);
+      } else {
+        captureError(new Error(`challenges failed (${res.status})`), {
+          screen: 'coach', action: 'load-challenges', endpoint: 'communityPosts', status: res.status,
+        });
+      }
+    } catch (e) {
+      captureError(e, { screen: 'coach', action: 'load-challenges', endpoint: 'communityPosts' });
+    } finally {
+      setChLoading(false);
+    }
+  };
+
+  // Its own effect, placed after the function it calls rather than with the
+  // plan fetchers above — those already trip the lint rule for being used
+  // before they are declared, and there was no reason to add a third.
+  useEffect(() => {
+    if (!userId) return;
+    fetchChallenges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const openStartChallenge = () => {
+    // Defaults that are actually reachable: today, a month out, and roughly what
+    // the pack really lifted over the last 30 days. The 100,000 kg club asked
+    // for about three times that and nobody got close.
+    const sug = chSuggestion || {};
+    setChEditingId(null);
+    setChMsg(null);
+    setChForm({
+      name: '',
+      prize: '',
+      targetKg: sug.targetKg || 5000,
+      startDate: sug.startDate || todayISO(),
+      endDate: sug.endDate || todayISO(),
+    });
+  };
+
+  const openEditChallenge = (c) => {
+    setChEditingId(c.id);
+    setChMsg(null);
+    setChForm({
+      name: c.name || '', prize: c.prize || '', targetKg: c.targetKg || 0,
+      startDate: c.startDate || todayISO(), endDate: c.endDate || todayISO(),
+    });
+  };
+
+  const saveChallenge = async () => {
+    if (!chForm || chSaving) return;
+    if (!chForm.name.trim()) { setChMsg({ type: 'error', text: 'Give the challenge a name.' }); return; }
+    setChSaving(true); setChMsg(null);
+    try {
+      const payload = chEditingId
+        ? { action: 'updateChallenge', userId, challengeId: chEditingId, ...chForm }
+        : { action: 'startChallenge', userId, ...chForm };
+      const res = await fetch(COMMUNITY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': CLIENTS_KEY || '' },
+        body: JSON.stringify(payload),
+      });
+      // The server is the one that refuses a second running challenge, so its
+      // message is the useful one — show it rather than a generic failure.
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setChMsg({ type: 'error', text: data.error || `Could not save (${res.status}).` });
+        return;
+      }
+      setChForm(null);
+      setChEditingId(null);
+      setChMsg({ type: 'success', text: chEditingId ? 'Challenge updated.' : 'Challenge started — announced on the feed.' });
+      fetchChallenges();
+    } catch (e) {
+      setChMsg({ type: 'error', text: 'Could not reach the server. Try again.' });
+      captureError(e, { screen: 'coach', action: 'save-challenge', endpoint: 'communityPosts' });
+    } finally {
+      setChSaving(false);
+    }
+  };
+
+  const endChallengeNow = async (c) => {
+    if (!window.confirm(`End "${c.name}" now? The standings freeze and the result goes on the feed.`)) return;
+    setChSaving(true); setChMsg(null);
+    try {
+      const res = await fetch(COMMUNITY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-functions-key': CLIENTS_KEY || '' },
+        body: JSON.stringify({ action: 'endChallenge', userId, challengeId: c.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setChMsg({ type: 'error', text: data.error || `Could not end it (${res.status}).` });
+        return;
+      }
+      setChForm(null);
+      setChMsg({ type: 'success', text: 'Challenge ended and the result posted.' });
+      fetchChallenges();
+    } catch (e) {
+      setChMsg({ type: 'error', text: 'Could not reach the server. Try again.' });
+      captureError(e, { screen: 'coach', action: 'end-challenge', endpoint: 'communityPosts' });
+    } finally {
+      setChSaving(false);
     }
   };
 
@@ -481,7 +613,7 @@ export default function CoachDashboard() {
         {/* ── TAB SWITCHER ── */}
         <Reveal delay={60}>
         <div style={{ display: 'flex', background: 'var(--soft)', borderRadius: 14, padding: 4, gap: 4 }}>
-          {[{ key: 'clients', label: 'Clients' }, { key: 'plans', label: 'Plan builder' }].map(tab => (
+          {[{ key: 'clients', label: 'Clients' }, { key: 'plans', label: 'Plan builder' }, { key: 'challenges', label: 'Challenges' }].map(tab => (
             <button key={tab.key} onClick={() => setView(tab.key)} style={{
               flex: 1, padding: 10, borderRadius: 11, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
               background: view === tab.key ? 'var(--card)' : 'transparent',
@@ -585,6 +717,181 @@ export default function CoachDashboard() {
                 </Reveal>
               );
             })}
+          </>
+        )}
+
+        {/* ══ CHALLENGES ══ */}
+        {view === 'challenges' && (
+          <>
+            {chMsg && (
+              <div style={{ borderRadius: 14, padding: '12px 16px', textAlign: 'center', fontSize: 13, fontWeight: 700,
+                background: chMsg.type === 'success' ? 'var(--accent-tint)' : 'var(--red-tint)',
+                color: chMsg.type === 'success' ? 'var(--accent-strong)' : 'var(--red-ink)',
+              }}>{chMsg.text}</div>
+            )}
+
+            {chLoading && (
+              <p style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'center', padding: '10px 0', margin: 0 }}>Loading challenges…</p>
+            )}
+
+            {/* ── the one that is running ── */}
+            {!chLoading && chActive && !chForm && (
+              <Reveal>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--gold-tint)', borderRadius: 26, padding: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <p style={{ ...eyebrow, color: 'var(--gold)' }}>Running now</p>
+                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, background: 'var(--gold-tint)', color: 'var(--gold)', borderRadius: 999, padding: '3px 10px' }}>
+                    ends {chActive.endDate}
+                  </span>
+                </div>
+                <p className="gd-disp" style={{ margin: '6px 0 2px', fontSize: 20, fontWeight: 700 }}>{chActive.name}</p>
+                <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
+                  {Number(chActive.targetKg).toLocaleString()} kg target · {chActive.prize || 'no prize set'} · {(chActive.joinedBy || []).length} joined
+                </p>
+
+                {(chActive.standings || []).length > 0 ? (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <p style={{ ...eyebrow, fontSize: 10 }}>Standings</p>
+                    {chActive.standings.slice(0, 5).map((row, i) => (
+                      <div key={row.userId || i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="gd-disp" style={{ width: 18, fontSize: 13, fontWeight: 700, color: i === 0 ? 'var(--gold)' : 'var(--ink-3)' }}>{i + 1}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</span>
+                        <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>{row.kg.toLocaleString()} kg</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ ...hintStyle, marginTop: 12 }}>Nobody has joined yet. It shows on Community with a join button.</p>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button onClick={() => openEditChallenge(chActive)} disabled={chSaving} style={{
+                    flex: 1, padding: 13, background: 'var(--soft)', border: 'none', borderRadius: 14,
+                    color: 'var(--ink-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: chSaving ? 0.5 : 1,
+                  }}>Edit</button>
+                  <button onClick={() => endChallengeNow(chActive)} disabled={chSaving} style={{
+                    flex: 1, padding: 13, background: 'var(--red-tint)', border: 'none', borderRadius: 14,
+                    color: 'var(--red-ink)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: chSaving ? 0.5 : 1,
+                  }}>End it now</button>
+                </div>
+              </div>
+              </Reveal>
+            )}
+
+            {/* ── nothing running ── */}
+            {!chLoading && !chActive && !chForm && (
+              <Reveal>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18, textAlign: 'center' }}>
+                <p className="gd-disp" style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>No challenge running</p>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                  Community shows nothing where the card was. Start one and it goes up with an announcement on the feed.
+                </p>
+                <button onClick={openStartChallenge} className="gd-disp gd-shine" style={{
+                  width: '100%', padding: 15, background: 'var(--grad)', border: 'none', borderRadius: 14,
+                  color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: 'var(--glow-grad)',
+                }}>Start a challenge</button>
+              </div>
+              </Reveal>
+            )}
+
+            {/* ── start / edit form ── */}
+            {chForm && (
+              <Reveal>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <p style={eyebrow}>{chEditingId ? 'Edit challenge' : 'New challenge'}</p>
+
+                <div>
+                  <p style={fieldLabel}>Name</p>
+                  <input type="text" placeholder="e.g. September Grind" value={chForm.name}
+                    onChange={e => setChForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
+                </div>
+
+                <div>
+                  <p style={fieldLabel}>Prize</p>
+                  <input type="text" placeholder="e.g. Tub of creatine 🏆" value={chForm.prize}
+                    onChange={e => setChForm(f => ({ ...f, prize: e.target.value }))} style={inputStyle} />
+                  <p style={hintStyle}>Shown on the card and in the announcement. Just a label — nothing tracks it.</p>
+                </div>
+
+                <div>
+                  <p style={fieldLabel}>Target (kg)</p>
+                  {/* Same draft-then-clamp-on-blur pattern as the session
+                      generator: a plain controlled number input restores the old
+                      value the moment you clear it, so it cannot be typed into. */}
+                  {[{ label: 'Target kg', value: chForm.targetKg, min: 1, step: 500, onChange: (v) => setChForm(f => ({ ...f, targetKg: v })) }].map(f => (
+                    <input
+                      key={f.label}
+                      type="number" value={numDraft[f.label] ?? String(f.value)} min={f.min} step={f.step}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        setNumDraft(d => ({ ...d, [f.label]: raw }));
+                        const n = parseInt(raw, 10);
+                        if (!Number.isNaN(n) && n >= f.min) f.onChange(n);
+                      }}
+                      onBlur={() => commitNum(f)}
+                      onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      style={{ ...inputStyle, fontSize: 16, fontWeight: 800, textAlign: 'center' }}
+                    />
+                  ))}
+                  {chSuggestion && (
+                    <p style={hintStyle}>
+                      The pack lifted <b style={{ color: 'var(--ink-2)' }}>{fmtKg(chSuggestion.packKg30d)} kg</b> in the last 30 days,
+                      so {chSuggestion.targetKg.toLocaleString()} kg is a target somebody can actually reach.
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <p style={fieldLabel}>Starts</p>
+                    <input type="date" value={chForm.startDate}
+                      onChange={e => setChForm(f => ({ ...f, startDate: e.target.value }))} style={inputStyle} />
+                  </div>
+                  <div>
+                    <p style={fieldLabel}>Ends</p>
+                    <input type="date" value={chForm.endDate}
+                      onChange={e => setChForm(f => ({ ...f, endDate: e.target.value }))} style={inputStyle} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => { setChForm(null); setChEditingId(null); setChMsg(null); }} disabled={chSaving} style={{
+                    flex: 1, padding: 15, background: 'var(--soft)', border: 'none', borderRadius: 14,
+                    color: 'var(--ink-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: chSaving ? 0.5 : 1,
+                  }}>Cancel</button>
+                  <button onClick={saveChallenge} disabled={chSaving} className="gd-disp gd-shine" style={{
+                    flex: 1.4, padding: 15, background: 'var(--grad)', border: 'none', borderRadius: 14,
+                    color: 'var(--on-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    opacity: chSaving ? 0.5 : 1, boxShadow: chSaving ? 'none' : 'var(--glow-grad)',
+                  }}>{chSaving ? 'Saving…' : chEditingId ? 'Save changes' : 'Start it'}</button>
+                </div>
+              </div>
+              </Reveal>
+            )}
+
+            {/* ── history ── */}
+            {!chLoading && chPast.length > 0 && (
+              <>
+                <p style={{ ...eyebrow, marginLeft: 4 }}>Past challenges</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {chPast.map(c => (
+                    <div key={c.id} style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 14, padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name || 'Untitled'}</p>
+                        <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--ink-3)' }}>{c.startDate} → {c.endDate}</span>
+                      </div>
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                        {c.winnerName
+                          ? <><b style={{ color: 'var(--gold)' }}>{c.winnerName}</b> won it — {Number(c.targetKg).toLocaleString()} kg target</>
+                          : c.closestName
+                            ? <>Nobody reached {Number(c.targetKg).toLocaleString()} kg · {c.closestName} closest on {fmtKg(c.closestKg)} kg</>
+                            : <>Nobody logged against it · {Number(c.targetKg).toLocaleString()} kg target</>}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
 

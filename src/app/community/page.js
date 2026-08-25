@@ -223,15 +223,20 @@ export default function CommunityPage() {
 
   const myRank = leaderboard.findIndex(u => u.userId === userId);
 
-  // Challenge derived values
+  // Challenge derived values. A finished challenge is a different card, not the
+  // running one with the numbers greyed out — no countdown, no progress bar to
+  // a target nobody will reach now, no join button.
+  const chEnded = challenge?.status === 'ended';
   const chJoined = challenge?.joinedBy?.includes(userId);
-  const chMine = challenge?.progress?.find(p => p.userId === userId);
+  const chStandings = (chEnded ? challenge?.finalStandings : challenge?.progress) || [];
+  const chMine = chStandings.find(p => p.userId === userId);
   const chMyKg = chMine?.kg || 0;
+  const chMyPlace = chStandings.findIndex(p => p.userId === userId);
   const chPct = challenge ? Math.min((chMyKg / challenge.targetKg) * 100, 100) : 0;
-  const chDaysLeft = challenge
-    ? Math.max(Math.ceil((new Date(challenge.endDate) - new Date()) / 86400000), 0)
-    : 0;
-  const chLeader = challenge?.progress?.[0];
+  // Counted server-side against the gym's own calendar. Working it out here from
+  // a bare 'YYYY-MM-DD' parses as UTC midnight and lands a day out.
+  const chDaysLeft = Math.max(challenge?.daysLeft ?? 0, 0);
+  const chLeader = chStandings[0];
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
@@ -251,31 +256,87 @@ export default function CommunityPage() {
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* ── CHALLENGE (real) ── */}
+        {/* ── CHALLENGE ── */}
+        {/* No challenge running means NO card. An empty shell where the card
+            was is worse than the space it leaves. */}
         {challenge && (
           <Reveal>
           <div className="gd-shine" style={{
             background: 'linear-gradient(180deg, var(--card-2), var(--card))',
-            border: '1px solid var(--gold-tint)', borderRadius: 26, padding: 18,
+            border: `1px solid ${chEnded ? 'var(--line)' : 'var(--gold-tint)'}`, borderRadius: 26, padding: 18,
             boxShadow: 'var(--shadow-card)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--gold)', textTransform: 'uppercase' }}>
-                Challenge · prize: {challenge.prize}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: chEnded ? 'var(--ink-3)' : 'var(--gold)', textTransform: 'uppercase' }}>
+                {chEnded ? 'Challenge finished' : `Challenge · prize: ${challenge.prize}`}
               </p>
-              <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--gold-tint)', color: 'var(--gold)', borderRadius: 999, padding: '3px 10px' }}>
-                {chDaysLeft} day{chDaysLeft === 1 ? '' : 's'} left
-              </span>
+              {!chEnded && (
+                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, background: 'var(--gold-tint)', color: 'var(--gold)', borderRadius: 999, padding: '3px 10px' }}>
+                  {chDaysLeft} day{chDaysLeft === 1 ? '' : 's'} left
+                </span>
+              )}
             </div>
             <p className="gd-disp" style={{ margin: '6px 0 2px', fontSize: 21, fontWeight: 700 }}>{challenge.name}</p>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>
-              First to {challenge.targetKg.toLocaleString()} kg takes it home
+              {chEnded
+                ? `Target was ${challenge.targetKg.toLocaleString()} kg · ${challenge.startDate} to ${challenge.endDate}`
+                : `First to ${challenge.targetKg.toLocaleString()} kg takes it home`}
             </p>
 
-            {challenge.winnerName ? (
+            {chEnded ? (
+              <>
+                {/* Say plainly what happened. Either someone won it, or nobody
+                    did and this is who came closest — never a dead progress bar. */}
+                <div style={{
+                  marginTop: 14, borderRadius: 14, padding: '12px 14px',
+                  background: challenge.winnerName ? 'var(--gold-tint)' : 'var(--soft)',
+                  border: `1px solid ${challenge.winnerName ? 'var(--gold)' : 'var(--line)'}`,
+                }}>
+                  {challenge.winnerName ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /></svg>
+                      <p className="gd-disp" style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
+                        {challenge.winnerName} takes {challenge.prize || 'it'}
+                      </p>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)', textAlign: 'center' }}>
+                      {challenge.closestName
+                        ? <>Nobody reached {challenge.targetKg.toLocaleString()} kg. <b style={{ color: 'var(--ink)' }}>{challenge.closestName}</b> got closest with {fmtKg(challenge.closestKg)} kg.</>
+                        : <>Nobody logged against this one.</>}
+                    </p>
+                  )}
+                </div>
+
+                {chStandings.length > 0 && (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <p style={{ ...eyebrow, fontSize: 10 }}>Final standings</p>
+                    {chStandings.slice(0, 3).map((p, i) => {
+                      const me = p.userId === userId;
+                      return (
+                        <div key={p.userId || i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span className="gd-disp" style={{ width: 18, fontSize: 13, fontWeight: 700, color: i === 0 ? 'var(--gold)' : 'var(--ink-3)' }}>{i + 1}</span>
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: me ? 800 : 600, color: me ? 'var(--ink)' : 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {p.name}{me ? ' (you)' : ''}
+                          </span>
+                          <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>{fmtKg(p.kg)} kg</span>
+                        </div>
+                      );
+                    })}
+                    {chMyPlace >= 3 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 6, borderTop: '1px solid var(--line-2)' }}>
+                        <span className="gd-disp" style={{ width: 18, fontSize: 13, fontWeight: 700, color: 'var(--ink-3)' }}>{chMyPlace + 1}</span>
+                        <span style={{ flex: 1, fontSize: 13.5, fontWeight: 800, color: 'var(--ink)' }}>You</span>
+                        <span style={{ flexShrink: 0, fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-2)' }}>{fmtKg(chMyKg)} kg</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : challenge.winnerName ? (
               <div style={{ marginTop: 14, background: 'var(--gold-tint)', border: '1px solid var(--gold)', borderRadius: 14, padding: '12px 14px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /></svg>
-                <p className="gd-disp" style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{challenge.winnerName} takes the creatine!</p>
+                <p className="gd-disp" style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{challenge.winnerName} takes {challenge.prize || 'it'}!</p>
               </div>
             ) : chJoined ? (
               <>
@@ -287,7 +348,7 @@ export default function CommunityPage() {
                       transition: 'width 1.2s cubic-bezier(0.22, 1, 0.36, 1)',
                     }} />
                   </div>
-                  {(challenge.progress || []).slice(0, 3).map((p, ri) => {
+                  {chStandings.slice(0, 3).map((p, ri) => {
                     const left = Math.min(Math.max((p.kg / challenge.targetKg) * 100, 3), 97);
                     const mine = p.userId === userId;
                     return (

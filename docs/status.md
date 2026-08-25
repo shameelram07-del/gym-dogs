@@ -66,6 +66,35 @@ Still needed: <frontend push / API zip redeploy / app setting / nothing>
 
 ---
 
+### 2026-08-25 — challenges the coach actually runs (coach-challenges.md)
+Built by: Claude Code
+Shipped: challenges have a lifecycle. A challenge is now a normal doc with its own id and a
+`status`, not one hardcoded singleton auto-created in code and never ended — which is why the
+100,000 kg club sat at "0 days left" against a target roughly 3× what the pack lifts in a month.
+New **Challenges** tab in Coach HQ: start (name, prize, target, dates), edit, end early, live
+standings, and a list of past ones. The suggested target is the pack's real 30-day volume, rounded,
+and the screen says what it is based on. At most one runs at a time, refused server-side with a
+message. A challenge whose end date has passed is closed **on read**, freezing final standings and
+recording the winner or who got closest. Community shows a finished challenge with final standings
+and no countdown/progress bar/join button, keeps it for 7 days, then shows nothing at all rather
+than an empty shell. Coach-only is enforced server-side, not just by hiding the tab.
+Also fixed the three **UTC date bugs** in `communityPosts` via a new `gymdogs-api-v2/lib/day.js`.
+The one that bit: `today <= endDate` decides whether someone can still win, and as a UTC date it
+flipped at midday NZ — so on the final day the window shut half a day early and a target beaten in
+the afternoon would not have been credited.
+**`gymdogs-api-v2` is now a git repo** — it was production source with no undo. A patch script
+truncated `communityPosts/index.js` to 0 bytes during this build; recovered and independently
+verified byte-identical against the deploy zip by Cowork. Baseline is the as-deployed code.
+Touched: `gymdogs-api-v2/communityPosts/index.js`, `gymdogs-api-v2/lib/day.js` (new),
+`gymdogs-api-v2/.gitignore` (new), `src/app/coach/page.js`, `src/app/community/page.js`,
+`scripts/migrate-challenge-doc.js` (new)
+Still needed: **API zip redeploy** (13 function folders, preflight clean) — nothing works until
+then. After deploying, run `node scripts/migrate-challenge-doc.js` (dry run) then `--apply` to give
+the 100,000 kg club its status and standings. Not run yet. **Untested end to end — needs the
+deploy.** Frontend push also needed.
+
+---
+
 ### 2026-08-25 — retired sessions were showing up as saved drafts
 Built by: Claude Code
 Shipped: `workoutPlans` listed drafts as "isActive = false and not archived", but publishing a plan
