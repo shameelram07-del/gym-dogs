@@ -31,6 +31,10 @@ function readinessStyle(score) {
 
 const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', equipment: '', sets: 3, reps: '10-12', cue: '', equipFilter: 'All' });
 
+// Enough to recognise the one you want without turning the tail of the screen
+// into a list again.
+const DRAFTS_PREVIEW = 5;
+
 // The session tag is now the STYLE, not the shape — what the groups are is the
 // coach's job, and he picks that above the button.
 const STYLE_BRIEF = {
@@ -106,6 +110,8 @@ export default function CoachDashboard() {
   // null means "follow the minutes"; a number means the coach overrode it.
   const [countOverride, setCountOverride] = useState(null);
   const [runNote, setRunNote] = useState('');
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [draftsAll, setDraftsAll] = useState(false);
   const [clients, setClients] = useState([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [assignedTo, setAssignedTo] = useState([]); // empty = everyone
@@ -219,6 +225,19 @@ export default function CoachDashboard() {
     // and otherwise just drop the draft so the previous number comes back.
     if (Number.isNaN(n)) { if (f.onEmpty) f.onEmpty(); return; }
     f.onChange(Math.min(Math.max(n, f.min), f.max ?? Infinity));
+  };
+
+  // Newest first: the API hands these back in whatever order Cosmos stored
+  // them, and "the newest 5" has to mean something.
+  const draftsNewest = [...drafts].sort((a, b) =>
+    String(b.createdAt || b.date || '').localeCompare(String(a.createdAt || a.date || ''))
+  );
+  const draftsShown = draftsAll ? draftsNewest : draftsNewest.slice(0, DRAFTS_PREVIEW);
+
+  // Collapsing also forgets "show all", so reopening starts short again.
+  const toggleDrafts = () => {
+    if (draftsOpen) setDraftsAll(false);
+    setDraftsOpen(o => !o);
   };
 
   // Derived rather than held in state, so changing the minutes moves the count
@@ -583,24 +602,6 @@ export default function CoachDashboard() {
               </div>
             )}
 
-            {drafts.length > 0 && (
-              <div>
-                <p style={{ ...eyebrow, marginLeft: 4, marginBottom: 8 }}>Saved drafts</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {drafts.map(d => (
-                    <div key={d.id} style={{ background: 'var(--card)', border: `1px solid ${draftId === d.id ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name || 'Untitled'}</p>
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)' }}>{d.exercises?.length || 0} exercises · {d.tag} · {d.date}</p>
-                      </div>
-                      <button onClick={() => editDraft(d)} style={{ flexShrink: 0, background: 'var(--accent-tint)', border: 'none', borderRadius: 10, padding: '8px 12px', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Edit</button>
-                      <button onClick={() => deleteDraft(d)} aria-label="Delete draft" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--red-ink)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Delete</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <p id="gd-builder-form" style={{ ...eyebrow, marginLeft: 4, scrollMarginTop: 12 }}>{draftId ? 'Editing draft' : 'Create new session'}</p>
 
             <Reveal delay={100}>
@@ -842,6 +843,45 @@ export default function CoachDashboard() {
               <button onClick={() => handlePublish(false)} disabled={saving} style={{ flex: 1, padding: 15, background: 'var(--soft)', border: 'none', borderRadius: 14, color: 'var(--ink-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1 }}>Save draft</button>
               <button onClick={() => handlePublish(true)} disabled={saving} className="gd-disp gd-shine" style={{ flex: 1.4, padding: 15, background: 'var(--grad)', border: 'none', borderRadius: 14, color: 'var(--on-accent)', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: saving ? 0.5 : 1, boxShadow: saving ? 'none' : 'var(--glow-grad)' }}>Publish &amp; activate</button>
             </div>
+
+            {/* Drafts live BELOW the builder and start closed. Building a
+                session is what this screen is for; scrolling past eleven old
+                drafts to reach the form was the wrong way round. */}
+            {draftsNewest.length > 0 && (
+              <div>
+                <button onClick={toggleDrafts} aria-expanded={draftsOpen} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'var(--soft)', border: 'none', borderRadius: 16, padding: '13px 16px',
+                  color: 'var(--ink-2)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>
+                  <span>Saved drafts ({draftsNewest.length})</span>
+                  <span style={{ color: 'var(--ink-3)', fontSize: 16, transform: draftsOpen ? 'rotate(90deg)' : 'none', transition: 'transform .15s ease' }}>&rsaquo;</span>
+                </button>
+
+                {draftsOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                    {draftsShown.map(d => (
+                      <div key={d.id} style={{ background: 'var(--card)', border: `1px solid ${draftId === d.id ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name || 'Untitled'}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--ink-3)' }}>{d.exercises?.length || 0} exercises · {d.tag} · {d.date}</p>
+                        </div>
+                        <button onClick={() => editDraft(d)} style={{ flexShrink: 0, background: 'var(--accent-tint)', border: 'none', borderRadius: 10, padding: '8px 12px', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Edit</button>
+                        <button onClick={() => deleteDraft(d)} aria-label="Delete draft" style={{ flexShrink: 0, background: 'none', border: 'none', color: 'var(--red-ink)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Delete</button>
+                      </div>
+                    ))}
+                    {draftsNewest.length > DRAFTS_PREVIEW && (
+                      <button onClick={() => setDraftsAll(v => !v)} style={{
+                        background: 'none', border: 'none', padding: '4px 0 0',
+                        color: 'var(--accent-strong)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                      }}>
+                        {draftsAll ? 'Show fewer' : `Show all ${draftsNewest.length}`}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
