@@ -11,6 +11,42 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — feed post counted pre-filled sets as logged
+Built by: Claude Code
+Shipped: a session with 4 logged sets posted "7 sets" to the feed. `shareToFeed` counted
+`s.done || s.kg || s.reps`, and progressive overload pre-fills last session's kg into rows nobody has
+touched, so three untouched rows counted. Volume was right throughout — kg × 0 reps is 0 — so only
+the count was ever wrong, and `volStr` was not touched.
+
+**Definition kept: reps entered, or ticked done. Not kg.** That is `isLogged`, which already existed
+in this file as the autosave rule — comment and all, "pre-filled weights (progressive overload)
+alone must NOT create a session". It was local to the autosave effect, so nothing else could reach
+it. Lifted to module scope with the reasoning written up, and now used by autosave, the feed count
+and one more site below.
+
+**Checked the other five places sets get filtered. Two were the same bug, three are not:**
+- **Fixed** — the summary sent to `aiCoach` on finish (`filter(s => s.kg || s.reps)`) had the same
+  defect from the other direction: a pre-filled row rendered as `80kg x ? reps`, so the coach note
+  was written against sets nobody performed.
+- **Left alone** — `formatLast` looks like the identical filter but reads `lastSession`, not `logs`.
+  That is what came back from the server, where every row was really performed; there is no pre-fill
+  to exclude, and `isLogged` there would *hide* a saved set ticked without reps.
+- **Left alone, deliberately looser** — the two `hadData` checks in `swapExercise` and
+  `removeExerciseFromSession`. They are not asking "was this done" but "might anything have been
+  saved for it", and the answer must stay yes for a set that was autosaved and then had its reps
+  cleared. Tightening those to `isLogged` would leave the old exercise's volume on the server
+  permanently. Both now carry a comment saying so.
+- Untouched and already correct: `doneSets` and `doneExercises` use `s.done` only.
+
+Touched: `src/app/workout/page.js`
+Still needed: frontend push. No API redeploy, no `FIELDS` change. `npm run build` passes.
+**Verified before the push**, on localhost with the feed POST intercepted so nothing reached the
+pack: 4 sets logged on a 6-exercise session, post body
+`Crushed Iron Grip Fury — 4 sets, 2.4k kg total volume 💪`. It said **7 sets** before the fix, and
+the volume is unchanged at 2.4k kg.
+
+---
+
 ### 2026-08-27 — app sweep: nine defects from the 26 Aug drive-through
 Built by: Claude Code
 Shipped: brief `docs/briefs/app-sweep-fixes.md`. **Eight of the nine fixed; item 14 was a mirage.**
@@ -130,8 +166,14 @@ gives a different six), titles across three runs (**Strength Unleashed / Power S
 Grit** — varied, no filler words, not exercise names), Clients at 15, the Progress headline matching
 its bars, PRs reading 23 on both Profile and Progress, and the dashboard challenge card naming the
 live challenge.
-**Not tested live:** the two feed strings (`3.6k kg`, "1 exercise") and the Eat slot catch-up — both
-need a real workout finished / a day's food logged, so they are the two to watch first.
+**`3.6k kg` now confirmed live on the deployed site** (published a session to a single member and
+finished it the morning of the 27th). The real feed post reads
+`Crushed Iron Grip Fury — 7 sets, 2.4k kg total volume` sitting directly above an older
+`Crushed Push Day — 9 sets, 1.5kkg` — the old bug and the fix in the same feed, one post apart.
+That same post is also where the **"7 sets"** count bug was caught; it is fixed in the entry above,
+so this one post proves both.
+**Still not tested live:** "1 exercise" (needs a 1-exercise session published) and the Eat slot
+catch-up (needs a day's food logged, then Eat opened in a later slot).
 
 Out of scope and untouched, as briefed: publishing a session, posting to the community feed, and the
 `--vio` violet on the readiness ring.

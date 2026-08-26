@@ -36,6 +36,19 @@ const DEMO_PLAN = {
   ],
 };
 
+/**
+ * Has this set actually been done?
+ *
+ * Reps entered, or ticked off. **Not kg** — progressive overload pre-fills last
+ * session's weight into rows nobody has touched, so `s.kg` is true on sets that
+ * were never performed. Autosave has always used this rule (a pre-filled weight
+ * alone must not create a session); the feed post did not, and announced "7 sets"
+ * for a session with 4 logged and 3 pre-filled.
+ *
+ * Volume is immune — kg × 0 reps is 0 — which is why only the count was wrong.
+ */
+const isLogged = (s) => !!((s.reps && String(s.reps).trim()) || s.done);
+
 function toSlug(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -363,9 +376,6 @@ export default function WorkoutPage() {
   useEffect(() => {
     if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
     if (activePlan.date && activePlan.date !== TODAY) return; // don't save a previous day's session under today
-    // A set only counts as "logged" if reps were entered or it was ticked done —
-    // pre-filled weights (progressive overload) alone must NOT create a session.
-    const isLogged = (s) => (s.reps && String(s.reps).trim()) || s.done;
     const hasData = exercises.some((_, i) => (logs[i] || []).some(isLogged));
     if (!hasData) return;
     setAutoSaveStatus('saving');
@@ -462,6 +472,10 @@ export default function WorkoutPage() {
 
   const swapExercise = (idx, libEx) => {
     const old = exercises[idx];
+    // Deliberately looser than `isLogged`: the question is not "was this done"
+    // but "might anything have been saved for it", and the answer has to stay
+    // yes for a set that was autosaved and then had its reps cleared. Answering
+    // no there would leave the old exercise's volume on the server for good.
     const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);
     setExercises(prev => prev.map((e, i) => (i === idx ? fromLib(libEx) : e)));
     setLogs(prev => ({ ...prev, [idx]: blankSets(libEx.defaultSets) }));
@@ -475,7 +489,7 @@ export default function WorkoutPage() {
     const len = exercises.length;
     if (len <= 1) { showToast('Cannot remove the only exercise'); return; }
     const removed = exercises[idx];
-    const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);
+    const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);   // loose on purpose — see swapExercise
     setExercises(prev => prev.filter((_, i) => i !== idx));
     setLogs(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
     setLastSession(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
@@ -564,7 +578,7 @@ export default function WorkoutPage() {
       setShowComplete(true);
 
       const summary = exercises.map((ex, idx) => {
-        const sets = (logs[idx] || []).filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
+        const sets = (logs[idx] || []).filter(isLogged).map(s => `${s.kg||'?'}kg x ${s.reps||'?'} reps`).join(', ');
         return sets ? `${ex.name}: ${sets}` : null;
       }).filter(Boolean).join('. ');
       if (summary) getAICoachNote(summary);
@@ -586,7 +600,7 @@ export default function WorkoutPage() {
       // Carries its own unit. The two post texts below appended `kg` themselves,
       // which is how the feed came to read "3.6kkg".
       const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k kg` : `${Math.round(vol)} kg`;
-      const nSets = Object.values(logs).flat().filter(s => s.done || s.kg || s.reps).length;
+      const nSets = Object.values(logs).flat().filter(isLogged).length;
       const res = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY || '' },
@@ -616,6 +630,9 @@ export default function WorkoutPage() {
   const formatLast = (exIdx) => {
     const sets = lastSession[exIdx];
     if (!sets || sets.length === 0) return null;
+    // Reads lastSession, NOT logs. This is what came back from the server, so
+    // every row in it was really performed — there is no pre-fill to exclude and
+    // `isLogged` here would hide a saved set that was ticked without reps.
     return sets.filter(s => s.kg || s.reps).map(s => `${s.kg||'?'}kg × ${s.reps||'?'}`).join(', ');
   };
 
