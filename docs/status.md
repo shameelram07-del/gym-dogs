@@ -27,7 +27,7 @@ row's block partner as unavailable, naming the partner. Style loses FULL BODY (a
 and already a day preset). Regenerate warns only when there are hand edits, naming them. Publish
 confirms and states the audience and the feed post; Save draft / Publish stay side by side.
 Touched also: `Reveal.js` — see the note below.
-Still needed: frontend push only. No API redeploy, no `FIELDS` change; the published plan document
+Deployed: pushed as `e7b3ca3`. No API redeploy, no `FIELDS` change; the published plan document
 keeps its exact shape. Build passes; lint 37 problems, **identical to baseline**.
 
 Notes back to Cowork — three things:
@@ -37,13 +37,19 @@ Notes back to Cowork — three things:
    intersect** — and `Reveal` is driven by IntersectionObserver, so every Reveal in a hidden panel
    would have been sitting at `opacity: 0` waiting on an observer that may not fire. `Reveal` now
    reveals immediately when `getClientRects()` is empty. **Anything else that keeps panels mounted
-   needs this.**
+   needs this.** **Verified on localhost before the push** — generated a Pull session, switched to
+   Challenges, switched back: all six exercises and the collapsed brief still there, no blank tab.
+   The guard holds; this is no longer a theoretical fix.
 2. **Swap disables clashing exercises rather than hiding them**, with the reason ("same station as
    Barbell Row"). The brief said exclude. Showing why beats silently shortening the list — but it is
    a deviation, so overrule it if you meant hidden.
 3. The `#gd-builder-form` anchor is now `#gd-session` and sits on the session card itself, rather
    than pointing an old name at a new place.
-**Untested — Shameel to run `npm run dev`.**
+
+Tested: **Done-when 3 (the tab-switch regression) passes** — Shameel ran it on localhost before the
+push. That was the one this whole split risked, and the only one verified so far. Items 1–2 and
+4–12 are still unchecked: swap's block-partner filtering, regenerate's warn-on-edits, the publish
+confirmation, and the name auto-fill rules.
 
 ---
 
@@ -68,7 +74,7 @@ tokens across six files. `BarcodeScanner` keeps its literal black/white delibera
 camera viewport over live video, not a themed surface.
 Touched: `lib/ui.js` (new), `globals.css`, `layout.js`, `BottomNav.js`, and the eyebrow/cardStyle
 import swap in all 11 screens + AddFoodSheet, EditItemSheet, TargetsSetup.
-Still needed: frontend push only. No API redeploy, no `FIELDS` change. `npm run build` passes; lint
+Deployed: pushed as `a58b41a`. No API redeploy, no `FIELDS` change. `npm run build` passes; lint
 is at 37 problems, **identical to the pre-change baseline**.
 For Cowork: `docs/briefs/coach-hq-rebuild.md` should be built on `lib/ui.js` — `cardStyle`, `chip`,
 `fieldLabel` and `banner` already exist, so the rebuild adds `ExerciseRow` rather than new styling.
@@ -98,7 +104,8 @@ there is no longer an uncapped path.
 Touched: API — `aiCoach/index.js`, `dayWrap/index.js`, `lib/aiBudget.js`. Frontend —
 `app/coach/page.js`, `app/nutrition/page.js`, `app/dashboard/page.js`, `app/workout/page.js`,
 `lib/food.js`, `components/AddFoodSheet.js`, `components/EditItemSheet.js`.
-Still needed: **API zip redeploy** (13 functions) *and* the frontend push. No `FIELDS` change — the
+Deployed: frontend pushed as `57acb76`. **API zip redeploy (13 functions) still outstanding — the
+cap is not live until it runs.** No `FIELDS` change — the
 spend doc is `aispend_<month>` in `users` with a matching `userId`, so `userProfiles` never sees it.
 Deploy the API first: an old frontend reads the 429 as a plain failure and still falls back
 correctly, whereas a new frontend against the old API simply never sees a 429.
