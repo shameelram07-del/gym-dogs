@@ -96,6 +96,13 @@ export default function NutritionPage() {
   const [items, setItems] = useState([]);   // flat, in the order they were eaten
   const [waterMl, setWaterMl] = useState(0);
   const [adding, setAdding] = useState(false);
+  // The sheet now closes on every add, so this screen carries the whole
+  // confirmation: a toast naming what landed, and the new row lit up for a
+  // moment so the eye finds it in the list.
+  const [toast, setToast] = useState(null);
+  const [justAdded, setJustAdded] = useState(null);   // id of the newest row
+  const toastTimer = useRef();
+  const highlightTimer = useRef();
   const [editingWater, setEditingWater] = useState(false);
   const [editing, setEditing] = useState(null);   // the logged item being corrected
   const [saveError, setSaveError] = useState('');
@@ -387,6 +394,12 @@ export default function NutritionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, userId, TODAY, total.calories, !!targets]);
 
+  // Leaving the screen mid-toast must not fire a setState into nothing.
+  useEffect(() => () => {
+    clearTimeout(toastTimer.current);
+    clearTimeout(highlightTimer.current);
+  }, []);
+
   function openSetup() {
     setSetupForm(seedFromProfile(profileRef));
     setSetupOpen(true);
@@ -408,15 +421,23 @@ export default function NutritionPage() {
   const calPct = Math.min(total.calories / T.calories, 1);
   const R = 52, CIRC = 2 * Math.PI * R;
 
-  // The sheet stays open after an add, so a whole meal goes in without reopening.
+  // The sheet closes itself on every add, so this is also where the add is
+  // confirmed — nothing else tells him it worked.
   const addItem = (item) => {
     const stamped = { ...item, at: new Date().toISOString() };
-    // From the ref, not `items`: the sheet stays open so a whole meal can be
-    // logged in one visit, and several adds can land before React re-renders.
-    // Reading the closure there kept only the last one.
+    // From the ref, not `items`: an add can land before React has re-rendered
+    // the previous one. Reading the closure there kept only the last one.
     const next = [...itemsRef.current, stamped];
     itemsRef.current = next;
     setItems(next);
+
+    setToast(stamped.name);
+    setJustAdded(stamped.id);
+    clearTimeout(toastTimer.current);
+    clearTimeout(highlightTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+    // Outlives the toast, then fades out via the row's own transition.
+    highlightTimer.current = setTimeout(() => setJustAdded(null), 2600);
     saveProfile({
       nutrition: nutritionPayload(next, waterRef.current),
       ...logPatch(next),
@@ -602,7 +623,11 @@ export default function NutritionPage() {
                 </div>
 
                 {rows.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderTop: '1px solid var(--line-2)' }}>
+                  <div key={item.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderTop: '1px solid var(--line-2)',
+                    background: item.id === justAdded ? 'var(--accent-tint)' : 'transparent',
+                    transition: 'background-color .55s ease',
+                  }}>
                     <span style={{ fontSize: 19, width: 26, textAlign: 'center', flexShrink: 0 }}>{emojiFor(item.name)}</span>
                     <button onClick={() => setEditing(item)} style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -796,6 +821,20 @@ export default function NutritionPage() {
           onSaveFavourites={(favs) => { if (profileLoaded.current) saveProfile({ foodFavourites: favs }); }}
           onClose={() => setAdding(false)}
         />
+      )}
+
+      {/* ── ADD CONFIRMED ── the sheet has closed by now, so this is the receipt */}
+      {toast && (
+        <div role="status" aria-live="polite" style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          bottom: 'calc(78px + env(safe-area-inset-bottom))', zIndex: 110,
+          background: 'var(--accent)', color: 'var(--on-accent)', padding: '11px 18px', borderRadius: 999,
+          fontSize: 14, fontWeight: 700, boxShadow: '0 12px 30px -10px rgba(0,0,0,0.5)',
+          maxWidth: 'min(84vw, 420px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          animation: 'gdRise .25s ease',
+        }}>
+          ✓ Added {toast}
+        </div>
       )}
 
       <BottomNav />

@@ -137,24 +137,13 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
   // quick add
   const [quick, setQuick] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
 
-  // Feedback. The sheet deliberately stays open so you can log a whole meal in
-  // one visit — which means every add MUST confirm itself, or it reads as broken.
-  const [added, setAdded] = useState([]);          // names, most recent last
-  const [toast, setToast] = useState(null);
-  const toastTimer = useRef();
-  useEffect(() => () => clearTimeout(toastTimer.current), []);
-
-  function commit(item, { close } = {}) {
+  // Every add closes the sheet — one add, one visible result. The confirmation
+  // now lives on the Nutrition screen behind (a toast and the new row briefly
+  // highlighted), because the in-sheet signals were too quiet to be noticed.
+  function commit(item) {
     onAdd(item);
-    setAdded((a) => [...a, item.name]);
-    setToast(item.name);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 1800);
     if (navigator.vibrate) navigator.vibrate(18);
-    // Drop the photo once it has produced something logged, so it can't quietly
-    // attach itself to the next, unrelated estimate.
-    setPhotoPreview(null);
-    if (close) onClose();
+    onClose();
   }
 
   // Pre-fill the meal name from whatever came back, but stop overwriting it the
@@ -339,15 +328,8 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ minWidth: 0 }}>
                 <h3 className="gd-disp" style={{ fontSize: 19, fontWeight: 800, margin: 0 }}>Add food</h3>
-                {added.length > 0 && (
-                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--accent-strong)', fontWeight: 600 }}>
-                    {added.length} added &mdash; keep going or tap Done
-                  </p>
-                )}
               </div>
-              {added.length > 0
-                ? <button onClick={onClose} style={{ background: 'var(--accent)', border: 'none', color: 'var(--on-accent)', padding: '9px 16px', borderRadius: 999, fontSize: 14, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>Done</button>
-                : <button onClick={onClose} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', color: 'var(--ink-2)', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>×</button>}
+              <button onClick={onClose} aria-label="Close" style={{ background: 'var(--soft)', border: 'none', color: 'var(--ink-2)', width: 32, height: 32, borderRadius: '50%', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>×</button>
             </div>
           </div>
 
@@ -367,19 +349,6 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
               );
             })}
           </div>
-
-          {/* Confirmation — sits above the body so it's visible from any tab */}
-          {toast && (
-            <div style={{
-              position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(24px + env(safe-area-inset-bottom))',
-              background: 'var(--accent)', color: 'var(--on-accent)', padding: '11px 18px', borderRadius: 999,
-              fontSize: 14, fontWeight: 700, boxShadow: '0 12px 30px -10px rgba(0,0,0,0.5)', zIndex: 5,
-              maxWidth: '84%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              animation: 'gdRise .25s ease',
-            }}>
-              ✓ {toast}
-            </div>
-          )}
 
           {/* Body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px calc(20px + env(safe-area-inset-bottom))' }}>
@@ -655,7 +624,7 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
                               : (mealName.trim() || mealNameFrom(aiResult.items)),
                             ...totals,
                             ...(single ? {} : { components: aiResult.items }),
-                          }, { close: true });
+                          });
                         }} style={{ ...primaryBtn(true), width: '100%', marginTop: aiResult.items.length >= 2 ? 10 : 12 }}>
                           {aiResult.items.length >= 2 ? 'Log as one meal' : 'Log it'} &middot; {sumItems(aiResult.items).calories} kcal
                         </button>
