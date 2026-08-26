@@ -37,6 +37,50 @@ const templateSession = (groups, count, people) => {
   return built.length ? built : [emptyExercise()];
 };
 
+/**
+ * The title, as the model actually returns it.
+ *
+ * It comes back wrapped in quotes often enough that the field would otherwise
+ * read “Iron Harvest”, quote marks and all, and a model that decides to write a
+ * sentence must not land a sentence in a heading — anything long is discarded
+ * and `suggestName` takes over.
+ */
+function cleanTitle(raw) {
+  if (typeof raw !== 'string') return '';
+  const t = raw
+    .replace(/["“”‘’]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.]+$/, '');
+  return t.length > 0 && t.length <= 40 ? t : '';
+}
+
+/**
+ * The reply, in either shape it arrives in.
+ *
+ * The prompt now asks for {"title":…,"exercises":[…]}, but a bare array is still
+ * accepted — the model drops back to the old shape often enough that treating
+ * one as a failure would silently swap a real AI session for a template.
+ */
+function parseAiReply(text) {
+  if (!text) return { title: '', items: [] };
+  const obj = text.match(/\{[\s\S]*\}/);
+  if (obj) {
+    try {
+      const d = JSON.parse(obj[0]);
+      if (d && Array.isArray(d.exercises)) return { title: cleanTitle(d.title), items: d.exercises };
+    } catch { /* not the object shape — try the array below */ }
+  }
+  const arr = text.match(/\[[\s\S]*\]/);
+  if (arr) {
+    try {
+      const d = JSON.parse(arr[0]);
+      if (Array.isArray(d)) return { title: '', items: d };
+    } catch { /* nothing usable in there */ }
+  }
+  return { title: '', items: [] };
+}
+
 function findExercise(name) {
   const target = String(name).toLowerCase().trim();
   for (const group of muscleGroups) {
@@ -204,7 +248,10 @@ export function useSessionBuilder({ userId, clients }) {
         ].filter(Boolean) : []),
         '',
         'Choose ONLY exercises from this catalogue, copying the names exactly.',
-        'Reply with ONLY a JSON array, no prose, in the form [{"name":"exact name","sets":3,"reps":"10-12","block":"A"}].',
+        '',
+        'Also NAME the session. Short and punchy — 2 to 4 words, title case, no quotes and no emoji.',
+        'Something a coach would chalk on the board: "Iron Harvest", "Steel Rain", "The Long Pull". Not "Pull Day".',
+        'Reply with ONLY a JSON object, no prose, in the form {"title":"Iron Harvest","exercises":[{"name":"exact name","sets":3,"reps":"10-12","block":"A"}]}.',
         `Catalogue:\n${catalogueFor(groups)}`,
       ].filter((l) => l !== null && l !== undefined).join('\n');
 
@@ -226,12 +273,12 @@ export function useSessionBuilder({ userId, clients }) {
       }
 
       let parsed = [];
-      const match = text && text.match(/\[[\s\S]*\]/);
-      if (match) {
+      const { title: aiTitle, items } = parseAiReply(text);
+      if (items.length) {
         try {
           const chosen = new Set(groups);
           const seen = new Set();
-          parsed = JSON.parse(match[0]).map((item) => {
+          parsed = items.map((item) => {
             const lib = findExercise(item && item.name);
             // A name that isn't in the library, is a repeat, or belongs to a
             // group he didn't ask for is dropped rather than shown.
@@ -258,7 +305,9 @@ export function useSessionBuilder({ userId, clients }) {
       const usedAI = parsed.length >= 3;
       // The pairing rule is verified here, not trusted.
       const built = usedAI ? fillToCount(parsed, groups, count, heads) : templateSession(groups, count, heads);
-      applyGenerated(built, heads, groups);
+      // A template session is not the one the model named, so it gets the
+      // target-derived name rather than a title describing exercises it doesn't have.
+      applyGenerated(built, heads, groups, usedAI ? aiTitle : '');
       setSaveMsg({
         type: 'success',
         text: usedAI
@@ -277,14 +326,15 @@ export function useSessionBuilder({ userId, clients }) {
   };
 
   /** Shared by generate and regenerate: install a fresh session and collapse the brief. */
-  function applyGenerated(built, heads, groups) {
+  function applyGenerated(built, heads, groups, aiTitle = '') {
     setExercises(built);
     setRunNote(runNoteFor(heads, built));
     setEditedRows([]);          // a fresh session has no hand edits
     setOpenRow(null);
     setBriefOpen(false);        // the screen never shows a full brief AND a full session
-    // The auto-name only ever loses to a name he typed himself.
-    if (!nameTouched) setPlanName(suggestName(groups));
+    // Gym Daddy's title if there is one, the target-derived name if not — and
+    // either way it only ever loses to a name he typed himself.
+    if (!nameTouched) setPlanName(aiTitle || suggestName(groups));
   }
 
   /**

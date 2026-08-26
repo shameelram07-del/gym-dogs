@@ -11,6 +11,23 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-26 — session title at the top, What's live is tappable
+Built by: Claude Code
+Shipped: brief `docs/briefs/session-title-and-live-link.md`, both parts. (1) The name field has
+**moved out of `PublishCard` and to the top of the session card** — borderless, `gd-disp`, 20px,
+placeholder "Name this session". There is exactly one name field on the screen; publish still
+refuses a blank name. The `aiCoach` prompt now asks for `{"title":…,"exercises":[…]}` and a new
+`parseAiReply` accepts either that or a bare array, so an old-shaped reply still generates. The
+title is cleaned (quotes stripped, anything over 40 chars discarded) and only applied when
+`nameTouched` is false — a typed name survives Regenerate. A template session (AI capped or failed)
+still falls back to `suggestName(groups)`. (2) `LiveNow` is now a real `<button>` that pushes to
+`/workout`, with `gd-card gd-press`; added a `.gd-card.gd-press:active` rule to `globals.css`
+because the hover lift outranked `button:active` and the card had no pressed state.
+Touched: `components/coach/SessionBuilder.js`, `PublishCard.js`, `LiveNow.js`,
+`useSessionBuilder.js`, `app/globals.css`
+Still needed: frontend push. **No API redeploy, no `FIELDS` change** — the title is the existing
+`plan.name` and the prompt is client-side text. **Untested — Shameel to run `npm run dev`.**
+
 ### 2026-08-26 — Coach HQ session builder rebuilt
 Built by: Claude Code
 Shipped: brief `docs/briefs/coach-hq-rebuild.md`, all of it. `coach/page.js` goes **1217 -> 137

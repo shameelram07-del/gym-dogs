@@ -334,6 +334,11 @@ button:active {
 .gd-card.gd-press {
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
 }
+/* The press itself. Needed explicitly because the hover lift above outranks
+   `button:active`, so a pressed card would otherwise sit still on desktop. */
+.gd-card.gd-press:active {
+  transform: scale(0.985);
+}
 
 /* kill the clunky number-input spinners in set/kg fields */
 input[type="number"]::-webkit-outer-spin-button,

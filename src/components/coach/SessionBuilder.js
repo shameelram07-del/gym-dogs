@@ -34,6 +34,30 @@ export default function SessionBuilder({ b, clients }) {
       {b.hasSession && (
         <Reveal delay={80}>
           <div id="gd-session" style={{ ...cardStyle, padding: '4px 14px 14px', scrollMarginTop: 12 }}>
+            {/* The session's name, at the top of the session.
+
+                It is the same `planName` the publish card used to hold, and it
+                moved because position was making an argument about what it is:
+                sitting under Publish at the bottom of the screen it read as a
+                publish setting, when a dramatic title is part of the session
+                itself. Styled as the heading it is — borderless, display face,
+                no field label — so it does not look like the first row of a
+                form. Gym Daddy fills it in; typing over it wins for good. */}
+            <input
+              type="text"
+              value={b.planName}
+              onChange={(e) => { b.setPlanName(e.target.value); b.setNameTouched(true); }}
+              placeholder="Name this session"
+              aria-label="Session name"
+              className="gd-disp"
+              style={{
+                width: '100%', boxSizing: 'border-box', margin: '12px 0 2px',
+                background: 'transparent', border: 'none', borderBottom: '1px solid var(--line)',
+                borderRadius: 0, padding: '2px 2px 10px',
+                color: 'var(--ink)', fontSize: T.xl, fontWeight: 700, outline: 'none',
+              }}
+            />
+
             {/* Gym Daddy's run note sits INSIDE the session it describes. It
                 used to float between the generate button and the exercise list,
                 while the safety notes it gets joined to at publish were ~600px

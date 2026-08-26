@@ -11,26 +11,15 @@ import { cardStyle, fieldLabel, hint, chip, inputStyle, R } from '@/lib/ui';
  * the name field first on screen it was never empty, so the auto-name never
  * fired. You could type "Chest & Shoulders", switch Target to Legs, and publish
  * leg day under the wrong name.
+ *
+ * The name has since left this card entirely — it is the session's title and it
+ * now sits at the top of the session, in SessionBuilder. There is exactly one
+ * name field on the screen; do not add a second one here. `handlePublish` still
+ * refuses a blank name, and the error still surfaces in this card.
  */
 export default function PublishCard({ b, clients }) {
   return (
     <div style={{ ...cardStyle, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div>
-        <p style={fieldLabel}>Name</p>
-        <input
-          type="text"
-          placeholder="e.g. Pull Day"
-          value={b.planName}
-          onChange={(e) => { b.setPlanName(e.target.value); b.setNameTouched(true); }}
-          style={inputStyle}
-        />
-        <p style={hint}>
-          {b.nameTouched
-            ? 'Yours — regenerating won’t change it.'
-            : 'Named from your target. Change it and it stays changed.'}
-        </p>
-      </div>
-
       <div>
         <p style={fieldLabel}>Goes out to</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
