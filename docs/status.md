@@ -120,6 +120,24 @@ cheaper, never remove them — that predates this brief and was left alone.
 
 ---
 
+## Open bugs
+
+### `dayWrap` has never fired — cause unknown
+Deployed 24 Aug and carried by two `config-zip` deploys since; `wrapEmail` is in the `FIELDS`
+allowlist. **The code is deployed and both previously stated blockers are gone — but this is NOT
+verified.** `costTest` on 25 Aug at 22:01 UTC showed heartbeats for `keepWarm`, `costReport` and
+`weighInReminder` and **none for `dayWrap`** — and that beat sits outside the try/catch, so it would
+be there even if the send had failed. The timer is registered, `isDisabled` false, schedule
+`0 0 10 * * *`, and the timer subsystem is alive (`keepWarm` beat two minutes earlier). Shameel has
+received no wrap email. Cause unknown — this is live and open, not done.
+
+### `costReport` 429s from the Cost Management API
+Failed the same morning (25 Aug) with a **429** from the Azure Cost Management API. Separate from the
+`dayWrap` problem — this function does fire, the call is throttled. Needs a retry with backoff
+around the Cost Management request.
+
+---
+
 ## Waiting on Shameel — pick these up when he's ready
 
 ### Move the AI to Claude — **PAUSED, his call, revisit from Fri 14 Aug 2026**
@@ -141,11 +159,6 @@ breaks. `providerNote` in the response says which provider answered.
 
 Still open on that job: the frontend doesn't send `userId` to `foodAI`, so the per-user daily cap
 is inert. Small change in `src/lib/food.js` and its callers.
-
-### Gym Daddy on a timeline — **BUILT 25 Aug, waiting on the API redeploy**
-Slots plus the emailed wrap, both built (see the entry below). The frontend half is inert until the
-API half ships: `dayWrap` has to be zipped and deployed, and `wrapEmail` has to reach the `FIELDS`
-allowlist. **Nothing here is live until Shameel runs the zip deploy.**
 
 ### Other open items
 - **Test runner.** `CLAUDE.md` claimed `src/lib/nutrition.js` was unit-tested; it isn't — no jest,
@@ -267,6 +280,8 @@ Touched: `src/lib/nutrition.js`, `src/app/nutrition/page.js`, `CLAUDE.md`,
 `gymdogs-api-v2/dayWrap/{index.js,function.json}` (new), `gymdogs-api-v2/userProfiles/index.js`
 Still needed: **frontend push AND an API zip redeploy** — the zip must now contain **13** function
 folders. Without the redeploy, `wrapEmail` is silently dropped and no wrap email is ever sent.
+**Update 26 Aug:** both done — deployed 24 Aug, `wrapEmail` is in `FIELDS`. But `dayWrap` has still
+never fired; see **Open bugs** above.
 **Untested against real data — Shameel to run `npm run dev`.**
 
 ---
