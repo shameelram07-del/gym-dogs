@@ -104,11 +104,11 @@ there is no longer an uncapped path.
 Touched: API — `aiCoach/index.js`, `dayWrap/index.js`, `lib/aiBudget.js`. Frontend —
 `app/coach/page.js`, `app/nutrition/page.js`, `app/dashboard/page.js`, `app/workout/page.js`,
 `lib/food.js`, `components/AddFoodSheet.js`, `components/EditItemSheet.js`.
-Deployed: frontend pushed as `57acb76`. **API zip redeploy (13 functions) still outstanding — the
-cap is not live until it runs.** No `FIELDS` change — the
-spend doc is `aispend_<month>` in `users` with a matching `userId`, so `userProfiles` never sees it.
-Deploy the API first: an old frontend reads the 429 as a plain failure and still falls back
-correctly, whereas a new frontend against the old API simply never sees a 429.
+Deployed: **fully live, nothing outstanding.** Frontend pushed as `57acb76`. API zip built by Cowork
+and deployed by Shameel via `config-zip` on **2026-08-25 21:48 UTC (09:48 NZ on the 26th)**, 13
+functions verified after. `aiBudget` is gating and recording in `aiCoach` and `dayWrap` in
+production. No `FIELDS` change — the spend doc is `aispend_<month>` in `users` with a matching
+`userId`, so `userProfiles` never sees it.
 Notes back to Cowork: the brief lists "Gym Daddy's chat on the Coach screen" as a caller — **there
 is no chat UI in the app**. Nothing in `src/` matches `chat`, and Coach's only aiCoach call is the
 session generator. The four real callers are the session generator, the nutrition slot note, the
