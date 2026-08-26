@@ -21,6 +21,16 @@ export default function Reveal({ children, delay = 0, y = 20, style }) {
     }
     const el = ref.current;
     if (!el) return;
+    // An element inside a `display: none` subtree has no layout box, so it can
+    // never intersect anything. Coach HQ keeps all three tab panels mounted and
+    // hides the inactive ones — which is what stops a half-built session being
+    // destroyed by a tab switch — so a Reveal in a hidden panel would otherwise
+    // be relying on the observer firing later to escape opacity 0. Show it now
+    // instead: there is nothing to animate into view while it is hidden, and
+    // "invisible content on a tab you just opened" is not a risk worth running.
+    // getClientRects() is empty ONLY for a hidden subtree — content merely
+    // scrolled below the fold is still laid out and keeps its rects.
+    if (el.getClientRects().length === 0) { setOn(true); return; }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {

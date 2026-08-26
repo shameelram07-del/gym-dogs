@@ -11,6 +11,73 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-26 — Coach HQ session builder rebuilt
+Built by: Claude Code
+Shipped: brief `docs/briefs/coach-hq-rebuild.md`, all of it. `coach/page.js` goes **1217 -> 137
+lines** — a tab shell. New `src/components/coach/`: `useSessionBuilder` (all builder state),
+`SessionBuilder`, `TargetCard`, `ExerciseRow`, `SwapSheet`, `PublishCard`, `DraftList`, `LiveNow`,
+`ClientList`, `ChallengePanel`, `Avatar`, `useNumberDraft`.
+The order is now brief -> session -> publish, and **progressive disclosure is what makes it short**:
+before you generate, the session and publish sections do not render at all. After generating, the
+brief collapses to `Pull · Hypertrophy · 60 min · 2 people`. No step numbers, no locking.
+Exercises are **one line each** — number, name, sets x reps, block letter — expanding in place.
+Per-row muscle-group and equipment controls are gone; **Swap** replaces them and is aware of blocks,
+which they never were: it offers the same muscle group and marks anything sharing a station with the
+row's block partner as unavailable, naming the partner. Style loses FULL BODY (a shape, not a style,
+and already a day preset). Regenerate warns only when there are hand edits, naming them. Publish
+confirms and states the audience and the feed post; Save draft / Publish stay side by side.
+Touched also: `Reveal.js` — see the note below.
+Still needed: frontend push only. No API redeploy, no `FIELDS` change; the published plan document
+keeps its exact shape. Build passes; lint 37 problems, **identical to baseline**.
+
+Notes back to Cowork — three things:
+1. **The brief's "lift the state OR keep it mounted" hides a trap.** I did both (state in `page.js`,
+   panels hidden with `display:none` rather than unmounted, which also protects a half-filled
+   challenge form). But an element in a `display:none` subtree has **no layout box, so it can never
+   intersect** — and `Reveal` is driven by IntersectionObserver, so every Reveal in a hidden panel
+   would have been sitting at `opacity: 0` waiting on an observer that may not fire. `Reveal` now
+   reveals immediately when `getClientRects()` is empty. **Anything else that keeps panels mounted
+   needs this.**
+2. **Swap disables clashing exercises rather than hiding them**, with the reason ("same station as
+   Barbell Row"). The brief said exclude. Showing why beats silently shortening the list — but it is
+   a deviation, so overrule it if you meant hidden.
+3. The `#gd-builder-form` anchor is now `#gd-session` and sits on the session card itself, rather
+   than pointing an old name at a new place.
+**Untested — Shameel to run `npm run dev`.**
+
+---
+
+### 2026-08-26 — app-wide design pass: one system instead of twelve copies
+Built by: Claude Code
+Shipped: not from a brief — Shameel asked for a UI/UX review across all screens. The palette was
+never the problem; the **rhythm** was. The app was using **17 distinct corner radii** and **~25 font
+sizes** (including 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5), which is what read as unfinished.
+New `src/lib/ui.js` holds the shared look: `eyebrow` had been declared character-for-character in
+**twelve files** and `cardStyle` in four — those are now one definition each, imported. Also carries
+`R`/`T`/`SP` scales, `chip`, `pill`, `inputStyle`, `btnPrimary/Quiet/Danger` and `banner`. Inline
+style objects stay the house style; they just stop being re-typed.
+`globals.css`: three-level elevation ramp, `--sheen` (a 1px lit top edge — most of what separates a
+considered dark UI from a flat one), radius/type/spacing scales, `.gd-card` primitive, and
+**tabular numerals on `.gd-disp`** so every hero number in the app stops shifting sideways as it
+changes. `layout.js`: `themeColor` was still `#0A0714`, the **IGNITE violet** — the phone status bar
+was painting the old palette above a slate app. Same class of leftover as the magenta.
+`BottomNav`: labels went 500 -> 700 weight on selection, and bolder text is wider, so **every tab
+label shifted on navigation**. Now fixed weight, with colour and a sliding indicator carrying the
+state; also a real `<nav>` with `aria-current`. Hardcoded `#fff`/`#8B5CF6`/`#6EE7F9` replaced with
+tokens across six files. `BarcodeScanner` keeps its literal black/white deliberately — it is a
+camera viewport over live video, not a themed surface.
+Touched: `lib/ui.js` (new), `globals.css`, `layout.js`, `BottomNav.js`, and the eyebrow/cardStyle
+import swap in all 11 screens + AddFoodSheet, EditItemSheet, TargetsSetup.
+Still needed: frontend push only. No API redeploy, no `FIELDS` change. `npm run build` passes; lint
+is at 37 problems, **identical to the pre-change baseline**.
+For Cowork: `docs/briefs/coach-hq-rebuild.md` should be built on `lib/ui.js` — `cardStyle`, `chip`,
+`fieldLabel` and `banner` already exist, so the rebuild adds `ExerciseRow` rather than new styling.
+The Coach **structural** rebuild is deliberately NOT in this diff; mixing a screen rewrite into an
+app-wide styling pass would make both unreviewable.
+**Untested — Shameel to run `npm run dev`.**
+
+---
+
 ### 2026-08-26 — cost cap on aiCoach and dayWrap
 Built by: Claude Code
 Shipped: brief `docs/briefs/aicoach-cost-cap.md`. `lib/aiBudget` is now wired into **aiCoach** and
