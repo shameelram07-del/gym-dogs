@@ -6,7 +6,7 @@
 // two exercises in a block must not need the same station is far too easy for a
 // model to ignore. We ask it to follow the rule, then verify in code.
 
-import { exerciseLibrary } from '@/lib/exercises';
+import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 
 // ── The picker ────────────────────────────────────────────────────────────
 
@@ -276,4 +276,93 @@ export function stripRunNote(notes) {
     .replace(/^\d+ people, \d+ blocks? —.*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// ── The model's reply ─────────────────────────────────────────────────────
+// Reading what the generator sent back lives here rather than in the hook so it
+// can be checked without a browser — see `scripts/check-session-parse.mjs`. The
+// bug that put it here was invisible from the screen: every lookup missed, so
+// every session was a template and the status line said so while the model had
+// answered 200 with a perfectly good session.
+
+/**
+ * The title, as the model actually returns it.
+ *
+ * It comes back wrapped in quotes often enough that the field would otherwise
+ * read “Iron Harvest”, quote marks and all, and a model that decides to write a
+ * sentence must not land a sentence in a heading — anything long is discarded
+ * and `suggestName` takes over.
+ */
+export function cleanTitle(raw) {
+  if (typeof raw !== 'string') return '';
+  const t = raw
+    .replace(/["“”‘’]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[.]+$/, '');
+  return t.length > 0 && t.length <= 40 ? t : '';
+}
+
+/**
+ * The reply, in either shape it arrives in.
+ *
+ * The prompt now asks for {"title":…,"exercises":[…]}, but a bare array is still
+ * accepted — the model drops back to the old shape often enough that treating
+ * one as a failure would silently swap a real AI session for a template.
+ */
+export function parseAiReply(text) {
+  if (!text) return { title: '', items: [] };
+  const obj = text.match(/\{[\s\S]*\}/);
+  if (obj) {
+    try {
+      const d = JSON.parse(obj[0]);
+      if (d && Array.isArray(d.exercises)) return { title: cleanTitle(d.title), items: d.exercises };
+    } catch { /* not the object shape — try the array below */ }
+  }
+  const arr = text.match(/\[[\s\S]*\]/);
+  if (arr) {
+    try {
+      const d = JSON.parse(arr[0]);
+      if (Array.isArray(d)) return { title: '', items: d };
+    } catch { /* nothing usable in there */ }
+  }
+  return { title: '', items: [] };
+}
+
+/**
+ * Drop a trailing bracketed tag from a name.
+ *
+ * `catalogueFor` prints every option as `Name [Equipment]` and the prompt tells
+ * the model to copy the names exactly — so it does, brackets included. Nothing
+ * in the library has a bracket in its name, so `Plate-Loaded High Row [Plate
+ * Loaded]` matched nothing, every row came back null, and the session fell back
+ * to the deterministic template with the AI's title thrown away with it.
+ */
+const stripEquipmentTag = (name) => String(name == null ? '' : name)
+  .replace(/\s*\[[^[\]]*\]\s*$/, '')
+  .trim();
+
+/**
+ * The library row for a name the model returned, or null.
+ *
+ * Matched on the trimmed, case-insensitive name, with any trailing tag removed
+ * first — a name that never carried one is unaffected.
+ */
+export function findExercise(name) {
+  const target = stripEquipmentTag(name).toLowerCase();
+  if (!target) return null;
+  for (const group of muscleGroups) {
+    const found = exerciseLibrary[group]?.find((e) => e.name.toLowerCase() === target);
+    if (found) {
+      return {
+        muscleGroup: group,
+        name: found.name,
+        equipment: found.equipment,
+        sets: found.defaultSets,
+        reps: found.defaultReps,
+        cue: found.cue,
+      };
+    }
+  }
+  return null;
 }

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:session": "node scripts/check-session-parse.mjs"
   },
   "dependencies": {
     "@azure/cosmos": "^4.9.3",

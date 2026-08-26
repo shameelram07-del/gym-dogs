@@ -10,6 +10,7 @@ import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
 import { eyebrow, cardStyle } from '@/lib/ui';
+import { personalBests } from '@/lib/prs';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -76,30 +77,6 @@ function calcWeeklyVolume(logs) {
   }));
 }
 
-function calcPRs(logs) {
-  const maxByExercise = {};
-  logs.forEach(log => {
-    if (!log.exName) return;
-    try {
-      const sets = JSON.parse(log.sets_data || '[]');
-      sets.forEach(s => {
-        if (s.kg && parseFloat(s.kg) > 0) {
-          const kg = parseFloat(s.kg);
-          if (!maxByExercise[log.exName] || kg > maxByExercise[log.exName].kg) {
-            maxByExercise[log.exName] = { kg, date: log.date };
-          }
-        }
-      });
-    } catch (e) {
-      captureError(e, { screen: 'progress', action: 'parse-sets' });
-    }
-  });
-  return Object.entries(maxByExercise)
-    .map(([exercise, { kg, date }]) => ({ exercise, weight: kg, date: getWeekLabel(date) }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5);
-}
-
 // IGNITE consistency heatmap — last 5 weeks (Mon→Sun), intensity from daily volume
 function calcHeatmap(logs) {
   const volByDay = {};
@@ -131,6 +108,12 @@ function calcHeatmap(logs) {
   return days;
 }
 
+/** How every kg figure on this screen is written: 20.4k, or 850 under a tonne. */
+function fmtKg(total) {
+  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
+  return `${Math.round(total)}`;
+}
+
 function calcTotalVolume(logs) {
   let total = 0;
   logs.forEach(log => {
@@ -141,8 +124,7 @@ function calcTotalVolume(logs) {
       captureError(e, { screen: 'progress', action: 'parse-sets' });
     }
   });
-  if (total >= 1000) return `${(total / 1000).toFixed(1)}k`;
-  return `${Math.round(total)}`;
+  return fmtKg(total);
 }
 
 function calcRecoveryScore(sorenessLevels) {
@@ -379,8 +361,15 @@ export default function ProgressPage() {
 
   const weeklyData = calcWeeklyVolume(logs);
   const heatDays = calcHeatmap(logs);
-  const prs = calcPRs(logs);
+  // One shared definition of a PR — see @/lib/prs. `bests` is every one of
+  // them, which is the number the stat shows; the card below still only has
+  // room to list the heaviest five.
+  const bests = personalBests(logs, (e) => captureError(e, { screen: 'progress', action: 'parse-sets' }));
+  const prs = bests.slice(0, 5).map((b) => ({ ...b, date: getWeekLabel(b.date) }));
   const totalVolume = calcTotalVolume(logs);
+  // The headline over the four bars is the sum of THOSE four weeks. It used to
+  // print the all-time figure, so it read 42.9k above bars adding up to 20.4k.
+  const chartedVolume = weeklyData.reduce((sum, d) => sum + d.rawVolume, 0);
   const totalSessions = new Set(logs.map(l => l.date).filter(Boolean)).size;
   const recoveryScore = calcRecoveryScore(sorenessLevels);
   const status = recoveryStatus(recoveryScore);
@@ -442,7 +431,7 @@ export default function ProgressPage() {
           {[
             { value: loading ? '—' : totalSessions, label: 'sessions', color: 'var(--ink)' },
             { value: loading ? '—' : `${totalVolume}`, label: 'kg lifted', color: 'var(--accent-strong)' },
-            { value: loading ? '—' : prs.length, label: 'PRs set', color: 'var(--orange)' },
+            { value: loading ? '—' : bests.length, label: 'PRs set', color: 'var(--orange)' },
           ].map((s, i) => (
             <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
               <p className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</p>
@@ -539,7 +528,7 @@ export default function ProgressPage() {
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <p style={eyebrow}>Weekly volume</p>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--accent-strong)' }}>{loading ? '—' : `${totalVolume} kg`}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--accent-strong)' }}>{loading ? '—' : `${fmtKg(chartedVolume)} kg`}</p>
           </div>
           {loading ? (
             <p style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, padding: '20px 0' }}>Loading…</p>
@@ -550,7 +539,7 @@ export default function ProgressPage() {
               {weeklyData.map((d) => (
                 <div key={d.week} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, height: '100%', justifyContent: 'flex-end' }}>
                   <span style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 600 }}>
-                    {d.rawVolume >= 1000 ? `${(d.rawVolume/1000).toFixed(1)}k` : Math.round(d.rawVolume)}
+                    {fmtKg(d.rawVolume)}
                   </span>
                   <div className={d.isCurrent ? 'gd-shimbar' : undefined} style={{ width: '100%', height: chartOn ? `${Math.max(d.volume, 5)}%` : '0%', background: d.isCurrent ? 'var(--grad)' : 'var(--soft)', borderRadius: '8px 8px 4px 4px', transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: d.isCurrent ? '0 4px 18px var(--accent-glow)' : 'none' }} />
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{d.week}</span>

@@ -117,6 +117,12 @@ export default function NutritionPage() {
   const [coachNote, setCoachNote] = useState('');
   const [coachBusy, setCoachBusy] = useState(false);
   const noteRef = useRef({ date: '', slots: {} });
+  // The slot is only marked spent once the call comes back, and a call can be in
+  // the air for 20 seconds. Anything logged in that window re-runs the effect
+  // against a slot that still looks unspent, so without this the one call a slot
+  // is allowed could go out twice. A ref, not state, so it cannot re-trigger
+  // the effect it guards.
+  const coachInFlight = useRef(false);
 
   // The live day, mirrored into refs. Anything that SAVES must read these rather
   // than its own render's closure. The coach note fires its write up to 28
@@ -291,6 +297,8 @@ export default function NutritionPage() {
 
   // ── Coach note ───────────────────────────────────────────────────────
   async function generateCoachNote(slot, kcal, count) {
+    if (coachInFlight.current) return;
+    coachInFlight.current = true;
     setCoachBusy(true);
     let text = '';
     const controller = new AbortController();
@@ -358,6 +366,7 @@ export default function NutritionPage() {
     };
     setCoachNote(text);
     setCoachBusy(false);
+    coachInFlight.current = false;
     // Persist the cached note against what is on the day RIGHT NOW. Reading the
     // closure's `items`/`waterMl` here re-saved a snapshot from before the call
     // started. And if midnight passed while the model was thinking, don't write
@@ -389,7 +398,20 @@ export default function NutritionPage() {
     // another one; the next note comes when the next slot opens.
     if (n.date === TODAY && n.slots[slot]) { show(); return; }
 
-    const id = setTimeout(() => generateCoachNote(slot, Math.round(total.calories), items.length), COACH_DEBOUNCE_MS);
+    // This slot is unspent and the note on screen belongs to an earlier one —
+    // you logged all morning, closed the app, and opened Eat at 16:00. That note
+    // quotes this morning's total against an afternoon header, so it does not
+    // get shown while we wait: clearing it drops the card back to the
+    // deterministic fallback, which reads off the live numbers. And the 8-second
+    // debounce is there to fold three quick adds into one call, not to make you
+    // stare at a stale read on arrival, so a catch-up fires straight away.
+    const stale = !!cached && cached.slot !== slot;
+    if (stale) setCoachNote('');
+
+    const id = setTimeout(
+      () => generateCoachNote(slot, Math.round(total.calories), items.length),
+      stale ? 0 : COACH_DEBOUNCE_MS,
+    );
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, userId, TODAY, total.calories, !!targets]);

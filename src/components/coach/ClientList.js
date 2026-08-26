@@ -37,6 +37,11 @@ export default function ClientList({ clients, loading }) {
   const avgReadiness = withReadiness.length > 0
     ? Math.round(withReadiness.reduce((a, c) => a + c.readiness, 0) / withReadiness.length)
     : '—';
+  // "avg readiness 84" was one person's score wearing the whole pack's label —
+  // everybody else reads "— No data". The maths was right; say what it covers.
+  const readinessLabel = withReadiness.length === clients.length && clients.length > 0
+    ? 'avg readiness'
+    : `readiness · ${withReadiness.length} of ${clients.length}`;
 
   const shown = clients.filter((c) => {
     if (filter === 'trained') return c.trainedToday;
@@ -51,7 +56,7 @@ export default function ClientList({ clients, loading }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {[
             { value: `${trainedToday}/${clients.length}`, label: 'trained today', color: 'var(--accent-strong)' },
-            { value: avgReadiness, label: 'avg readiness', color: 'var(--blue-ink)' },
+            { value: avgReadiness, label: readinessLabel, color: 'var(--blue-ink)' },
             { value: alerting.length, label: 'alerts', color: alerting.length > 0 ? 'var(--orange)' : 'var(--ink-3)' },
           ].map((s, i) => (
             <div key={i} style={{ ...cardStyle, padding: '16px 8px', textAlign: 'center' }}>

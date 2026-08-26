@@ -8,6 +8,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
 import { eyebrow, cardStyle } from '@/lib/ui';
+import { prCount } from '@/lib/prs';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -51,25 +52,6 @@ function calcStreak(logs) {
     if (diff <= 1) { streak++; current = d; } else break;
   }
   return streak;
-}
-
-function calcPRCount(logs) {
-  const maxByExercise = {};
-  logs.forEach(log => {
-    if (!log.exName) return;
-    try {
-      const sets = JSON.parse(log.sets_data || '[]');
-      sets.forEach(s => {
-        if (s.kg && parseFloat(s.kg) > 0) {
-          const kg = parseFloat(s.kg);
-          if (!maxByExercise[log.exName] || kg > maxByExercise[log.exName]) maxByExercise[log.exName] = kg;
-        }
-      });
-    } catch (e) {
-      captureError(e, { screen: 'profile', action: 'parse-sets' });
-    }
-  });
-  return Object.keys(maxByExercise).length;
 }
 
 function calcTotalSessions(logs) {
@@ -267,15 +249,17 @@ export default function ProfilePage() {
 
   const totalSessions = calcTotalSessions(logs);
   const streak = calcStreak(logs);
-  const prCount = calcPRCount(logs);
+  // Same definition as Progress — see @/lib/prs. These two screens showed 22
+  // and 5 for the same account until they shared one.
+  const prs = prCount(logs, (e) => captureError(e, { screen: 'profile', action: 'parse-sets' }));
   const totalVolume = calcTotalVolume(logs);
   const levelInfo = computeLevel(totalSessions, totalVolume);
   const myGoals = goalChips(profileRef?.onboarding);
 
   // Trophy coins — SVG icons on gradient coins, shine when earned
   const ACHIEVEMENTS = [
-    { icon: 'medal',    label: 'First PR',      earned: prCount >= 1,         coin: 'var(--grad)',       glow: 'var(--accent-glow)' },
-    { icon: 'trophy',   label: '5 PRs set',     earned: prCount >= 5,         coin: 'var(--coin-gold)',  glow: 'var(--coin-gold-glow)' },
+    { icon: 'medal',    label: 'First PR',      earned: prs >= 1,         coin: 'var(--grad)',       glow: 'var(--accent-glow)' },
+    { icon: 'trophy',   label: '5 PRs set',     earned: prs >= 5,         coin: 'var(--coin-gold)',  glow: 'var(--coin-gold-glow)' },
     { icon: 'dumbbell', label: '10 tonnes',     earned: totalVolume >= 10000, coin: 'var(--coin-ice)',   glow: 'var(--coin-ice-glow)' },
     { icon: 'flame',    label: '14-day streak', earned: streak >= 14,         coin: 'var(--coin-ember)', glow: 'var(--coin-ember-glow)' },
   ];
@@ -336,7 +320,7 @@ export default function ProfilePage() {
           {[
             { value: statsLoading ? '—' : totalSessions, label: 'workouts' },
             { value: statsLoading ? '—' : streak, label: 'day streak' },
-            { value: statsLoading ? '—' : prCount, label: 'PRs set' },
+            { value: statsLoading ? '—' : prs, label: 'PRs set' },
           ].map((s, i) => (
             <div key={i} style={{ background: 'var(--soft)', borderRadius: 16, padding: '14px 8px', textAlign: 'center' }}>
               {/* Gradient numbers — the three read as one set rather than three

@@ -13,6 +13,24 @@ import { useSessionBuilder } from '@/components/coach/useSessionBuilder';
 import { captureError } from '@/lib/monitoring';
 
 const CLIENTS_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/clients';
+
+/**
+ * A person, not a scheduled task.
+ *
+ * The timer functions stamp a heartbeat doc into the `users` container so
+ * "did this timer actually fire?" has an answer (`lib/heartbeat.js` in the API).
+ * Those docs carry `type: "heartbeat"` and a userId of `heartbeat_<function>`,
+ * but `clients` doesn't SELECT `type`, so costReport, dayWrap, weighInReminder
+ * and keepWarm arrived here looking like four members who had never trained —
+ * counted in "trained today" and in "Goes out to" along with everyone real.
+ *
+ * The userId prefix is the flag that already reaches the browser, so that is
+ * what gets filtered on. Filtered HERE rather than in ClientList because the
+ * publish step reads the same list. The tidier fix is `WHERE c.type != 'heartbeat'`
+ * in the API's clients query — that is a manual zip redeploy, so it is written
+ * up in docs/status.md rather than done quietly.
+ */
+const isRealMember = (c) => !!c && !String(c.userId || '').startsWith('heartbeat_');
 const CLIENTS_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 const TABS = [
@@ -62,7 +80,7 @@ export default function CoachDashboard() {
         const res = await fetch(CLIENTS_URL, { headers: { 'x-functions-key': CLIENTS_KEY || '' } });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data)) setClients(data);
+          if (Array.isArray(data)) setClients(data.filter(isRealMember));
         } else {
           captureError(new Error(`clients failed (${res.status})`), {
             screen: 'coach', action: 'load-clients', endpoint: 'clients', status: res.status,

@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { todayISO } from '@/lib/day';
-import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import {
   countForMinutes, suggestName, runNoteFor, stripRunNote,
   catalogueFor, buildFromSelection, fillToCount,
+  parseAiReply, findExercise,
 } from '@/lib/session';
 import { captureError } from '@/lib/monitoring';
 
@@ -37,58 +37,8 @@ const templateSession = (groups, count, people) => {
   return built.length ? built : [emptyExercise()];
 };
 
-/**
- * The title, as the model actually returns it.
- *
- * It comes back wrapped in quotes often enough that the field would otherwise
- * read “Iron Harvest”, quote marks and all, and a model that decides to write a
- * sentence must not land a sentence in a heading — anything long is discarded
- * and `suggestName` takes over.
- */
-function cleanTitle(raw) {
-  if (typeof raw !== 'string') return '';
-  const t = raw
-    .replace(/["“”‘’]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[.]+$/, '');
-  return t.length > 0 && t.length <= 40 ? t : '';
-}
-
-/**
- * The reply, in either shape it arrives in.
- *
- * The prompt now asks for {"title":…,"exercises":[…]}, but a bare array is still
- * accepted — the model drops back to the old shape often enough that treating
- * one as a failure would silently swap a real AI session for a template.
- */
-function parseAiReply(text) {
-  if (!text) return { title: '', items: [] };
-  const obj = text.match(/\{[\s\S]*\}/);
-  if (obj) {
-    try {
-      const d = JSON.parse(obj[0]);
-      if (d && Array.isArray(d.exercises)) return { title: cleanTitle(d.title), items: d.exercises };
-    } catch { /* not the object shape — try the array below */ }
-  }
-  const arr = text.match(/\[[\s\S]*\]/);
-  if (arr) {
-    try {
-      const d = JSON.parse(arr[0]);
-      if (Array.isArray(d)) return { title: '', items: d };
-    } catch { /* nothing usable in there */ }
-  }
-  return { title: '', items: [] };
-}
-
-function findExercise(name) {
-  const target = String(name).toLowerCase().trim();
-  for (const group of muscleGroups) {
-    const found = exerciseLibrary[group]?.find((e) => e.name.toLowerCase() === target);
-    if (found) return { muscleGroup: group, name: found.name, equipment: found.equipment, sets: found.defaultSets, reps: found.defaultReps, cue: found.cue };
-  }
-  return null;
-}
+/** "1 exercise", "6 exercises" — the feed post read "1 exercises". */
+const exCountLabel = (n) => `${n} exercise${n === 1 ? '' : 's'}`;
 
 /**
  * Everything the session builder knows, held OUTSIDE the builder component.
@@ -249,9 +199,37 @@ export function useSessionBuilder({ userId, clients }) {
         '',
         'Choose ONLY exercises from this catalogue, copying the names exactly.',
         '',
+        // NO EXAMPLE TITLES, and the shape line's title is a placeholder. Naming
+        // "Iron Harvest" here got "Iron Harvest" back on every generation — the
+        // model copies a title far more readily than it invents one, and the
+        // literal JSON template was the strongest pull of the two. Describe the
+        // flavour instead; if you add an example back, expect to see it shipped.
+        //
+        // The same goes for a vocabulary list. "metal, weather, work, animals"
+        // used to sit in the flavour line and three Pull generations came back
+        // "Iron Grip Session", "Iron Grip Challenge", "Iron Grip Session" — the
+        // groups are all it knew about at naming time, so "metal" plus "back and
+        // biceps" is iron and grip every time. The exercises are what vary
+        // between generations, so the exercises are what it names the session
+        // after, and no adjective bank is supplied for it to pad from.
+        //
+        // That then swung the other way — "High Row Hammer Curl", "High Row
+        // Hammer Action" — because "name it after the exercises" reads as
+        // permission to reuse their names. The exercises are the INPUT and the
+        // feeling is the output; both halves have to be said or it lands on one
+        // of the two failure modes. Do not delete either.
         'Also NAME the session. Short and punchy — 2 to 4 words, title case, no quotes and no emoji.',
-        'Something a coach would chalk on the board: "Iron Harvest", "Steel Rain", "The Long Pull". Not "Pull Day".',
-        'Reply with ONLY a JSON object, no prose, in the form {"title":"Iron Harvest","exercises":[{"name":"exact name","sets":3,"reps":"10-12","block":"A"}]}.',
+        `Read the ${count} exercises you just chose and name the session after what getting through them FEELS like. The lifts are what you read; the feeling is what you name. NOT the muscle groups — those are identical on every session of this type and the exercises are not, which is why the exercises are what you read.`,
+        'The title must NOT be built out of the exercise names. Do not copy one in, and do not join two together — "High Row Hammer Curl" is a list, not a title.',
+        'Something a coach would chalk on the board: concrete, physical, a bit of menace in it. Invent a fresh one for THIS session.',
+        'The title must NOT contain the words Session, Day, Workout, Training or Challenge. Those are padding, and a title that needs one of them is not finished. Do not name the muscle groups back either ("Pull Day", "Chest and Back").',
+        // The exercises come FIRST in the shape and the title LAST. The reply is
+        // written start to finish, so a title in the first field is chosen before
+        // a single exercise exists — "name it after the exercises you just chose"
+        // is only true if they are already on the page. `parseAiReply` reads both
+        // by key, so the order costs nothing.
+        'Reply with ONLY a JSON object, no prose, in the form {"exercises":[{"name":"exact name","sets":3,"reps":"10-12","block":"A"}],"title":"..."}.',
+        'Write the exercises first and the title last, so you are naming the session you actually built.',
         `Catalogue:\n${catalogueFor(groups)}`,
       ].filter((l) => l !== null && l !== undefined).join('\n');
 
@@ -476,7 +454,7 @@ export function useSessionBuilder({ userId, clients }) {
             userId,
             name: 'Coach Shameel',
             initials: 'CS',
-            text: `📋 New session published: ${plan.name} (${plan.exercises.length} exercises) — assigned to ${audienceLabel()}. Get after it.`,
+            text: `📋 New session published: ${plan.name} (${exCountLabel(plan.exercises.length)}) — assigned to ${audienceLabel()}. Get after it.`,
             tag: '📋 New session',
           }),
         });

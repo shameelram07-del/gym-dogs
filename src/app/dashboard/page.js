@@ -33,6 +33,21 @@ async function getJson(url, key, label) {
   }
 }
 
+/**
+ * The teaser's second line: prize and target, in whatever the challenge has.
+ * Either field can be missing on a challenge started before they were required,
+ * and half a sentence reads worse than a shorter one.
+ */
+function challengeLine(ch) {
+  const target = Number(ch.targetKg);
+  const bits = [
+    'Pack challenge',
+    ch.prize ? `prize: ${ch.prize}` : null,
+    Number.isFinite(target) && target > 0 ? `first to ${target.toLocaleString()} kg` : null,
+  ].filter(Boolean);
+  return bits.join(' · ');
+}
+
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -217,6 +232,9 @@ export default function DashboardPage() {
   const [ringOn, setRingOn]         = useState(false);
   const [showSetup, setShowSetup]   = useState(false); // gentle onboarding nudge
   const [sessionOpen, setSessionOpen] = useState(false); // expandable exercise list
+  // The live challenge, read from the same place Community reads it. Null until
+  // it loads and null when nothing is running — both mean no card.
+  const [challenge, setChallenge] = useState(null);
   const [loading, setLoading]       = useState(true);
 
   const dismissSetup = () => {
@@ -373,6 +391,14 @@ export default function DashboardPage() {
         const dismissed = localStorage.getItem('gd-setup-dismissed') === uid;
         if (!done && !dismissed) setShowSetup(true);
       } catch (e) {}
+
+      // The challenge teaser used to be two hardcoded strings naming a challenge
+      // that ended on 7 Aug. `communityPosts` is the one place that knows which
+      // one is running, and it also hands back an ENDED one for a week after the
+      // fact — the teaser is only for a live one, so that gets filtered out here.
+      const feed = await getJson(`${API}/communityPosts`, key, 'communityPosts');
+      const live = feed && feed.challenge && feed.challenge.status !== 'ended' ? feed.challenge : null;
+      setChallenge(live);
 
       askCoach(`Give a short motivational coach note (1 sentence, max 12 words) for someone with a ${streak}-day streak who has done ${weekSessions} sessions this week.`, uid);
 
@@ -693,6 +719,10 @@ export default function DashboardPage() {
         </Reveal>
 
         {/* ── CHALLENGE TEASER ── */}
+        {/* No challenge running means no card. It used to name the 100,000 kg
+            club whatever was actually on, which outlived that challenge by
+            three weeks and disagreed with Community the whole time. */}
+        {challenge && (
         <Reveal delay={240}>
         <button onClick={() => router.push('/community')} className="gd-shine" style={{
           ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14,
@@ -702,12 +732,15 @@ export default function DashboardPage() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 21v-4M17 4H7v5a5 5 0 0 0 10 0V4z" /><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3" /></svg>
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>100,000 kg club</p>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>Pack challenge · prize: creatine — see who&rsquo;s closest</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>{challenge.name}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--ink-2)' }}>
+              {challengeLine(challenge)}
+            </p>
           </div>
           <span style={{ color: 'var(--gold)', fontSize: 18 }}>›</span>
         </button>
         </Reveal>
+        )}
 
         <Reveal delay={260}>
         <div style={{ marginBottom: 14 }}><QuoteCard mode="random" /></div>

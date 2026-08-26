@@ -11,6 +11,133 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — app sweep: nine defects from the 26 Aug drive-through
+Built by: Claude Code
+Shipped: brief `docs/briefs/app-sweep-fixes.md`. **Eight of the nine fixed; item 14 was a mirage.**
+
+**1. Gym Daddy was never generating sessions.** Root cause confirmed as briefed: `catalogueFor`
+prints the catalogue as `Name [Equipment]`, the prompt says to copy names exactly, so the model
+returned `"Plate-Loaded High Row [Plate Loaded]"` and `findExercise` matched nothing — every row
+null, `parsed.length >= 3` false, template every time, AI title discarded. `findExercise` now
+strips a trailing bracketed tag before the lookup, so every caller benefits. `findExercise`,
+`parseAiReply` and `cleanTitle` **moved out of `useSessionBuilder.js` into `lib/session.js`**, which
+is pure and was already the place for logic checkable without a browser. Only a trailing
+`[square bracket]` is stripped — `Cable Curl (Straight Bar)` keeps its parentheses.
+**2. The parse check** is `scripts/check-session-parse.mjs` — `npm run check:session`, 11 checks,
+all passing. It feeds a captured 6-exercise reply through `parseAiReply` + `findExercise` and
+asserts all six survive. It loads `lib/session.js` by reading the source and importing it as a
+data: URL with the `@/lib/…` alias rewritten — there is no test runner and no `"type": "module"`,
+so a plain import would be parsed as CommonJS and die on the first `export`. Nothing in the app
+changed to make it runnable.
+**3. Dashboard challenge card** now reads `data.challenge` from `communityPosts` (the same source
+Community uses) and renders its name, prize and target. It does **not** render when nothing is
+running, and an ENDED challenge — which that endpoint keeps handing back for a week — is filtered
+out, so the teaser is only ever a live one. Costs the dashboard one extra GET on load.
+**4. Progress "Weekly volume"** headline is now `chartedVolume`, the sum of the four bars beneath
+it, not the all-time figure. All-time still sits in the "kg lifted" stat where it belongs. Added a
+local `fmtKg()` so the headline, the bar labels and `calcTotalVolume` all write kg the same way.
+**5. PR count — kept 22, the Profile definition.** Not two definitions: both screens already
+counted distinct exercises you have moved weight on. Progress was printing `prs.length` on a list
+it had already cut to `.slice(0, 5)` for display, so its stat was really "rows that fit in the
+card". One PR per exercise is now in **new `lib/prs.js`** (`personalBests`, `prCount`), used by both
+screens; it also matches Profile's "First PR" / "5 PRs set" badges, and it grows as you train.
+Progress still lists only the heaviest five.
+**6. "3.6kkg"** — `volStr` in `workout/page.js` now carries its own unit (`3.6k kg` / `850 kg`) and
+both the PR and non-PR post branches stopped appending `kg`.
+**7. "1 exercises"** — new `exCountLabel()` in `useSessionBuilder.js`. Old posts left alone.
+**8. Service accounts out of the coach client list.** They are not accounts: the API's
+`lib/heartbeat.js` stamps a doc into the `users` container per timer function so a dead timer can be
+noticed, and `clients/index.js` selects `c.name` with no type filter, so `costReport`, `dayWrap`,
+`weighInReminder` and `keepWarm` arrived looking like four members who had never trained. **Used
+the flag that already exists** — those docs carry `type: "heartbeat"` and a userId of
+`heartbeat_<function>`; `type` is not selected so it never reaches the browser, but the userId does,
+so `isRealMember` filters on the `heartbeat_` prefix. Filtered in `coach/page.js` where the list is
+fetched, so `ClientList`'s counts, the publish "Goes out to" and `audienceLabel` all see the same
+list. No new field, no API change needed.
+**9. Nutrition slot catch-up.** Partly a mirage: the effect *did* already schedule the current
+slot's note on open. What it also did was show the earlier slot's note for the 8-second debounce
+first — which is exactly the "at 258 kcal" against a header reading 882 that was reported. Now,
+when the cached note belongs to an earlier slot than the current one, the stale text is cleared (the
+card drops to the deterministic read off live numbers) and the catch-up fires immediately instead of
+after 8s. Still one call per slot; the empty-day reset and the pre-05:00 no-slot rule untouched.
+Added a `coachInFlight` ref, because the slot is only marked spent when the call returns and a call
+can be in the air 20s — without it a 0 ms catch-up plus one more logged item could spend the slot's
+one call twice.
+**Follow-up, same day:** the generator named every session **"Iron Harvest"** — it was copying the
+example. The prompt used that name twice, once as an example and once as the literal value in the
+JSON shape line, and the shape line was the stronger pull. Both example titles are gone: the shape
+line now reads `{"title":"..."}` and the flavour is described rather than demonstrated (concrete and
+physical — metal, weather, work, animals), with an explicit "invent a fresh one for THIS session"
+and "do not name the muscle groups back". Left a comment above those lines saying not to put an
+example back. If the model ever echoes the `...` placeholder, `cleanTitle` reduces it to empty and
+`suggestName(groups)` takes over, so the worst case is the old target-derived name, not a literal
+"...". **Needs a live re-test: two Generates should produce two different titles.**
+
+**Second follow-up:** titles then varied but converged — three Pull generations gave "Iron Grip
+Session", "Iron Grip Challenge", "Iron Grip Session". Three changes, no extra AI call. (a) Banned
+the padding words: the title must not contain Session, Day, Workout, Training or Challenge. (b) It
+now names the session after **the exercises it just chose**, not the muscle groups — the groups are
+identical on every Pull session, the exercises are not. (c) **The JSON shape now puts `exercises`
+first and `title` last.** Without that, (b) was nominal: a reply is written start to finish, so a
+title in the first field is picked before a single exercise exists. `parseAiReply` reads both by
+key, so the order is free — two new checks in `check:session` cover it (13 checks now).
+Also removed the "metal, weather, work, animals" vocabulary list from the flavour line: it was
+feeding the convergence, since "metal" plus "back and biceps" is iron and grip every time. The
+no-examples comment stands and now covers vocabulary banks too.
+
+**Third follow-up:** "name it after the exercises" then swung the other way — "High Row Hammer
+Curl", "High Row Hammer Action", "Rage Against The Machine". The first two are exercise names joined
+together. Added: the title must not be built out of the exercise names — do not copy one in, do not
+join two — and reframed the line so both halves are explicit: **the lifts are the input, the feeling
+is what gets named.** Variety kept, nothing rolled back. The comment above these lines now records
+both failure modes (converging on the groups' vocabulary / listing the exercises) with a note not to
+delete either half. **Three prompt iterations in one day and no test can catch this one** — the only
+check is a few live Generates, so re-read that comment before touching those lines again.
+
+**10. "avg readiness"** label now reads `readiness · 1 of 15` whenever only some of the pack has
+reported, and stays `avg readiness` when everyone has.
+
+**Item 14 was a mirage — no change made.** `workout/page.js:792` reads
+`Superset {ex.block} &mdash; alternate with your partner`, with the space present in the source.
+Compiled that exact line through Next's own SWC: the children come out as
+`["Superset ", b, " — alternate with your partner"]`, both spaces intact, so the DOM says
+`Superset A — alternate with your partner`. The reported "Superset A—" is an extraction artefact
+of joining adjacent text runs, the same class as the three items already dropped from the brief.
+
+Touched: `lib/session.js`, **new** `lib/prs.js`, **new** `scripts/check-session-parse.mjs`,
+`components/coach/useSessionBuilder.js`, `components/coach/ClientList.js`, `app/coach/page.js`,
+`app/dashboard/page.js`, `app/progress/page.js`, `app/profile/page.js`, `app/workout/page.js`,
+`app/nutrition/page.js`, `package.json` (`check:session`)
+Still needed: **nothing.** Frontend pushed; `npm run build` passes; lint error count unchanged from
+before these edits (28 pre-existing). **No `FIELDS` change. No API redeploy outstanding — see below.**
+
+**The API half is DONE AND LIVE** (deployed the morning of the 27th by Cowork, 13 functions
+verified). Both follow-ups this brief raised are closed at source, so do not carry them forward:
+1. `clients/index.js` filters the heartbeat docs itself now, and also went through `lib/day.js` for
+   today, week start, streak and days-since — it had been computing all four off
+   `toISOString()`, which is trap 1 and made it wrong from NZ midnight until noon.
+2. `communityPosts/index.js` filters them in **all four** `users` queries, so Community reports
+   **15 members**, matching Coach HQ, and "trained today" reads **0/15** correctly against sessions
+   dated the 26th.
+3. `lib/costCore.js:78` is **deliberately still UTC** — Azure bills in UTC and that query is
+   explicitly `T00:00:00Z`. Not a bug; do not "fix" it.
+
+The frontend `isRealMember` filter in `coach/page.js` is now belt-and-braces rather than the only
+guard. Left in place: it costs nothing and holds if the API is ever rolled back.
+
+**Verified live before the push:** the generator (status "Session ready", real exercises, Regenerate
+gives a different six), titles across three runs (**Strength Unleashed / Power Surge / Grind Through
+Grit** — varied, no filler words, not exercise names), Clients at 15, the Progress headline matching
+its bars, PRs reading 23 on both Profile and Progress, and the dashboard challenge card naming the
+live challenge.
+**Not tested live:** the two feed strings (`3.6k kg`, "1 exercise") and the Eat slot catch-up — both
+need a real workout finished / a day's food logged, so they are the two to watch first.
+
+Out of scope and untouched, as briefed: publishing a session, posting to the community feed, and the
+`--vio` violet on the readiness ring.
+
+---
+
 ### 2026-08-26 — session title at the top, What's live is tappable
 Built by: Claude Code
 Shipped: brief `docs/briefs/session-title-and-live-link.md`, both parts. (1) The name field has

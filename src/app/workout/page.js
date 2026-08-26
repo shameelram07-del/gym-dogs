@@ -583,7 +583,9 @@ export default function WorkoutPage() {
     setSharing(true);
     try {
       const vol = Object.values(logs).flat().reduce((a, s) => a + (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0), 0);
-      const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k` : `${Math.round(vol)}`;
+      // Carries its own unit. The two post texts below appended `kg` themselves,
+      // which is how the feed came to read "3.6kkg".
+      const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k kg` : `${Math.round(vol)} kg`;
       const nSets = Object.values(logs).flat().filter(s => s.done || s.kg || s.reps).length;
       const res = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts', {
         method: 'POST',
@@ -592,8 +594,8 @@ export default function WorkoutPage() {
           userId,
           name: userName,
           text: prs.length > 0
-            ? `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume. NEW PR: ${prs[0].name} ${prs[0].kg}kg 🏆`
-            : `Crushed ${activePlan.name} — ${nSets} sets, ${volStr}kg total volume 💪`,
+            ? `Crushed ${activePlan.name} — ${nSets} sets, ${volStr} total volume. NEW PR: ${prs[0].name} ${prs[0].kg}kg 🏆`
+            : `Crushed ${activePlan.name} — ${nSets} sets, ${volStr} total volume 💪`,
           tag: prs.length > 0 ? '🏆 New PR' : '🏋️ Session done',
         }),
       });
