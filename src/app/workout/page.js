@@ -9,6 +9,7 @@ import Reveal from '@/components/Reveal';
 import { randomQuote } from '@/lib/quotes';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import { captureError, breadcrumb } from '@/lib/monitoring';
+import { eyebrow } from '@/lib/ui';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -21,7 +22,6 @@ const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const CARD_R = 26;
 
 // Localhost-only preview data so the screen can be reviewed without sign-in.
@@ -933,7 +933,7 @@ export default function WorkoutPage() {
           <button onClick={handleSave} disabled={saving} className="gd-disp" style={{
             background: 'var(--grad)',
             border: 'none', borderRadius: 16, padding: '15px 0',
-            color: '#fff', fontSize: 14, fontWeight: 700,
+            color: 'var(--on-accent)', fontSize: 14, fontWeight: 700,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
             boxShadow: 'var(--glow-grad), inset 0 1px 0 rgba(255,255,255,0.3)',
           }}>
@@ -1006,7 +1006,7 @@ export default function WorkoutPage() {
           <button className="gdc" onClick={shareToFeed} disabled={shared || sharing} style={{
             width: '100%', border: 'none', borderRadius: 16, padding: 16,
             background: shared ? 'var(--soft)' : 'var(--grad)',
-            color: shared ? 'var(--accent-strong)' : '#fff',
+            color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
             fontSize: 15, fontWeight: 800, cursor: shared ? 'default' : 'pointer',
             boxShadow: shared ? 'none' : 'var(--glow-grad)',
           }}>
@@ -1025,7 +1025,7 @@ export default function WorkoutPage() {
       {toast && (
         <div style={{
           position: 'fixed', bottom: 'calc(130px + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
-          zIndex: 150, background: 'var(--ai-card-1)', color: '#fff', fontSize: 13, fontWeight: 600,
+          zIndex: 150, background: 'var(--ai-card-1)', color: 'var(--on-dark)', fontSize: 13, fontWeight: 600,
           padding: '10px 18px', borderRadius: 999, maxWidth: 'calc(100% - 40px)', textAlign: 'center',
         }}>
           {toast}

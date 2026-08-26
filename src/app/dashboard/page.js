@@ -534,8 +534,8 @@ export default function DashboardPage() {
             <svg width="100" height="100" viewBox="0 0 120 120">
               <defs>
                 <linearGradient id="gdReadyGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#6EE7F9" />
-                  <stop offset="1" stopColor="#8B5CF6" />
+                  <stop offset="0" stopColor="var(--ice)" />
+                  <stop offset="1" stopColor="var(--vio)" />
                 </linearGradient>
               </defs>
               <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
@@ -627,7 +627,7 @@ export default function DashboardPage() {
             <div style={{ padding: '0 20px 20px' }}>
               {doneToday ? (
                 <div style={{ width: '100%', borderRadius: 17, background: 'var(--on-dark-soft)', color: 'var(--on-dark)', padding: 15, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--on-dark)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
                   Completed today
                 </div>
               ) : (

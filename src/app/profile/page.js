@@ -7,6 +7,7 @@ import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow, cardStyle } from '@/lib/ui';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
@@ -96,8 +97,6 @@ function calcTotalVolume(logs) {
   return total;
 }
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 // Same XP math as the dashboard so the level shown here always matches.
 const LEVEL_TITLES = ['Pup', 'Young Dog', 'Trainee', 'Working Dog', 'Strong Dog', 'Beast', 'Big Dog', 'Alpha', 'Top Dog', 'Legend'];
@@ -316,7 +315,7 @@ export default function ProfilePage() {
         </p>
         <div className="gd-disp" style={{
           display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 14,
-          padding: '7px 15px', borderRadius: 999, background: 'var(--grad)', color: '#fff',
+          padding: '7px 15px', borderRadius: 999, background: 'var(--grad)', color: 'var(--on-accent)',
           fontWeight: 700, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase',
           boxShadow: 'var(--glow-grad)',
         }}>
@@ -418,7 +417,7 @@ export default function ProfilePage() {
                   boxShadow: a.earned ? `0 8px 22px ${a.glow}` : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a.earned ? '#fff' : 'var(--ink-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a.earned ? 'var(--on-accent)' : 'var(--ink-3)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     {COIN_ICONS[a.icon]}
                   </svg>
                 </div>
@@ -468,7 +467,7 @@ export default function ProfilePage() {
 
       {/* ── TOAST ── */}
       {notice && (
-        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 150, background: 'var(--ai-card-1)', color: '#fff', fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 999 }}>
+        <div style={{ position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)', zIndex: 150, background: 'var(--ai-card-1)', color: 'var(--on-dark)', fontSize: 13, fontWeight: 600, padding: '10px 18px', borderRadius: 999 }}>
           {notice}
         </div>
       )}

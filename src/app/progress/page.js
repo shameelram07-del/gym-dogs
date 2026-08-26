@@ -9,6 +9,7 @@ import BottomNav from '@/components/BottomNav';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow, cardStyle } from '@/lib/ui';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -158,8 +159,6 @@ function recoveryStatus(score) {
   return { label: 'Rest up', color: 'var(--red-ink)', sub: 'Recovery day advised' };
 }
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 export default function ProgressPage() {
   const router = useRouter();
@@ -663,7 +662,7 @@ export default function ProgressPage() {
         <div style={{ background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderRadius: 26, padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <span style={{ fontSize: 18 }}>✨</span>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Recovery Note</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--on-dark)' }}>AI Recovery Note</span>
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>{aiNote}</p>
         </div>

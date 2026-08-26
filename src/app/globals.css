@@ -59,6 +59,16 @@
   /* depth */
   --shadow-card:  0 1px 2px rgba(16,24,40,0.04), 0 6px 20px rgba(16,24,40,0.05);
   --shadow-float: 0 12px 36px rgba(16,24,40,0.14);
+
+  /* Elevation ramp. Two levels was never enough to say what sits on top of
+     what, so everything read as one flat plane. --e2 IS --shadow-card and --e3
+     IS --shadow-float, kept identical so existing screens are untouched. */
+  --e1: 0 1px 2px rgba(16,24,40,0.04);
+  --e2: 0 1px 2px rgba(16,24,40,0.04), 0 6px 20px rgba(16,24,40,0.05);
+  --e3: 0 12px 36px rgba(16,24,40,0.14);
+  /* A 1px lit top edge. On a white card it does nothing, which is correct —
+     light mode gets its separation from the shadow. */
+  --sheen: inset 0 1px 0 rgba(255,255,255,0.8);
 }
 
 [data-theme="dark"] {
@@ -105,6 +115,14 @@
 
   --shadow-card:  0 1px 2px rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.50);
   --shadow-float: 0 18px 52px rgba(0,0,0,0.65);
+
+  --e1: 0 1px 2px rgba(0,0,0,0.45);
+  --e2: 0 1px 2px rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.50);
+  --e3: 0 18px 52px rgba(0,0,0,0.65);
+  /* This one earns its keep. On a dark card a faint lit top edge is the
+     difference between a flat rectangle and something with a surface — it is
+     most of what separates a considered dark UI from a cheap one. */
+  --sheen: inset 0 1px 0 rgba(255,255,255,0.055);
 }
 
 /* SLATE brand gradient + helpers — available in BOTH themes.
@@ -166,6 +184,36 @@
   --gold-deep: #B8860B;
   --gold-soft: #FFD97A;
   --on-gold:   #2A1D00;
+
+  /* ── Radius scale ──────────────────────────────────────────────
+     The app was using seventeen different corner radii — 26, 18, 17, 16, 14,
+     13, 12, 11, 10, 8, 7, 6, 4, 2 — which is not a scale, it is whatever each
+     card felt like on the day. Inconsistent rhythm is most of what reads as
+     amateur; the palette was never the problem.
+
+     --r-card is the 26px signature the design system already names. Use these
+     for anything you touch, in preference to a bare number. */
+  --r-chip:    999px;   /* pills, avatars, anything fully round */
+  --r-inner:   12px;    /* a field or tile INSIDE a card */
+  --r-control: 14px;    /* buttons, inputs, tab switchers */
+  --r-panel:   18px;    /* a secondary panel or a callout */
+  --r-card:    26px;    /* the signature card. Nothing else should be this big */
+
+  /* ── Type scale ────────────────────────────────────────────────
+     Same story: ~25 distinct sizes between 9 and 30, including 9.5, 10.5,
+     11.5, 12.5, 13.5, 14.5 and 15.5. Half-pixel steps are invisible
+     individually and mush collectively. Eight steps is plenty. */
+  --t-2xs: 10px;   /* uppercase micro-labels only */
+  --t-xs:  11px;   /* eyebrows, chip text */
+  --t-sm:  12.5px; /* secondary/meta copy */
+  --t-md:  14px;   /* body — the default */
+  --t-lg:  16px;   /* emphasised body, card titles */
+  --t-xl:  20px;   /* section headings */
+  --t-2xl: 26px;   /* screen headings */
+  --t-3xl: 34px;   /* hero numbers */
+
+  /* Vertical rhythm, so gaps stop being 6/7/8/9/10/11/12 at random. */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
 }
 
 /* Same hues, darker run, for light mode only. `.gd-grad-text` paints headings
@@ -182,7 +230,21 @@
 }
 
 /* display face for headings + hero numbers */
-.gd-disp { font-family: var(--font-display), 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+.gd-disp {
+  font-family: var(--font-display), 'Space Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+  /* Every hero number in this app is .gd-disp, and proportional digits mean a
+     figure that ticks 199 -> 200 physically jumps sideways. Tabular digits are
+     all one width, so a counter, a weight or a streak changes value without
+     moving. Costs nothing on text with no digits in it. */
+  font-variant-numeric: tabular-nums;
+  /* Stops a two-line heading breaking with one orphaned word. */
+  text-wrap: balance;
+}
+
+/* Tabular digits for a number that ISN'T set in the display face — set totals,
+   kg, kcal, timers. Same reason: numbers that change should not shift. */
+.gd-num { font-variant-numeric: tabular-nums; }
 
 /* gradient text — headline accents, PR numbers */
 .gd-grad-text {
@@ -228,12 +290,18 @@ body {
   .gd-page { animation: none; }
 }
 
-/* buttons feel responsive everywhere */
+/* buttons feel responsive everywhere.
+   The easing matters more than the scale: a linear press feels mechanical,
+   this one settles. Same curve as the page-in and the client card expand, so
+   the whole app moves with one hand. */
 button {
-  transition: transform 0.12s ease, opacity 0.15s ease, background-color 0.2s ease;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.15s ease,
+              background-color 0.2s ease,
+              box-shadow 0.2s ease;
 }
 button:active {
-  transform: scale(0.98);
+  transform: scale(0.975);
 }
 
 /* calm, consistent keyboard-focus ring */
@@ -241,6 +309,30 @@ button:active {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* The card primitive.
+   Border + radius + elevation + the lit top edge, in one place, so a card is
+   the same object on every screen instead of being re-typed as an inline style
+   each time. Pages can adopt it incrementally — `className="gd-card"` and drop
+   the background/border/borderRadius keys. */
+.gd-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--e2), var(--sheen);
+}
+
+/* A card you can press. The lift is small on purpose — this is a phone app
+   that happens to run on desktop, not a website. */
+@media (hover: hover) and (pointer: fine) {
+  .gd-card.gd-press:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--e3), var(--sheen);
+  }
+}
+.gd-card.gd-press {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
 }
 
 /* kill the clunky number-input spinners in set/kg fields */

@@ -16,6 +16,7 @@ import {
   sumItems, mealNameFrom,
 } from '@/lib/food';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow } from '@/lib/ui';
 
 const TABS = [
   { id: 'search', label: 'Search', icon: '🔍' },
@@ -24,7 +25,6 @@ const TABS = [
   { id: 'quick',  label: 'Quick',  icon: '⚡' },
 ];
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const field = {
   width: '100%', background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12,
   padding: '13px 14px', color: 'var(--ink)', fontSize: 15, fontWeight: 600, outline: 'none', boxSizing: 'border-box',
@@ -592,7 +592,7 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
                     <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 16, maxHeight: 200, objectFit: 'cover', display: 'block' }} />
                     <button onClick={() => setPhotoPreview(null)} aria-label="Remove photo" style={{
                       position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: '50%', border: 'none',
-                      background: 'rgba(0,0,0,0.62)', color: '#fff', fontSize: 17, lineHeight: 1, cursor: 'pointer',
+                      background: 'rgba(0,0,0,0.62)', color: 'var(--on-accent)', fontSize: 17, lineHeight: 1, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>×</button>
                   </div>

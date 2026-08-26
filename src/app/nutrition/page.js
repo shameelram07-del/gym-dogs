@@ -17,6 +17,7 @@ import {
   coachFallback, buildCoachPrompt, unknownMacros,
   slotFor, readCoachNotes, latestSlotNote,
 } from '@/lib/nutrition';
+import { eyebrow, cardStyle } from '@/lib/ui';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
@@ -30,8 +31,6 @@ const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 const COACH_DEBOUNCE_MS = 8000;
 const COACH_TIMEOUT_MS  = 20000;
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 const pillBase = { padding: '9px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--line)', background: 'var(--soft)', color: 'var(--ink-2)' };
 const pillOn = { ...pillBase, background: 'var(--accent-tint)', borderColor: 'var(--accent)', color: 'var(--accent-strong)' };
 
@@ -483,11 +482,11 @@ export default function NutritionPage() {
         {/* ── SET UP YOUR TARGETS ── */}
         {!targets && (
           <div style={{ ...cardStyle, background: 'var(--ai-card-1)', borderColor: 'transparent' }}>
-            <p style={{ ...eyebrow, color: 'rgba(255,255,255,0.6)' }}>Set up</p>
-            <h2 className="gd-disp" style={{ margin: '8px 0 6px', fontSize: 19, fontWeight: 800, color: '#fff' }}>
+            <p style={{ ...eyebrow, color: 'var(--on-dark-2)' }}>Set up</p>
+            <h2 className="gd-disp" style={{ margin: '8px 0 6px', fontSize: 19, fontWeight: 800, color: 'var(--on-dark)' }}>
               These numbers aren&rsquo;t yours yet
             </h2>
-            <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.5, color: 'rgba(255,255,255,0.72)' }}>
+            <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.5, color: 'var(--on-dark-2)' }}>
               You&rsquo;re looking at a generic {DEFAULT_TARGETS.calories} kcal. Answer four questions and I&rsquo;ll work out your real
               targets &mdash; then keep adjusting them as your weigh-ins come in.
             </p>

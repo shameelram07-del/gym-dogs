@@ -33,7 +33,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <div style={{
+    <nav aria-label="Main" style={{
       position: 'fixed',
       bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480,
       background: 'var(--nav-bg)',
@@ -51,6 +51,8 @@ export default function BottomNav() {
           <button
             key={item.href}
             onClick={() => router.push(item.href)}
+            aria-current={active ? 'page' : undefined}
+            aria-label={item.label}
             style={{
               flex: 1,
               background: 'transparent',
@@ -63,25 +65,41 @@ export default function BottomNav() {
               gap: 4,
               color: active ? 'var(--accent)' : 'var(--ink-3)',
               position: 'relative',
+              // The press scale on `button` is wrong for a nav tab — the whole
+              // bar appears to flinch. Colour and the indicator carry the state.
+              transform: 'none',
+              transition: 'color 0.2s ease',
             }}
           >
-            {active && (
-              <span style={{
-                position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)',
-                width: 34, height: 3, borderRadius: 99,
-                background: 'var(--grad)', boxShadow: '0 0 12px var(--accent-glow)',
-              }} />
-            )}
+            <span style={{
+              position: 'absolute', top: -10, left: '50%',
+              width: 34, height: 3, borderRadius: 99,
+              background: 'var(--grad)', boxShadow: '0 0 12px var(--accent-glow)',
+              // Always rendered, only revealed — mounting it on selection made
+              // the indicator pop into place instead of sliding up.
+              transform: `translateX(-50%) scaleX(${active ? 1 : 0.3})`,
+              opacity: active ? 1 : 0,
+              transition: 'opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+            }} />
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              stroke="currentColor"
+              // A hair heavier when selected. At 24px this reads as weight
+              // rather than as a different icon, which is the point.
+              strokeWidth={active ? 2.2 : 1.8}
+              strokeLinecap="round" strokeLinejoin="round"
+              style={{ transition: 'stroke-width 0.2s ease' }}>
               {ICONS[item.key]}
             </svg>
-            <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>
+            {/* Fixed weight on purpose. This was 500 -> 700 on selection, and
+                since bolder text is WIDER, every tab label physically shifted
+                each time you navigated. Colour and the bar say "selected"
+                without moving the layout. */}
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.01em' }}>
               {item.label}
             </span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

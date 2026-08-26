@@ -6,6 +6,7 @@ import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow, cardStyle } from '@/lib/ui';
 
 const API = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api';
 const KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -13,8 +14,6 @@ const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
 const MEDAL = ['var(--gold)', 'var(--silver)', 'var(--bronze)'];
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
-const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26, padding: 18 };
 
 function Avatar({ initial, size = 38 }) {
   return (

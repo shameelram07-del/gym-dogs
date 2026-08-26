@@ -35,7 +35,10 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0A0714",
+  // SLATE's --bg. This was still #0A0714 — the IGNITE ink-violet — so on a
+  // phone the browser chrome and the iOS status bar were painting the old
+  // palette right above a slate app. Same class of leftover as the magenta.
+  themeColor: "#080B11",
   width: "device-width",
   initialScale: 1,
 };

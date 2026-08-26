@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
+import { eyebrow } from '@/lib/ui';
 
 const exercises = [
   {
@@ -57,7 +58,6 @@ const exercises = [
   },
 ];
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const cardStyle = { background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 26 };
 
 // Chip vocabulary, shared with the rest of the app: ice for neutral facts,

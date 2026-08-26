@@ -6,8 +6,8 @@ import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
+import { eyebrow } from '@/lib/ui';
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 
 // Signed-in users always go straight to the dashboard.
 // (The dashboard shows a dismissible "finish your setup" card for anyone

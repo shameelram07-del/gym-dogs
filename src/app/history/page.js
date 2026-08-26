@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow } from '@/lib/ui';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -15,7 +16,6 @@ const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const CARD_R = 26;
 
 function setsOf(sets_data) {

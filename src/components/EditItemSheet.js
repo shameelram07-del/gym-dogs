@@ -9,8 +9,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { aiFromText, sumItems, mealNameFrom, describeMealCorrection } from '@/lib/food';
 import { captureError } from '@/lib/monitoring';
+import { eyebrow } from '@/lib/ui';
 
-const eyebrow = { fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', color: 'var(--ink-3)', textTransform: 'uppercase', margin: 0 };
 const field = {
   width: '100%', background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12,
   padding: '13px 14px', color: 'var(--ink)', fontSize: 15, fontWeight: 600, outline: 'none', boxSizing: 'border-box',
