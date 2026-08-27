@@ -11,6 +11,51 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — Gym Daddy quoted a stale calorie total inside its own slot
+Built by: Claude Code
+Shipped: the note fired after two coffees (153 kcal) and a minute later the day was 1102, so the
+header read 1102 while the card read "you're currently at 153 kcal". Confirmed live on the deployed
+site. **One AI call per slot is unchanged** — nothing here regenerates anything. What changed is
+whether a note that has been overtaken is still shown.
+
+The cached slot note already stored `kcal`, the total it was written against; it just never reached
+the render, because the card held only the note's text. State now holds the note object, and the
+render asks new `coachNoteText(note, currentKcal, targetKcal)` in `lib/nutrition.js` — pure, no
+clock, next to the other slot helpers. It returns `''` when the day has drifted too far, and `''` is
+already what the card falls back on, so a stale note and a failed call take the identical path.
+
+**Threshold: a tenth of the day's calorie target** (`NOTE_DRIFT_FRACTION`), not a fixed number of
+calories, because the cutoff has to mean the same *thing* at every target rather than the same
+figure — 120 kcal for someone eating 1200, 350 for someone eating 3500, roughly a snack either way,
+where a flat 200 would be a meal to the first person and a rounding error to the second. Erring
+tight costs nothing: the alternative on screen is `coachFallback`, computed from live totals and
+always accurate, just flatter to read. The comparison is **absolute**, since deleting a meal moves
+the day away from the note as surely as adding one.
+
+Behaviour checked by running the pure function over real numbers before the push:
+- the live failure (note@153, day 1102, target 2400 — drift 949 vs cutoff 240) → **fallback**
+- the scaling property: drift 250 → **fallback** at target 1200, **AI note** at target 3500
+- boundary at target 2000: drift 200 keeps the note, 201 drops it
+- a meal deleted (note@1500, day 900) → **fallback**
+- a note cached before `kcal` existed, or no usable target → **note kept**, since there is nothing
+  to measure drift against and hiding it would be a guess
+- `null` note and a failed call's empty `text` → fallback, exactly as before
+
+Kept untouched, as instructed: one call per slot, the `coachInFlight` guard, the empty-day reset, the
+pre-05:00 no-slot rule, and the empty-text fallback.
+
+Touched: `src/lib/nutrition.js`, `src/app/nutrition/page.js`
+Still needed: frontend push. No API redeploy, no `FIELDS` change. `npm run build` passes.
+**Verified live** on localhost against the same day's real data that failed in the afternoon: cached
+note written at 153 kcal, day at 1102, target 2300 — the card reads
+`1102 in, 1198 left of 2300. Protein's the one to watch: 44g of 160g.` and **no AI call fired**,
+which is the point: the slot was already spent, so the fix had to work without one.
+Not added: a `scripts/check-coach-note.mjs` alongside the session one. The logic is pure and worth
+pinning, but it needs the data-URL loader factored out of `check-session-parse.mjs` to avoid a second
+copy — a separate job, say the word.
+
+---
+
 ### 2026-08-27 — feed post counted pre-filled sets as logged
 Built by: Claude Code
 Shipped: a session with 4 logged sets posted "7 sets" to the feed. `shareToFeed` counted

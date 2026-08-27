@@ -14,7 +14,7 @@ import { captureError } from '@/lib/monitoring';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
   summariseDay, upsertDay, flattenEntries, migrateWater,
-  coachFallback, buildCoachPrompt, unknownMacros,
+  coachFallback, buildCoachPrompt, unknownMacros, coachNoteText,
   slotFor, readCoachNotes, latestSlotNote,
 } from '@/lib/nutrition';
 import { eyebrow, cardStyle } from '@/lib/ui';
@@ -114,7 +114,9 @@ export default function NutritionPage() {
   // One entry per slot — morning, midday, evening — because a slot that has
   // already spoken must not speak again, even after a reload. The card shows the
   // most recent one.
-  const [coachNote, setCoachNote] = useState('');
+  // The NOTE, not just its text — `kcal` (the total it was written against) has
+  // to reach the render, or there is no way to tell that the day has moved on.
+  const [coachNote, setCoachNote] = useState(null);
   const [coachBusy, setCoachBusy] = useState(false);
   const noteRef = useRef({ date: '', slots: {} });
   // The slot is only marked spent once the call comes back, and a call can be in
@@ -150,7 +152,7 @@ export default function NutritionPage() {
     setWaterMl(0); waterRef.current = 0;
     // New day, new slots — all three are unspent again.
     noteRef.current = { date: '', slots: {} };
-    setCoachNote('');
+    setCoachNote(null);
   }), [TODAY]);
 
   // Targets setup
@@ -188,8 +190,7 @@ export default function NutritionPage() {
               const cached = readCoachNotes(p.nutrition, todayISO());
               if (Object.keys(cached.slots).length) {
                 noteRef.current = cached;
-                const latest = latestSlotNote(cached);
-                setCoachNote((latest && latest.text) || '');
+                setCoachNote(latestSlotNote(cached));
               }
             }
           }
@@ -364,7 +365,7 @@ export default function NutritionPage() {
         [slot]: { slot, text, itemCount: count, kcal, generatedAt: new Date().toISOString() },
       },
     };
-    setCoachNote(text);
+    setCoachNote({ slot, text, kcal });
     setCoachBusy(false);
     coachInFlight.current = false;
     // Persist the cached note against what is on the day RIGHT NOW. Reading the
@@ -379,14 +380,14 @@ export default function NutritionPage() {
   useEffect(() => {
     // An empty day must drop any note it was holding, or yesterday's read
     // survives the midnight rollover and gets shown against a blank day.
-    if (items.length === 0) { setCoachNote(''); setCoachBusy(false); return; }
+    if (items.length === 0) { setCoachNote(null); setCoachBusy(false); return; }
     // No targets set yet: a model call would only describe generic numbers.
     if (!userId || !targets) { setCoachBusy(false); return; }
 
     const n = noteRef.current;
     const cached = latestSlotNote(n.date === TODAY ? n : null);
     // Whatever this slot decides, the card keeps showing the latest note it has.
-    const show = () => setCoachNote((cached && cached.text) || '');
+    const show = () => setCoachNote(cached);
 
     // Which moment of the day is this? Before 05:00 there is no slot — those
     // hours belong to the evening that just finished, so nothing new is written
@@ -406,7 +407,7 @@ export default function NutritionPage() {
     // debounce is there to fold three quick adds into one call, not to make you
     // stare at a stale read on arrival, so a catch-up fires straight away.
     const stale = !!cached && cached.slot !== slot;
-    if (stale) setCoachNote('');
+    if (stale) setCoachNote(null);
 
     const id = setTimeout(
       () => generateCoachNote(slot, Math.round(total.calories), items.length),
@@ -698,7 +699,8 @@ export default function NutritionPage() {
         <Reveal delay={150} style={{ ...cardStyle, background: `linear-gradient(135deg, var(--ai-card-1), var(--ai-card-2))`, borderColor: 'transparent' }}>
           <p style={{ ...eyebrow, color: 'var(--ice)' }}>Gym Daddy</p>
           <p style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.55, color: 'var(--on-dark)' }}>
-            {coachNote || coachFallback(total, T, coachHour, unknown, slotFor(coachHour))}
+            {coachNoteText(coachNote, total.calories, T.calories)
+              || coachFallback(total, T, coachHour, unknown, slotFor(coachHour))}
           </p>
           {coachBusy && (
             <div style={{ marginTop: 12, height: 6, background: 'var(--on-dark-soft)', borderRadius: 999, overflow: 'hidden' }}>

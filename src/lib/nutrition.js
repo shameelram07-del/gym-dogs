@@ -433,6 +433,50 @@ export function latestSlotNote(notes) {
   return null;
 }
 
+/**
+ * How far the day may move before a slot's note stops being true.
+ *
+ * A note quotes the total it was written against — "you're currently at 153
+ * kcal" — so once enough food lands inside the same slot the sentence is simply
+ * false: one afternoon the card read 153 while the header read 1102. There is
+ * one model call per slot and that stays, so nothing here regenerates anything.
+ * What this decides is whether the note is still worth showing.
+ *
+ * **A tenth of the day's calorie target**, not a fixed number of calories,
+ * because the cutoff has to mean the same THING at every target rather than the
+ * same figure: 120 kcal for someone eating 1200, 350 for someone eating 3500 —
+ * roughly a snack either way, where a flat 200 would be a meal to the first
+ * person and a rounding error to the second.
+ *
+ * Erring tight costs nothing. The alternative on screen is `coachFallback`,
+ * which is generated from the live totals and is always accurate — it reads a
+ * little flatter, and that is the whole of what is lost.
+ */
+export const NOTE_DRIFT_FRACTION = 0.1;
+
+/**
+ * A slot note's text, or '' once the day has moved too far past the total it
+ * was written against. '' is what the card already falls back to, so a stale
+ * note and a failed call take the same path.
+ *
+ * @param {object} note        cached slot note; `kcal` is the total it describes
+ * @param {number} currentKcal what the day actually is now
+ * @param {number} targetKcal  the day's calorie target, which sets the cutoff
+ */
+export function coachNoteText(note, currentKcal, targetKcal) {
+  if (!note || !note.text) return '';
+  const written = Number(note.kcal);
+  const now = Number(currentKcal);
+  const target = Number(targetKcal);
+  // A note cached before `kcal` was stored, or no usable target: there is
+  // nothing to measure drift against, so leave it showing rather than hide a
+  // note that may well be current.
+  if (![written, now, target].every(Number.isFinite) || target <= 0) return note.text;
+  // Absolute, because deleting a meal moves the day away from the note just as
+  // surely as adding one does.
+  return Math.abs(now - written) > target * NOTE_DRIFT_FRACTION ? '' : note.text;
+}
+
 // One line each, not three prompt builders. The slot changes the angle; the
 // numbers, the history and the rules underneath it are identical.
 const SLOT_BRIEF = {
