@@ -9,7 +9,7 @@ import TargetsSetup from '@/components/TargetsSetup';
 import AddFoodSheet from '@/components/AddFoodSheet';
 import EditItemSheet from '@/components/EditItemSheet';
 import Reveal from '@/components/Reveal';
-import { pushRecent, toCustomFood, upsertCustomFood } from '@/lib/food';
+import { pushRecent, toCustomFood, upsertCustomFood, portionWarning } from '@/lib/food';
 import { captureError } from '@/lib/monitoring';
 import {
   calculateTargets, DEFAULT_TARGETS, seedFromProfile,
@@ -665,6 +665,16 @@ export default function NutritionPage() {
                       {Array.isArray(item.components) && item.components.length > 0 && (
                         <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {item.components.map((c) => c.name).join(' · ')}
+                        </p>
+                      )}
+                      {/* Numbers foodAI itself flagged as impossible. Same ember
+                          language as "No protein on record" in the add sheet:
+                          the app has doubts about the figure, and the figure is
+                          shown and logged unchanged either way. The row is
+                          already the button into the fix-its-numbers sheet. */}
+                      {portionWarning(item) && (
+                        <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--ember)', lineHeight: 1.45, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {portionWarning(item)} &mdash; tap to check
                         </p>
                       )}
                       <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

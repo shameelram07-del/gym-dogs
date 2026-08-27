@@ -109,6 +109,12 @@ export default function EditItemSheet({ item, userId, onSave, onDelete, onClose 
       fat: macro(f.fat),
       corrected: true,   // stops the estimate badge reappearing
     };
+    // The spread carries `portionCheck` with it, and it must not survive: it
+    // says "the model's own numbers contradict each other", and these numbers
+    // are now the ones you just typed. Same reasoning as `corrected` above.
+    // A meal re-estimated through the correction box gets fresh components with
+    // fresh flags of their own, so a still-impossible answer still says so.
+    delete next.portionCheck;
     // id and at come through the spread untouched, so a corrected meal keeps
     // its place in the day rather than jumping to the end.
     if (components) next.components = components;

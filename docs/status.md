@@ -11,6 +11,54 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — the app reads foodAI's portionCheck
+Built by: Claude Code
+Shipped: `foodAI` has been flagging physically impossible items since this morning's deploy — macros
+weighing more than the stated food, or above 9.2 kcal per gram — and nothing in the app read it.
+It does now.
+
+**Reused the 24 Aug language rather than inventing a second one.** `missingMacros` puts an ember
+line on a row for a macro the database hasn't got ("No protein on record"); this is the same idea
+from the other direction, so a flagged item gets an ember line in the same size and position:
+`The macros weigh more than the food does — tap to check`. No icon, no red, no badge. The row was
+already the button into the fix-its-numbers sheet, so nothing new was built to land in.
+**The numbers are logged exactly as they came.** The API reports and does not correct, and neither
+does the app — the figure on the row is the model's own either way.
+
+New `portionWarning(item)` in `lib/food.js`, next to `missingMacros` for the same reason — pure, and
+the two belong together. Wording for both values, plus:
+- **a value we have no wording for still shows a line** ("These numbers don't add up"), because
+  treating an unknown value as "fine" is how the next check the API learns would land silently;
+- **missing means fine**, as specified — absent `portionCheck` returns `''`;
+- **meals ask their parts.** A meal is one logged entry with its ingredients in `components`, and
+  the flag lands on the ingredient, not the meal. One flagged part is named
+  (`Whole milk: more kcal than that weight can hold`), several are counted, since the row is one line.
+
+**One thing this had to fix to work:** `EditItemSheet.save()` spreads `...item`, so `portionCheck`
+would have survived a correction and the warning would have stuck to numbers the user had just typed
+by hand. It is deleted on save now, the same reasoning as the existing `corrected: true`. A meal
+re-estimated through the correction box gets fresh components carrying fresh flags, so an answer
+that is still impossible still says so.
+
+Checked all eight cases by running the pure function: no flag, each of the two values, an unknown
+value, a meal with one / two / no flagged parts, and a null item.
+
+Touched: `src/lib/food.js`, `src/app/nutrition/page.js`, `src/components/EditItemSheet.js`
+Still needed: frontend push. No API redeploy (it is already live), no `FIELDS` change — `portionCheck`
+rides inside the existing `nutritionLog` JSON. `npm run build` passes.
+**Verified live** on localhost by injecting a `macros-exceed-weight` `portionCheck` into a `foodAI`
+response and logging the item: the row rendered
+`The macros weigh more than the food does — tap to check` as an ember line above the numbers,
+matching the "No … on record" treatment. Test item removed afterwards. Still unseen against a real
+flag from the model, which needs an estimate whose numbers genuinely come back impossible.
+
+**The response's `flagged` count is still unread**, deliberately. Nothing on the day's list needs it
+— the per-item flag carries the whole message there. Where it would earn its place is the AI review
+list inside the add sheet, flagging an item **before** it is logged rather than after; that is a
+separate piece of work and was not in this one.
+
+---
+
 ### 2026-08-27 — quick-add truncated every number it was given
 Built by: Claude Code
 Shipped: `AddFoodSheet` quick-add parsed calories and all three macros with `parseInt`.

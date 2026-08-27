@@ -95,6 +95,52 @@ export function missingMacros(dbItem) {
 }
 
 /**
+ * Food data we have but can't believe, as opposed to food data we don't have.
+ *
+ * `missingMacros` above covers the 24 Aug case: the database has no figure, so
+ * we say "No protein on record" in ember and leave it unknown. This is the same
+ * idea from the other direction — `foodAI` now sets `portionCheck` on an item
+ * whose own numbers contradict each other, either because the macros weigh more
+ * than the stated food or because it works out denser than 9.2 kcal per gram
+ * (pure fat is 9, so nothing edible is above it).
+ *
+ * The API reports and does not correct, and neither do we: the numbers are the
+ * model's own and get logged exactly as they came. All this does is put an ember
+ * line on the row saying it is worth a look, which is what the rest of the
+ * uncertain-food language already looks like.
+ *
+ * `portionCheck` is absent when nothing looked wrong, so absent means fine.
+ */
+const PORTION_CHECK_WORDS = {
+  'macros-exceed-weight': 'The macros weigh more than the food does',
+  'energy-too-dense': 'More kcal than that weight can hold',
+};
+
+// A value we don't have wording for is still a flag. Saying something vague
+// beats saying nothing, which is what treating an unknown value as "fine" would
+// do the next time the API learns a new check.
+const PORTION_CHECK_FALLBACK = 'These numbers don’t add up';
+
+const checkWords = (v) => (v ? (PORTION_CHECK_WORDS[v] || PORTION_CHECK_FALLBACK) : '');
+
+/**
+ * Why a logged item is worth a second look, in words — or '' when it isn't.
+ *
+ * A meal is logged as one entry with its ingredients in `components`, and the
+ * flag lands on the ingredient, not the meal. So a meal has to ask its parts:
+ * one flagged part is named, several are counted, because the row is one line.
+ */
+export function portionWarning(item) {
+  if (!item) return '';
+  if (item.portionCheck) return checkWords(item.portionCheck);
+  const flagged = (Array.isArray(item.components) ? item.components : [])
+    .filter((c) => c && c.portionCheck);
+  if (flagged.length === 1) return `${flagged[0].name}: ${checkWords(flagged[0].portionCheck).toLowerCase()}`;
+  if (flagged.length > 1) return `${flagged.length} of these are worth a look`;
+  return '';
+}
+
+/**
  * Database entries are per 100g. Turn one into an actual logged item.
  *
  * A macro the database doesn't have stays **null**, not 0 — `(x || 0) * f` was
