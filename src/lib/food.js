@@ -167,7 +167,13 @@ export function fileToCompressedDataUrl(file, maxDim = 800, quality = 0.72) {
 // on one line and still explain itself — and so a correction has something to
 // work from. It rides inside the existing nutritionLog JSON: no new API field.
 
-const num = (v) => (isFinite(Number(v)) ? Number(v) : 0);
+/**
+ * A macro field as a NUMBER — exported because the sheets need it too.
+ *
+ * Never parseInt: `parseInt('0.5')` is 0, so half a gram of fat logged as
+ * nothing and 12.5 kcal logged as 12. Round at the call site, after this.
+ */
+export const num = (v) => (isFinite(Number(v)) ? Number(v) : 0);
 
 /** Totals for a list of AI items. Summed raw, rounded once at the end. */
 export function sumItems(items) {

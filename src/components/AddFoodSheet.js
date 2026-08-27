@@ -13,7 +13,7 @@ import {
   lookupBarcode, searchFoods, aiFromText, aiFromPhoto, aiFromLabel,
   scaleToGrams, defaultGrams, fileToCompressedDataUrl, missingMacros,
   toggleFavourite, isFavourite, recentFoods, searchCustomFoods,
-  sumItems, mealNameFrom,
+  sumItems, mealNameFrom, num,
 } from '@/lib/food';
 import { captureError } from '@/lib/monitoring';
 import { eyebrow } from '@/lib/ui';
@@ -661,15 +661,20 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
                   {[['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']].map(([k, label]) => (
                     <div key={k}>
                       <p style={{ ...eyebrow, marginBottom: 6 }}>{label}</p>
-                      <input type="number" inputMode="numeric" value={quick[k]} onChange={(e) => setQuick((s) => ({ ...s, [k]: e.target.value }))} placeholder="g" style={{ ...field, textAlign: 'center' }} />
+                      <input type="number" inputMode="decimal" value={quick[k]} onChange={(e) => setQuick((s) => ({ ...s, [k]: e.target.value }))} placeholder="g" style={{ ...field, textAlign: 'center' }} />
                     </div>
                   ))}
                 </div>
                 <button disabled={!quickValid} onClick={() => {
+                  // parseInt truncated, so 0.5 g of fat logged as 0 and 12.5 kcal
+                  // as 12. Number-then-round, the way the rest of the food path
+                  // does it. Clamped at 0 as well: type="number" accepts "-5",
+                  // and a negative would come straight off the day's totals.
+                  const q = (v) => Math.max(0, Math.round(num(v)));
                   commit({
                     id: Date.now(), name: quick.name.trim(),
-                    calories: parseInt(quick.calories) || 0, protein: parseInt(quick.protein) || 0,
-                    carbs: parseInt(quick.carbs) || 0, fat: parseInt(quick.fat) || 0,
+                    calories: q(quick.calories), protein: q(quick.protein),
+                    carbs: q(quick.carbs), fat: q(quick.fat),
                   });
                   setQuick({ name: '', calories: '', protein: '', carbs: '', fat: '' });
                 }} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add it</button>

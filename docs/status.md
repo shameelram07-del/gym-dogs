@@ -11,6 +11,41 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — quick-add truncated every number it was given
+Built by: Claude Code
+Shipped: `AddFoodSheet` quick-add parsed calories and all three macros with `parseInt`.
+`parseInt('0.5')` is 0, so half a gram of fat logged as nothing and 12.5 kcal logged as 12. Now
+number-then-round, matching the rest of the food path. `lib/food.js` already had exactly the right
+helper (`num`) sitting module-private, so it is **exported rather than copied** — `EditItemSheet` has
+a third near-identical local `n`, worth folding in next time that file is open, not worth touching
+today.
+
+Two things came with it, both deliberate:
+- the value is **clamped at 0**, because `type="number"` accepts `-5` and `parseInt('-5') || 0`
+  passed it straight through, which would have come off the day's totals;
+- the three macro inputs move from `inputMode="numeric"` to `"decimal"` — on iOS the numeric pad has
+  no decimal point, so on a phone the fix would have been unreachable. That is the existing
+  convention, not a new one: `EditItemSheet` already uses `decimal` for macros and `numeric` for kcal.
+
+Checked every `parseInt` in `src/`: the only other five are reps and set counts, whole numbers by
+nature. Nothing else in the food flow.
+
+Verified by running the new parse over the reported values: `0.5` → 1 (was 0), `12.5` → 13 (was 12),
+`0.4` → 0, `-5` → 0 (was -5), `250` → 250, `''` and `abc` → 0.
+
+Touched: `src/lib/food.js`, `src/components/AddFoodSheet.js`
+Still needed: frontend push. **No API redeploy outstanding — see below.** `npm run build` passes.
+
+**The API half of today's nutrition work is DONE AND DEPLOYED** — zip uploaded, came back
+`provisioningState: Succeeded`. Do not carry it forward:
+- `foodLookup` no longer converts `energy_100g` to kcal on faith — it goes unit-named field, then
+  explicit unit, then the macros as arbiter, then kJ as the documented default.
+- `foodAI` flags physically impossible portions with a `portionCheck` field and a `flagged` count,
+  **without rewriting any number** — it reports, it does not correct.
+- Both pinned by new `scripts/check-energy.mjs` and `scripts/check-portion.mjs` in the API repo.
+
+---
+
 ### 2026-08-27 — a dead Cosmos key out of the repo
 Built by: Claude Code
 Shipped: `migrate.js` had the Cosmos endpoint and primary key hardcoded. It now reads
