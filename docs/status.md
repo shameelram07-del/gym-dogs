@@ -11,6 +11,30 @@ Keep entries short. Long explanations belong in the brief, not here.
 
 ---
 
+### 2026-08-27 — a dead Cosmos key out of the repo
+Built by: Claude Code
+Shipped: `migrate.js` had the Cosmos endpoint and primary key hardcoded. It now reads
+`COSMOS_ENDPOINT` / `COSMOS_KEY` from the environment and exits 1 with the two `export` lines
+printed when either is unset — the same shape as `scripts/fix-log-dates.js`. Added a header saying
+what the file actually does (it only lists docs; despite the name it migrates nothing) and why no key
+goes back in.
+
+Swept the rest of the repo: **no tracked file carries a credential literal any more.** The
+`documents.azure.com` hits in the other three scripts are the `<account>` placeholder in their usage
+text, and the function keys in `.next/` are build output, gitignored, and `NEXT_PUBLIC_` by design.
+
+> **The key is still in git history**, and this repo goes public at launch. Removing it from the
+> working tree does not remove it from the commits it was in. It was rotated on 25 Aug so it opens
+> nothing, and the decision has been taken to **leave the history alone for now**: scrubbing it means
+> rewriting pushed history, which is a deliberate pre-launch job, not something to fold into an
+> unrelated commit. Flagged here so it is not forgotten before launch.
+
+Touched: `migrate.js`
+Still needed: frontend push. No API redeploy, no `FIELDS` change. Docs/tooling only — nothing
+user-facing.
+
+---
+
 ### 2026-08-27 — Gym Daddy quoted a stale calorie total inside its own slot
 Built by: Claude Code
 Shipped: the note fired after two coffees (153 kcal) and a minute later the day was 1102, so the
