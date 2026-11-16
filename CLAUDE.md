@@ -173,3 +173,21 @@ can pick the thread back up. See `docs/briefs/_TEMPLATE.md`.
 - If it needs a new profile field or an API change, **say so explicitly** — that's a separate
   manual deploy Shameel has to run, and forgetting it is how features look broken in production.
 - Tell Shameel what to test, and let him push.
+
+---
+
+## Handover v7 additions (Nov 2026)
+
+Full context: `docs/HANDOVER.md` — read it first. Backend notes: `docs/backend-CLAUDE.md`
+(backend has no GitHub remote yet).
+
+- **Before starting work:** run `git status`, show Shameel what's uncommitted, and check the open
+  items in `docs/HANDOVER.md` §6.
+- Short answers, one step at a time, plain English, exact commands. Ask before committing.
+- **Show a mockup before big UI changes** — he approves pixels.
+- If the UI looks stale: stop dev, `Remove-Item -Recurse -Force .next` (PowerShell), restart.
+- `userProfiles` GET returns an **array** → `.find(p => p.userId === uid)`, never `[0]`.
+- Keep the `looksLikeGuid()` guards on display names (Entra names can be GUIDs).
+- Report errors via `src/lib/monitoring.js`; never an empty `catch`.
+- New routes need a rewrite in `staticwebapp.config.json`.
+- **Never commit secrets.** `migrate.js` used to hold a Cosmos key (see handover open item #3).
