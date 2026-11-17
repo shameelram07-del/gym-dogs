@@ -1,4 +1,4 @@
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Inter, Space_Grotesk, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import AppProvider from "@/components/AppProvider";
 
@@ -13,6 +13,15 @@ const spaceGrotesk = Space_Grotesk({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+});
+
+// The one big word per screen (.gd-mega): heavy condensed italic, so it reads
+// as speed rather than as a heading.
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-mega",
+  subsets: ["latin"],
+  weight: ["700", "900"],
+  style: ["italic"],
 });
 
 export const metadata = {
@@ -48,7 +57,7 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${interSans.variable} ${spaceGrotesk.variable} h-full antialiased`}
+      className={`${interSans.variable} ${spaceGrotesk.variable} ${barlowCondensed.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <script

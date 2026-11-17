@@ -217,7 +217,7 @@
   --t-xl:  20px;   /* section headings */
   --t-2xl: 26px;   /* screen headings */
   --t-3xl: 34px;   /* hero numbers */
-  --t-mega: clamp(52px, 17vw, 72px);   /* the one big word on a screen */
+  --t-mega: clamp(64px, 22vw, 96px);   /* the one big word on a screen */
 
   /* Vertical rhythm, so gaps stop being 6/7/8/9/10/11/12 at random. */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
@@ -254,16 +254,34 @@
 /* The one big word per screen: PUSH DAY. / BENCH PRESS. / DONE. / EAT.
    Colour stays ink; size and weight do the shouting. */
 .gd-mega {
-  font-family: var(--font-display), 'Space Grotesk', sans-serif;
+  font-family: var(--font-mega), 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  font-style: italic;
   font-size: var(--t-mega);
-  font-weight: 700;
-  line-height: 0.88;
-  letter-spacing: -0.045em;
+  font-weight: 900;
+  line-height: 0.84;
+  letter-spacing: -0.01em;
   text-transform: uppercase;
-  text-wrap: balance;
   overflow-wrap: anywhere;
   margin: 0;
 }
+/* Second line of a mega word: outline only. Same trick as a race livery. */
+.gd-mega .gd-outline {
+  color: transparent;
+  -webkit-text-stroke: 2px currentColor;
+  -webkit-text-stroke-color: var(--on-dark);
+}
+/* The slanted ember slab that slides in behind the hero picture. */
+@keyframes gdSlab { from { transform: skewX(-18deg) translateX(120%); } to { transform: skewX(-18deg) translateX(0); } }
+.gd-slab {
+  position: absolute; top: -20px; right: -22%; width: 62%; height: 250px; z-index: -2;
+  background: var(--grad);
+  transform: skewX(-18deg);
+  animation: gdSlab 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: none;
+}
+/* Slanted primary button, to match the slab. */
+.gd-slant { clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+
 
 /* Tabular digits for a number that ISN'T set in the display face — set totals,
    kg, kcal, timers. Same reason: numbers that change should not shift. */
@@ -409,6 +427,38 @@ input[type="number"] {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── The thud ──────────────────────────────────────────────────
+   The workout of the day drops in from above, lands hard, squashes a touch
+   and settles. The card takes the hit a beat later, and the picture behind
+   eases in. Plays once per load; transform/opacity only, so it stays smooth
+   on a phone. Reduced-motion users get none of it (blanket rule above). */
+@keyframes gdThud {
+  0%   { opacity: 0; transform: translateY(-90px) scale(1.18); }
+  55%  { opacity: 1; transform: translateY(0) scale(1); }
+  68%  { transform: translateY(5px) scale(1.03, 0.93); }
+  84%  { transform: translateY(-2px) scale(0.995, 1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes gdThudHit {
+  0%, 100% { transform: none; }
+  35%  { transform: translateY(5px); }
+  70%  { transform: translateY(-1px); }
+}
+@keyframes gdHeroIn {
+  from { opacity: 0; transform: scale(1.08); }
+  to   { opacity: 0.9; transform: none; }
+}
+.gd-thud {
+  transform-origin: left bottom;
+  animation: gdThud 0.62s cubic-bezier(0.3, 0, 0.2, 1) 0.18s both;
+}
+.gd-thud-card { animation: gdThudHit 0.3s ease-out 0.5s both; }
+.gd-hero-img {
+  opacity: 0.9;
+  transform-origin: right top;
+  animation: gdHeroIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* shared motion vocabulary (used via inline styles on pages) */

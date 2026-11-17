@@ -47,6 +47,24 @@ function challengeLine(ch) {
   return bits.join(' · ');
 }
 
+const HERO_DEFAULT = '/hero/default.webp';
+// Keyword in the session name or focus -> picture. Add a file to /public/hero
+// with one of these names and it is picked up; no code change needed.
+const HERO_KEYS = [
+  ['push', /push|chest|bench|shoulder|tricep/],
+  ['pull', /pull|back|row|bicep|lat/],
+  ['legs', /leg|squat|glute|quad|hamstring|lower/],
+  ['core', /core|abs/],
+  ['cardio', /cardio|run|conditioning|hiit/],
+  ['full', /full|total/],
+];
+function heroImageFor(plan) {
+  if (!plan) return '/hero/rest.webp';
+  const text = `${plan.name || ''} ${plan.focus || plan.tag || ''}`.toLowerCase();
+  const hit = HERO_KEYS.find(([, re]) => re.test(text));
+  return hit ? `/hero/${hit[0]}.webp` : HERO_DEFAULT;
+}
+
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Morning';
@@ -231,6 +249,7 @@ export default function DashboardPage() {
   const [ringOn, setRingOn]         = useState(false);
   const [showSetup, setShowSetup]   = useState(false); // gentle onboarding nudge
   const [sessionOpen, setSessionOpen] = useState(false); // expandable exercise list
+  const [heroFailed, setHeroFailed] = useState(null);     // which hero image 404'd
   // The live challenge, read from the same place Community reads it. Null until
   // it loads and null when nothing is running — both mean no card.
   const [challenge, setChallenge] = useState(null);
@@ -451,6 +470,15 @@ export default function DashboardPage() {
   const sessionFocus  = effPlan?.focus     || effPlan?.tag || null;
   const exerciseCount = effPlan?.exercises?.length || null;
   const sessionEyebrow = "Today's session";
+  // Image of the day: a session-specific picture if one exists in /public/hero
+  // (push.webp, pull.webp, legs.webp ...), otherwise the default. A missing
+  // file falls back once to the default, then to no image at all.
+  // First word solid, the rest outlined on the line below: PUSH / DAY.
+  const megaWords = (sessionName || (stalePlan ? 'No session' : 'Rest day')).trim().split(/\s+/);
+  const megaFirst = megaWords.length > 1 ? megaWords[0] : `${megaWords[0]}.`;
+  const megaRest = megaWords.length > 1 ? `${megaWords.slice(1).join(' ')}.` : '';
+  const heroWanted = heroImageFor(effPlan);
+  const heroSrc = heroFailed === 'all' ? null : heroFailed === heroWanted ? HERO_DEFAULT : heroWanted;
 
   const readinessLabel = readiness
     ? readiness >= 80 ? 'Primed to train' : readiness >= 60 ? 'Good to go' : 'Take it easy'
@@ -510,13 +538,30 @@ export default function DashboardPage() {
 
         {/* ── TODAY'S SESSION ── the main event: one big word, one ember button */}
         <Reveal>
-        <div style={{
+        <div className="gd-thud-card" style={{
           borderRadius: 26, padding: 0, overflow: 'hidden', marginBottom: 14,
           background: 'var(--hero-mesh)',
           border: '1px solid var(--hero-line)',
           boxShadow: 'var(--hero-glow)',
           color: 'var(--on-dark)',
+          position: 'relative', isolation: 'isolate',
         }}>
+          {/* Image of the day. Sits behind everything, faded into the card on
+              the left so the big word always reads. Decorative, so alt="". */}
+          {heroSrc && <div className="gd-slab" aria-hidden="true" />}
+          {heroSrc && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={heroSrc} alt="" aria-hidden="true" className="gd-hero-img"
+              onError={() => setHeroFailed((f) => (f === heroWanted ? 'all' : heroWanted))}
+              style={{
+                position: 'absolute', right: -8, top: 0, height: 236, width: 'auto', zIndex: -1,
+                WebkitMaskImage: 'linear-gradient(180deg, #000 45%, transparent 96%)',
+                maskImage: 'linear-gradient(180deg, #000 45%, transparent 96%)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
           <div
             onClick={() => effPlan?.exercises?.length && setSessionOpen(o => !o)}
             style={{ padding: '22px 22px 16px', cursor: effPlan?.exercises?.length ? 'pointer' : 'default' }}
@@ -524,8 +569,10 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <p style={{ ...eyebrow, letterSpacing: '0.14em', color: 'var(--on-dark-2)' }}>{sessionEyebrow}</p>
-                <p className="gd-mega" style={{ margin: '14px 0 0' }}>
-                  {sessionName || (stalePlan ? 'No session today' : 'Rest day')}.
+                {/* The gap is where the picture shows; the word lands under it. */}
+                <p key={sessionName || 'none'} className="gd-mega gd-thud" style={{ margin: heroSrc ? '120px 0 0' : '14px 0 0' }}>
+                  {megaFirst}
+                  {megaRest ? <><br /><span className="gd-outline">{megaRest}</span></> : null}
                 </p>
               </div>
             </div>
@@ -568,12 +615,11 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 /* THE accent on this screen. Nothing else on Home is a filled ember. */
-                <button onClick={() => router.push('/workout')} style={{
-                  width: '100%', border: 'none', borderRadius: 18, minHeight: 58,
+                <button onClick={() => router.push('/workout')} className="gd-slant" style={{
+                  width: '100%', border: 'none', borderRadius: 0, minHeight: 58, letterSpacing: '0.04em', textTransform: 'uppercase',
                   background: 'var(--grad)', color: 'var(--on-accent)', padding: '0 16px', fontSize: 17, fontWeight: 700,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  boxShadow: 'var(--glow-grad)',
-                }}>
+                  }}>
                   Start session
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                 </button>
