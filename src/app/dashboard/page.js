@@ -47,6 +47,7 @@ function challengeLine(ch) {
   return bits.join(' · ');
 }
 
+const HERO_IMAGES_ON = false;
 const HERO_DEFAULT = '/hero/default.webp';
 // Keyword in the session name or focus -> picture. Add a file to /public/hero
 // with one of these names and it is picked up; no code change needed.
@@ -477,8 +478,10 @@ export default function DashboardPage() {
   const megaWords = (sessionName || (stalePlan ? 'No session' : 'Rest day')).trim().split(/\s+/);
   const megaFirst = megaWords.length > 1 ? megaWords[0] : `${megaWords[0]}.`;
   const megaRest = megaWords.length > 1 ? `${megaWords.slice(1).join(' ')}.` : '';
-  const heroWanted = heroImageFor(effPlan);
-  const heroSrc = heroFailed === 'all' ? null : heroFailed === heroWanted ? HERO_DEFAULT : heroWanted;
+  // No picture yet (Shameel, Nov 2026). Flip HERO_IMAGES_ON to true once real
+  // photos are in /public/hero; everything below already handles it.
+  const heroWanted = HERO_IMAGES_ON ? heroImageFor(effPlan) : null;
+  const heroSrc = !heroWanted || heroFailed === 'all' ? null : heroFailed === heroWanted ? HERO_DEFAULT : heroWanted;
 
   const readinessLabel = readiness
     ? readiness >= 80 ? 'Primed to train' : readiness >= 60 ? 'Good to go' : 'Take it easy'
