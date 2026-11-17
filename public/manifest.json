@@ -4,8 +4,8 @@
   "description": "Train smart. Recover smarter.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#0B0B10",
-  "theme_color": "#12B76A",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
       "src": "/icons/icon.svg",

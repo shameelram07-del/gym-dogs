@@ -34,16 +34,16 @@
   --accent:        #111114;
   --accent-strong: #111114;
   --accent-tint:   rgba(17,17,20,0.06);
-  --accent-glow:   rgba(200,68,13,0.22);
+  --accent-glow:   rgba(122,98,56,0.20);
   --on-accent:     #FFFFFF;
 
   --gold:      #D9A514;
   --gold-tint: rgba(217,165,20,0.14);
   --card-2:    #FFFFFF;
 
-  --orange:      #C8440D;
-  --orange-ink:  #A8380A;
-  --orange-tint: rgba(200,68,13,0.10);
+  --orange:      #7A6238;
+  --orange-ink:  #5E4A28;
+  --orange-tint: rgba(122,98,56,0.10);
 
   /* Formerly ice blue / violet. Neutral now: one accent only. */
   --blue:      #5E5E66;
@@ -76,46 +76,46 @@
 }
 
 [data-theme="dark"] {
-  /* SLATE palette */
-  --bg:        #080B11;
-  --card:      #121822;
-  --soft:      #1C2431;
-  --shell-1:   #131C28;
-  --shell-2:   #060910;
+  /* NOIR palette: near-black ground, warm off-white ink, bronze accent */
+  --bg:        #050505;
+  --card:      #0D0D0E;
+  --soft:      #18181A;
+  --shell-1:   #0D0D0E;
+  --shell-2:   #030303;
 
-  --ink:       #F1F4F8;
-  --ink-2:     #9AA4B4;
-  --ink-3:     #7F8A9C;
+  --ink:       #EDEAE4;
+  --ink-2:     #8F8B84;
+  --ink-3:     #77736C;
 
   --line:      rgba(255,255,255,0.08);
   --line-2:    rgba(255,255,255,0.045);
 
-  --accent:        #F1F4F8;
-  --accent-strong: #F1F4F8;
-  --accent-tint:   rgba(255,255,255,0.08);
-  --accent-glow:   rgba(255,107,44,0.30);
-  --on-accent:     #170A03;
+  --accent:        #EDEAE4;
+  --accent-strong: #EDEAE4;
+  --accent-tint:   rgba(237,234,228,0.08);
+  --accent-glow:   rgba(168,139,92,0.25);
+  --on-accent:     #050505;
 
-  --gold:      #FFD166;
-  --gold-tint: rgba(255,209,102,0.12);
-  --card-2:    #131C28;
+  --gold:      #C9A96A;
+  --gold-tint: rgba(201,169,106,0.12);
+  --card-2:    #0D0D0E;
 
-  --orange:      #FF6B2C;
-  --orange-ink:  #FFB896;
-  --orange-tint: rgba(255,107,44,0.14);
+  --orange:      #A88B5C;
+  --orange-ink:  #D9C4A0;
+  --orange-tint: rgba(168,139,92,0.14);
 
-  --blue:      #C5CEDA;
-  --blue-ink:  #DCE3EC;
-  --blue-tint: rgba(255,255,255,0.07);
+  --blue:      #C9C5BD;
+  --blue-ink:  #DEDAD2;
+  --blue-tint: rgba(237,234,228,0.07);
 
-  --violet:    #9AA4B4;
+  --violet:    #8F8B84;
   --red:       #F04438;
   --red-ink:   #FF9F93;
   --red-tint:  rgba(240,68,56,0.18);
 
-  --nav-bg:    rgba(8,11,17,0.78);
-  --ai-card-1: #101823;
-  --ai-card-2: #1B2738;
+  --nav-bg:    rgba(5,5,5,0.86);
+  --ai-card-1: #0D0D0E;
+  --ai-card-2: #151516;
 
   --shadow-card:  0 1px 2px rgba(0,0,0,0.55), 0 14px 40px rgba(0,0,0,0.50);
   --shadow-float: 0 18px 52px rgba(0,0,0,0.65);
@@ -133,55 +133,56 @@
    --steel was called --mag until this palette landed; it has meant steel blue
    since commit 9dcbd28, so the old name only misled. No alias is kept. */
 :root, [data-theme="light"], [data-theme="dark"] {
-  /* EMBER (Nov 2026): 60% slate, 30% white, 10% ember. --steel/--ice/--vio
+  /* NOIR (Nov 2026): 60% black, 30% warm white, 10% bronze. The accent token
+     is still called --ember from the first pass; it is bronze now. --steel/--ice/--vio
      are kept as names so nothing breaks, but they are neutrals now. If you
      want colour, the answer is --ember, and only once per screen. */
-  --ember: #FF6B2C;
-  --steel: #9AA4B4;
-  --ice:   #C5CEDA;
-  --vio:   #9AA4B4;
+  --ember: #A88B5C;
+  --steel: #8F8B84;
+  --ice:   #C9C5BD;
+  --vio:   #8F8B84;
   /* The dark end of --grad, named so the logo tile can sit on the same run. */
-  --steel-deep: #2A3342;
+  --steel-deep: #2A2927;
   /* Cutouts on the logo tile. Fixed in both themes — the tile is always dark. */
   --logo-ink:   #08121C;
   /* --grad IS the accent fill. Still a gradient value so every existing
      `background: var(--grad)` keeps working, but it is one hue. */
-  --grad:      linear-gradient(135deg, #FF7A3D 0%, #FF5F1F 100%);
-  --grad-soft: linear-gradient(135deg, rgba(255,107,44,0.14), rgba(255,107,44,0.08));
-  --glow-grad: 0 8px 28px rgba(255,107,44,0.28);
+  --grad:      linear-gradient(135deg, #B59868 0%, #9C7F52 100%);
+  --grad-soft: linear-gradient(135deg, rgba(168,139,92,0.14), rgba(168,139,92,0.08));
+  --glow-grad: 0 0 0 transparent;
 
   /* The dashboard "today's session" hero: a dark mesh panel that stays dark in
      both themes (its text is white), so it lives here rather than per-theme. */
-  --hero-mesh: #121822;
+  --hero-mesh: #0D0D0E;
   --hero-line: rgba(255,255,255,0.07);
 
   /* Text on the always-dark panels (--ai-card-*, --hero-mesh). Fixed in both
      themes: --ink flips to near-black in light and would vanish on them. */
-  --on-dark:      #F1F4F8;
-  --on-dark-2:    #9AA4B4;
-  --on-dark-soft: rgba(255,255,255,0.10);   /* chips/buttons on those panels */
+  --on-dark:      #EDEAE4;
+  --on-dark-2:    #8F8B84;
+  --on-dark-soft: rgba(237,234,228,0.10);   /* chips/buttons on those panels */
 
   /* The hero's inverse "Start workout" pill: light plate, dark ink, on a panel
      that is dark in both themes — so neither --card nor --ink can serve. */
-  --hero-btn:     #F2F7FF;
-  --hero-btn-ink: #0E1622;
+  --hero-btn:     #EDEAE4;
+  --hero-btn-ink: #050505;
   --hero-glow: 0 24px 60px rgba(8,11,17,0.55);
 
   /* Consistency heatmap intensity ramp — one hue climbing into the gradient.
      Used by progress; history should read from these too rather than inventing
      a second scale. */
-  --heat-1: rgba(241,244,248,0.16);
-  --heat-2: rgba(241,244,248,0.42);
+  --heat-1: rgba(237,234,228,0.16);
+  --heat-2: rgba(237,234,228,0.42);
 
   /* Trophy coins. Deliberately their own hues — a shelf of identical steel
      discs reads as one award, not four. Kept as tokens so the ember coin
      tracks --ember instead of drifting to whatever the palette used to be. */
-  --coin-gold:       linear-gradient(135deg, #8A6A14, #FFD166);
-  --coin-gold-glow:  rgba(255,209,102,0.35);
-  --coin-ice:        linear-gradient(135deg, #4A5464, #C5CEDA);
-  --coin-ice-glow:   rgba(197,206,218,0.25);
-  --coin-ember:      linear-gradient(135deg, #7A3418, #FF6B2C);
-  --coin-ember-glow: rgba(255,107,44,0.35);
+  --coin-gold:       linear-gradient(135deg, #7A6238, #C9A96A);
+  --coin-gold-glow:  rgba(201,169,106,0.30);
+  --coin-ice:        linear-gradient(135deg, #4A4844, #C9C5BD);
+  --coin-ice-glow:   rgba(201,197,189,0.22);
+  --coin-ember:      linear-gradient(135deg, #5C4A2C, #A88B5C);
+  --coin-ember-glow: rgba(168,139,92,0.30);
 
   /* Podium metals. --gold already exists; these are its companions, plus the
      two shades the challenge bar and Join button need. */
@@ -229,10 +230,10 @@
    Keyed to the explicit attribute: dark is the default, so no attribute must
    keep the dark run rather than briefly flashing the light one. */
 [data-theme="light"] {
-  --ember:     #C8440D;
-  --grad:      linear-gradient(135deg, #D24E12 0%, #BC3F0A 100%);
-  --grad-soft: linear-gradient(135deg, rgba(200,68,13,0.10), rgba(200,68,13,0.06));
-  --glow-grad: 0 8px 24px rgba(200,68,13,0.22);
+  --ember:     #7A6238;
+  --grad:      linear-gradient(135deg, #86703F 0%, #6E5830 100%);
+  --grad-soft: linear-gradient(135deg, rgba(122,98,56,0.10), rgba(122,98,56,0.06));
+  --glow-grad: 0 0 0 transparent;
   --hero-glow: 0 24px 60px rgba(16,24,40,0.18);
   --heat-1:    rgba(17,17,20,0.14);
   --heat-2:    rgba(17,17,20,0.40);
