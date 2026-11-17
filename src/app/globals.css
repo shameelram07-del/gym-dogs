@@ -304,7 +304,23 @@
 
 html, body {
   height: 100%;
+  /* Nothing should ever scroll sideways on a phone. clip (not hidden) so
+     sticky elements keep working. */
+  overflow-x: clip;
 }
+
+/* A flex child input defaults to its intrinsic width (~20 characters), which
+   pushed Community's post box 6px past the screen on a 402px iPhone. */
+input, textarea, select { min-width: 0; }
+
+/* iOS zooms the whole page when you tap a field under 16px, then leaves it
+   zoomed, which is what "the app doesn't fit" usually is. 16px on touch. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: max(16px, 1em) !important; }
+}
+
+/* Stops iOS bumping text sizes on rotate. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 body {
   background: var(--bg);
@@ -408,8 +424,20 @@ input[type="number"] {
    so it reads as a mobile app on desktop instead of stretching edge to edge. */
 .app-shell {
   max-width: 480px;
+  /* body is a flex column, and a flex item defaults to min-width: auto, so
+     the shell used to stretch to fit its widest child (432px on a 402px
+     iPhone) and the right edge of every card fell off the screen. */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
+  /* Clear the Dynamic Island / status bar. The installed app draws under it
+     (statusBarStyle black-translucent), so this has to be explicit. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   position: relative;
   z-index: 1;
 }

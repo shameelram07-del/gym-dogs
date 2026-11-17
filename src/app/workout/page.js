@@ -699,7 +699,7 @@ export default function WorkoutPage() {
 
   if (!userId || planLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)' }}>
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" style={{ animation: 'gdFloat 2s ease-in-out infinite' }}><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11" /></svg>
         <p style={{ color: 'var(--ink-3)', letterSpacing: '0.06em', fontSize: 13 }}>Loading your session...</p>
         <BottomNav />
@@ -709,7 +709,7 @@ export default function WorkoutPage() {
 
   if (planError || !activePlan) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>📋</div>
         <p style={{ fontWeight: 800, fontSize: 18 }}>{planLoadFailed ? 'Connection problem' : 'No active session'}</p>
         <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>{planError || 'Your coach has not published a session yet.'}</p>
@@ -732,7 +732,7 @@ export default function WorkoutPage() {
   if (userId !== 'demo' && activePlan.date !== SESSION_DAY) {
     const whenStr = new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' });
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>🐕</div>
         <p className="gd-disp" style={{ fontWeight: 700, fontSize: 21 }}>No session for today yet</p>
         <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6, maxWidth: 300 }}>
@@ -759,7 +759,7 @@ export default function WorkoutPage() {
   const lastData = formatLast(activeExIdx);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}>
 
       {/* ── HEADER ──
           Reveal wraps only the static chrome. The exercise cards are NOT wrapped
@@ -1021,7 +1021,7 @@ export default function WorkoutPage() {
 
       {/* ── SESSION COMPLETE ── */}
       {showComplete && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', overflowY: 'auto', padding: '76px 26px 44px', textAlign: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', overflowY: 'auto', padding: 'calc(60px + env(safe-area-inset-top)) 26px calc(32px + env(safe-area-inset-bottom))', textAlign: 'center' }}>
           <style>{`@keyframes gdfall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(440px) rotate(540deg);opacity:0}}
           @keyframes gdrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
           .gdc{animation:gdrise .6s cubic-bezier(0.22,1,0.36,1) both}

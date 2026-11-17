@@ -89,7 +89,7 @@ export default function ExercisePage() {
   const prevStep = () => { if (activeStep > 0) setActiveStep(p => p - 1); };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>

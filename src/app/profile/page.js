@@ -276,7 +276,7 @@ export default function ProfilePage() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER — IGNITE conic XP ring ── */}
       <div style={{ textAlign: 'center', padding: '52px 20px 8px' }}>

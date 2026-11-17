@@ -423,7 +423,7 @@ export default function ProgressPage() {
     : 'Every session counts. Log workouts consistently and your records will climb week by week.';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER ── */}
       <div style={{ padding: '52px 20px 14px' }}>

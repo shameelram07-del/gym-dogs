@@ -498,7 +498,7 @@ export default function DashboardPage() {
   const ringOffset = readiness && ringOn ? CIRC * (1 - readiness / 100) : CIRC;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 96 }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 96 }}>
 
       {/* ── HEADER ── big greeting left, streak right. The streak is the one
           ember thing up here; everything else is ink. */}

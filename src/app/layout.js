@@ -50,6 +50,9 @@ export const viewport = {
   themeColor: "#050505",
   width: "device-width",
   initialScale: 1,
+  // Without this, iOS reports every safe-area inset as 0, so the Dynamic
+  // Island covered the top of each screen and the home bar sat on the nav.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {

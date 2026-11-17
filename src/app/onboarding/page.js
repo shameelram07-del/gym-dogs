@@ -178,7 +178,7 @@ export default function OnboardingPage() {
   // ─── FINISHED ───────────────────────────────────────────────
   if (finished) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px 40px' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 20px 40px' }}>
         <Reveal delay={0} style={{ textAlign: 'center' }}>
           <div className="gd-disp gd-grad-text" style={{ fontSize: 44, fontWeight: 700 }}>You are in.</div>
           <p style={{ fontSize: 15, color: 'var(--ink-2)', marginTop: 8 }}>Your plan is being built by Coach Shameel + AI.</p>
@@ -243,7 +243,7 @@ export default function OnboardingPage() {
   const labelTail = labelWords.slice(-2).join(' ');
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', padding: '0 20px 110px', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', padding: '0 20px 110px', maxWidth: 480, margin: '0 auto' }}>
 
       {/* Progress — deliberately outside the per-step Reveal so the bar slides
           between steps instead of fading out and back in. */}
@@ -333,7 +333,7 @@ export default function OnboardingPage() {
       )}
 
       {/* Fixed NEXT */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '16px 20px 32px', background: 'linear-gradient(to top, var(--bg) 72%, transparent)' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', background: 'linear-gradient(to top, var(--bg) 72%, transparent)' }}>
         {saveError && currentStep === totalSteps - 1 && (
           <p role="alert" style={{ ...banner('error'), margin: '0 0 12px' }}>
             Couldn&rsquo;t save your answers. Check your connection and tap Try again.

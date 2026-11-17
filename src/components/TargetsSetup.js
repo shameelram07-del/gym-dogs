@@ -111,7 +111,7 @@ export default function TargetsSetup({ initial, profile, onSave, onCancel }) {
   const rate = RATE_OPTIONS.find((r) => r.id === f.rate);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', color: 'var(--ink)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--bg)', color: 'var(--ink)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingTop: 'env(safe-area-inset-top)' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 20px 140px', minHeight: '100%' }}>
 
         {/* Progress — segmented, so each step feels like ground gained */}
@@ -293,7 +293,7 @@ export default function TargetsSetup({ initial, profile, onSave, onCancel }) {
         {/* Fixed action bar */}
         <div style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480,
-          padding: '16px 20px 32px', background: 'linear-gradient(to top, var(--bg) 68%, transparent)',
+          padding: '16px 20px calc(20px + env(safe-area-inset-bottom))', background: 'linear-gradient(to top, var(--bg) 68%, transparent)',
           display: 'flex', gap: 12,
         }}>
           {step > 0 && (
