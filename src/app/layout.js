@@ -65,7 +65,12 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col">
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(!localStorage.getItem('gd-theme-v2')){localStorage.setItem('gd-theme','dark');localStorage.setItem('gd-theme-v2','1');}var t=localStorage.getItem('gd-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}`,
+            // Must match src/lib/theme.js: localStorage, else the cookie
+            // backup, else dark. Copies a cookie-only choice back into
+            // localStorage so the two stay in step. The old gd-theme-v2
+            // migration forced dark over any choice once storage was
+            // wiped; it is gone.
+            __html: `(function(){var t=null;try{t=localStorage.getItem('gd-theme');}catch(e){}if(t!=='dark'&&t!=='light'){var m=document.cookie.match(/(?:^|;\\s*)gd-theme=(dark|light)/);t=m?m[1]:'dark';try{localStorage.setItem('gd-theme',t);}catch(e){}}document.documentElement.setAttribute('data-theme',t);})();`,
           }}
         />
         <AppProvider>

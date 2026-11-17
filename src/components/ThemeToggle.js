@@ -1,25 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const KEY = 'gd-theme';
+import { getTheme, setTheme as saveTheme, watchTheme } from '@/lib/theme';
 
 export default function ThemeToggle({ size = 38 }) {
-  const [theme, setTheme] = useState('light');
+  // Starts as dark to match the default, then reads what is actually applied.
+  // It never re-applies on mount: that is what used to flip the theme, because
+  // this component defaulted to light while the page defaulted to dark.
+  const [theme, setTheme] = useState('dark');
 
   useEffect(() => {
-    const saved = (typeof window !== 'undefined' && localStorage.getItem(KEY)) || 'light';
-    setTheme(saved);
-    document.documentElement.setAttribute('data-theme', saved);
+    setTheme(getTheme());
+    return watchTheme(setTheme);
   }, []);
 
   function toggle() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    document.documentElement.setAttribute('data-theme', next);
-    // Deliberate: private mode blocks localStorage. The theme still applies for
-    // this session, it just isn't remembered.
-    try { localStorage.setItem(KEY, next); } catch (e) {}
+    setTheme(saveTheme(theme === 'dark' ? 'light' : 'dark'));
   }
 
   const isDark = theme === 'dark';
