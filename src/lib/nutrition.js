@@ -166,9 +166,10 @@ export function measuredExpenditure(nutritionLog, weighIns, today) {
   if (spanDays < MIN_SPAN_DAYS) return { ok: false, reason: `weigh-ins only span ${spanDays} days` };
 
   // Only intake between the two weigh-ins counts — that's the period the weight
-  // change actually describes.
+  // change actually describes. Today is excluded: it's still being logged, so
+  // its partial total would read as a full day of under-eating.
   const inSpan = (Array.isArray(nutritionLog) ? nutritionLog : []).filter(
-    (r) => r && r.date && r.date >= first.date && r.date <= last.date && Number(r.kcal) >= MIN_LOGGED_KCAL
+    (r) => r && r.date && r.date >= first.date && r.date <= last.date && r.date < end && Number(r.kcal) >= MIN_LOGGED_KCAL
   );
   const coverage = inSpan.length / spanDays;
   if (coverage < MIN_COVERAGE) {
@@ -198,7 +199,13 @@ export function measuredExpenditure(nutritionLog, weighIns, today) {
  * switch would cause on day 11.
  */
 export function blendedExpenditure(setup, nutritionLog, weighIns, today) {
-  const formula = formulaExpenditure(setup);
+  // The formula seed uses the latest trend weight when there is one, not the
+  // weight typed at setup — the same weight calculateTargets uses below.
+  const trend = weightTrend(weighIns);
+  const latest = trend.length ? trend[trend.length - 1].trend : null;
+  const formula = formulaExpenditure(
+    latest !== null && inRange(latest, LIMITS.weight) ? { ...setup, weight: latest } : setup
+  );
   const measured = measuredExpenditure(nutritionLog, weighIns, today);
 
   if (formula === null) return null;
@@ -256,9 +263,22 @@ export function calculateTargets(setup, nutritionLog, weighIns, today) {
   if (floored) calories = floor;
 
   const direction = rate < -0.05 ? 'lose' : rate > 0.05 ? 'gain' : 'maintain';
-  const protein = Math.min(PROTEIN_PER_KG[direction] * currentWeight, 250);
-  const fat = Math.max((calories * 0.25) / 9, 0.6 * currentWeight);
-  const carbs = Math.max((calories - protein * 4 - fat * 9) / 4, 0);
+  let protein = Math.min(PROTEIN_PER_KG[direction] * currentWeight, 250);
+  let fat = Math.max((calories * 0.25) / 9, 0.6 * currentWeight);
+  // A low target (often the floor) can't fit both protein and the fat minimum.
+  // Rather than show grams that add up to more than the target, scale both down
+  // in proportion, rounding DOWN to the displayed 5 g steps against the
+  // displayed (rounded) calories, so the shown macros never exceed it.
+  const shownCalories = round(calories, 10);
+  let carbs;
+  if (protein * 4 + fat * 9 > shownCalories) {
+    const k = shownCalories / (protein * 4 + fat * 9);
+    protein = Math.floor((protein * k) / 5) * 5;
+    fat = Math.floor((fat * k) / 5) * 5;
+    carbs = Math.max(Math.floor((shownCalories - protein * 4 - fat * 9) / 4 / 5) * 5, 0);
+  } else {
+    carbs = Math.max((calories - protein * 4 - fat * 9) / 4, 0);
+  }
   // ~35 ml per kg, rounded to a friendly quarter-litre, held between 1.5 and 4 L.
   const waterMl = clamp(Math.round((currentWeight * 35) / 250) * 250, 1500, 4000);
 
@@ -629,7 +649,8 @@ export function seedFromProfile(profile) {
     sex: saved.sex || (p.onboarding && p.onboarding.gender) || '',
     age: str(saved.age ?? p.age),
     height: str(saved.height ?? p.height),
-    weight: str(saved.weight ?? latestWeight),
+    // A real weigh-in is more current than whatever was typed at setup.
+    weight: str(trend.length ? latestWeight : (saved.weight ?? p.weight)),
     activity: saved.activity || guessActivity,
     rate: saved.rate || guessRate,
   };

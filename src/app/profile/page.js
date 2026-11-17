@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import Reveal from '@/components/Reveal';
@@ -91,7 +91,7 @@ function computeLevel(sessions, volume) {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { instance, accounts, inProgress } = useMsal();
+  const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState('');
   const [userInitials, setUserInitials] = useState('');
@@ -114,7 +114,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (inProgress === 'startup') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
     const user = accounts[0];
     const uid = user.localAccountId;
     setUserId(uid);
@@ -137,7 +137,7 @@ export default function ProfilePage() {
           const profile = Array.isArray(data) ? data.find((p) => p.userId === uid) : null;
           if (profile) {
             setProfileRef(profile);
-            if (profile.name && profile.name !== uid) {
+            if (typeof profile.name === 'string' && profile.name.trim() && profile.name !== uid && profile.name.length < 50 && !isGuid(profile.name)) {
               setUserName(profile.name);
               setUserInitials(profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2));
             }
@@ -243,7 +243,6 @@ export default function ProfilePage() {
     finally { setSavingStats(false); }
   };
 
-  const handleSignOut = () => instance.logoutRedirect({ postLogoutRedirectUri: '/login' });
 
   if (!userId) return null;
 
@@ -439,13 +438,6 @@ export default function ProfilePage() {
           ))}
         </Reveal>
 
-        {/* ── SIGN OUT ── */}
-        <button onClick={handleSignOut} style={{
-          width: '100%', background: 'var(--red-tint)', border: 'none', borderRadius: 16,
-          padding: 16, color: 'var(--red-ink)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-        }}>
-          Sign out
-        </button>
 
       </div>
 

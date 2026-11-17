@@ -3,13 +3,14 @@ import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { randomQuote } from '@/lib/quotes';
 import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import { captureError, breadcrumb } from '@/lib/monitoring';
 import { eyebrow } from '@/lib/ui';
+import { COACH_ID } from '@/lib/coach';
 
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
@@ -20,7 +21,6 @@ const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
 
-const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
 
 const CARD_R = 26;
 
@@ -108,7 +108,8 @@ function DurationTimer() {
 function RestTimer({ onDone, trigger }) {
   const [seconds, setSeconds] = useState(90);
   const [running, setRunning] = useState(false);
-  const ref = useRef(null);
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
 
   // Auto-start (or restart) the timer whenever a set is marked done.
   useEffect(() => {
@@ -117,15 +118,17 @@ function RestTimer({ onDone, trigger }) {
     setRunning(true);
   }, [trigger]);
 
+  // One tick per second while running. Re-runs on every change to `seconds`
+  // or `running`, so play / reset / a new set always restart the countdown
+  // (the old interval only listened to `running` and could freeze on ⏸).
   useEffect(() => {
-    if (running && seconds > 0) {
-      ref.current = setInterval(() => setSeconds(s => {
-        if (s <= 1) { clearInterval(ref.current); setRunning(false); onDone?.(); return 0; }
-        return s - 1;
-      }), 1000);
-    }
-    return () => clearInterval(ref.current);
-  }, [running]);
+    if (!running) return;
+    const t = setTimeout(() => {
+      if (seconds <= 1) { setSeconds(0); setRunning(false); onDoneRef.current?.(); }
+      else setSeconds(seconds - 1);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [running, seconds]);
 
   const pct = (seconds / 90) * 100;
   const circ = 2 * Math.PI * 22;
@@ -147,7 +150,7 @@ function RestTimer({ onDone, trigger }) {
         <p style={{ margin: 0, fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: 'var(--ink)' }}>{m}:{s}</p>
         <p style={{ margin: 0, fontSize: 9, color: 'var(--ink-3)', letterSpacing: '0.06em', fontWeight: 600 }}>REST</p>
       </div>
-      <button onClick={() => { setRunning(r => !r); }} style={{
+      <button onClick={() => { if (!running && seconds <= 0) setSeconds(90); setRunning(r => !r); }} style={{
         width: 32, height: 32, borderRadius: '50%', background: 'var(--soft)',
         border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13,
         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -188,7 +191,13 @@ export default function WorkoutPage() {
   const [sharing, setSharing] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [prs, setPrs] = useState([]); // [{name, kg, prevKg}]
-  const startRef = useRef(Date.now());
+  // Session start time (ms). Set when the plan loads — from the saved startedAt
+  // if an in-progress session is restored — not when the page module renders.
+  const startRef = useRef(null);
+  const [durationMin, setDurationMin] = useState(1); // fixed once, at Finish
+  const [planLoadFailed, setPlanLoadFailed] = useState(false);
+  const fetchedLastRef = useRef(new Set()); // exercise names already looked up for "last time"
+  const exercisesRef = useRef([]);
   const activeCardRef = useRef(null);
   const saveTimer = useRef(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'unsaved'
@@ -197,11 +206,19 @@ export default function WorkoutPage() {
   const toastRef = useRef(null);
 
   // Held in state, never cached at module scope: a phone left open overnight
-  // would otherwise keep saving sets under yesterday's date. On rollover the
-  // existing activePlan.date guards below correctly stop saving to the old day.
+  // would otherwise keep saving sets under yesterday's date.
   const [TODAY, setTODAY] = useState(todayISO());
 
   useEffect(() => onDayChange(TODAY, setTODAY), [TODAY]);
+
+  // The day this session belongs to, captured when the plan / restored session
+  // loads. Once any set is logged the session stays pinned to that day, so a
+  // workout that runs past midnight keeps autosaving and can still be finished
+  // (under the day it started). An untouched session follows the clock, so a
+  // phone left open overnight still hits the "No session for today" guard.
+  const [sessionDate, setSessionDate] = useState(null);
+  const sessionStarted = exercises.some((_, i) => (logs[i] || []).some(isLogged));
+  const SESSION_DAY = sessionStarted && sessionDate ? sessionDate : TODAY;
 
   const showToast = (msg) => {
     setToast(msg);
@@ -213,7 +230,7 @@ export default function WorkoutPage() {
     if (inProgress !== 'none') return;
     if (accounts.length === 0) {
       if (IS_LOCAL) { setUserId('demo'); setUserName('Shameel'); return; }
-      router.push('/login');
+      router.push('/dashboard');
       return;
     }
     const user = accounts[0];
@@ -254,6 +271,8 @@ export default function WorkoutPage() {
         emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
       });
       setLogs(emptyLogs);
+      startRef.current = Date.now();
+      setSessionDate(todayISO());
       setPlanLoading(false);
       return;
     }
@@ -262,7 +281,10 @@ export default function WorkoutPage() {
         const res = await fetch(`${PLANS_API_URL}?userId=${userId}`, { headers: { 'x-functions-key': PLANS_API_KEY } });
         if (res.ok) {
           const data = await res.json();
+          const loadDay = todayISO();
           setActivePlan(data);
+          setSessionDate(loadDay);
+          startRef.current = Date.now();
           const emptyLogs = {};
           (data.exercises || []).forEach((ex, idx) => {
             emptyLogs[idx] = Array(ex.sets).fill(null).map(() => ({ kg: '', reps: '', done: false }));
@@ -274,7 +296,7 @@ export default function WorkoutPage() {
             const raw = localStorage.getItem('gd-workout-progress');
             if (raw) {
               const s = JSON.parse(raw);
-              if (s && s.planId === data.id && s.date === TODAY && Array.isArray(s.exercises) && s.logs) restored = s;
+              if (s && s.planId === data.id && s.date === loadDay && Array.isArray(s.exercises) && s.logs) restored = s;
             }
           } catch (e) {
             // We wrote this blob ourselves — if it won't parse, an in-progress
@@ -291,44 +313,64 @@ export default function WorkoutPage() {
             setExercises(Array.isArray(data.exercises) ? data.exercises : []);
             setLogs(emptyLogs);
           }
-        } else {
+        } else if (res.status === 404) {
           // Not an error: the coach simply hasn't published one.
           setPlanError('No active session found.');
+        } else {
+          // A real failure (5xx, auth, etc.) — don't dress it up as "no session".
+          setPlanLoadFailed(true);
+          setPlanError('Couldn’t load your session — check connection and retry.');
+          captureError(new Error(`load plan failed (${res.status})`), { screen: 'workout', action: 'load-plan', endpoint: 'workoutPlans', status: res.status });
         }
       } catch (e) {
-        setPlanError('Could not load session.');
+        setPlanLoadFailed(true);
+        setPlanError('Couldn’t load your session — check connection and retry.');
         captureError(e, { screen: 'workout', action: 'load-plan', endpoint: 'workoutPlans' });
       }
       finally { setPlanLoading(false); }
     })();
   }, [userId]);
 
+  useEffect(() => { exercisesRef.current = exercises; }, [exercises]);
+
+  // "Last time" + kg pre-fill, keyed by exercise NAME off the live session list
+  // (not activePlan.exercises): a restored, swapped or trimmed session has a
+  // different list, and index-keying showed / pre-filled the wrong exercise.
+  // lastSession is { [exName]: sets[] }. Each name is fetched once, so an
+  // exercise swapped or added mid-session gets its history too.
+  const exNamesKey = exercises.map(e => e?.name).filter(Boolean).join('\n');
   useEffect(() => {
     if (!userId || !activePlan || userId === 'demo') return;
+    const names = [...new Set(exNamesKey.split('\n').filter(Boolean))].filter(n => !fetchedLastRef.current.has(n));
+    if (!names.length) return;
+    names.forEach(n => fetchedLastRef.current.add(n));
     (async () => {
       const results = {};
-      await Promise.all(activePlan.exercises.map(async (ex, idx) => {
+      await Promise.all(names.map(async (name) => {
         try {
-          const res = await fetch(`${API_URL}?userId=${userId}&exName=${encodeURIComponent(ex.name)}&session=last`,
+          const res = await fetch(`${API_URL}?userId=${userId}&exName=${encodeURIComponent(name)}&session=last`,
             { headers: { 'x-functions-key': API_KEY } });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.length > 0) results[idx] = JSON.parse(data[0].sets_data || '[]');
-          }
+          if (res.status === 404) return; // never done before — nothing to show
+          if (!res.ok) throw new Error(`last-session lookup failed (${res.status})`);
+          const data = await res.json();
+          const sets = Array.isArray(data) && data.length > 0 ? JSON.parse(data[0].sets_data || '[]') : null;
+          if (Array.isArray(sets)) results[name] = sets;
         } catch (e) {
           // Losing this loses the progressive-overload pre-fill, which reads as
           // "the app forgot what I lifted last week".
           captureError(e, { screen: 'workout', action: 'last-session', endpoint: 'gymLogs' });
         }
       }));
-      setLastSession(results);
+      if (!Object.keys(results).length) return;
+      setLastSession(prev => ({ ...prev, ...results }));
 
       // Progressive overload: pre-fill each set's kg with last session's weight
       // so logging starts from where you left off (reps left blank on purpose).
       setLogs(prev => {
         const next = { ...prev };
-        Object.entries(results).forEach(([idx, lastSets]) => {
-          if (!next[idx] || !Array.isArray(lastSets)) return;
+        exercisesRef.current.forEach((ex, idx) => {
+          const lastSets = results[ex?.name];
+          if (!next[idx] || !Array.isArray(lastSets) || !lastSets.length) return;
           next[idx] = next[idx].map((s, i) => {
             if (s.kg) return s;
             const src = lastSets[i] || lastSets[lastSets.length - 1];
@@ -338,7 +380,7 @@ export default function WorkoutPage() {
         return next;
       });
     })();
-  }, [userId, activePlan]);
+  }, [userId, activePlan, exNamesKey]);
 
   // Auto-save the live session on every change so navigating away, refreshing,
   // or the app closing never loses logged progress. Cleared once Finish saves.
@@ -346,13 +388,13 @@ export default function WorkoutPage() {
     if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
     try {
       localStorage.setItem('gd-workout-progress', JSON.stringify({
-        planId: activePlan.id, date: TODAY, exercises, logs, activeExIdx, startedAt: startRef.current,
+        planId: activePlan.id, date: SESSION_DAY, exercises, logs, activeExIdx, startedAt: startRef.current,
       }));
     } catch (e) {
       // Not cosmetic: this is the crash-recovery copy of the live session.
       captureError(e, { screen: 'workout', action: 'autosave-local' });
     }
-  }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId, TODAY]);
+  }, [logs, exercises, activeExIdx, activePlan, planLoading, showComplete, userId, SESSION_DAY]);
 
   // Push a single exercise's sets to the server (upsert — safe to call repeatedly).
   const postLog = (idx, ex, rows) => {
@@ -360,7 +402,7 @@ export default function WorkoutPage() {
     return fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
-      body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(rows || []) }),
+      body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: SESSION_DAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(rows || []) }),
     })
       .then(res => { if (!res.ok) throw new Error(`autosave failed (${res.status})`); })
       .catch((e) => {
@@ -375,7 +417,7 @@ export default function WorkoutPage() {
   // that has data to the server. No "Finish" needed to keep progress.
   useEffect(() => {
     if (!activePlan || userId === 'demo' || planLoading || showComplete) return;
-    if (activePlan.date && activePlan.date !== TODAY) return; // don't save a previous day's session under today
+    if (activePlan.date && activePlan.date !== SESSION_DAY) return; // don't save a previous day's plan under a new day (a session started before midnight stays pinned to its own day)
     const hasData = exercises.some((_, i) => (logs[i] || []).some(isLogged));
     if (!hasData) return;
     setAutoSaveStatus('saving');
@@ -396,7 +438,7 @@ export default function WorkoutPage() {
       }
     }, 1200);
     return () => clearTimeout(saveTimer.current);
-  }, [logs, exercises, activePlan, planLoading, showComplete, userId, TODAY]);
+  }, [logs, exercises, activePlan, planLoading, showComplete, userId, SESSION_DAY]);
 
   // Bring the expanded exercise into view when it changes (tap or auto-advance),
   // so "opening" an exercise happens where you can see it.
@@ -454,7 +496,8 @@ export default function WorkoutPage() {
   };
 
   // Turn an index-keyed object ({0:.., 1:..}) into a contiguous array, mutate, and rekey —
-  // keeps logs / lastSession aligned with the exercises array after add/remove.
+  // keeps logs aligned with the exercises array after add/remove. (lastSession is
+  // keyed by exercise name, so it needs no realignment.)
   const asArray = (obj, len) => Array.from({ length: len }, (_, i) => obj[i]);
   const reArray = (arr) => arr.reduce((o, v, i) => { o[i] = v; return o; }, {});
 
@@ -470,6 +513,15 @@ export default function WorkoutPage() {
     showToast(`➕ Added ${libEx.name}`);
   };
 
+  // Clearing a swapped/removed exercise's volume on the server failed. postLog
+  // has already sent the real cause to captureError (as autosave does, not
+  // reported twice); this just stops the rejection going unhandled and tells
+  // the user, so "Saved" is not shown over a write that never landed.
+  const clearFailed = () => {
+    setAutoSaveStatus('unsaved');
+    showToast('⚠ Could not save that change — check your connection');
+  };
+
   const swapExercise = (idx, libEx) => {
     const old = exercises[idx];
     // Deliberately looser than `isLogged`: the question is not "was this done"
@@ -479,8 +531,7 @@ export default function WorkoutPage() {
     const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);
     setExercises(prev => prev.map((e, i) => (i === idx ? fromLib(libEx) : e)));
     setLogs(prev => ({ ...prev, [idx]: blankSets(libEx.defaultSets) }));
-    setLastSession(prev => { const n = { ...prev }; delete n[idx]; return n; });
-    if (hadData && old?.name && old.name !== libEx.name) postLog(idx, old, []); // clear old exercise's saved volume
+    if (hadData && old?.name && old.name !== libEx.name) postLog(idx, old, []).catch(clearFailed); // clear old exercise's saved volume
     setPicker(null);
     showToast(`🔁 Swapped in ${libEx.name}`);
   };
@@ -492,9 +543,8 @@ export default function WorkoutPage() {
     const hadData = (logs[idx] || []).some(s => s.kg || s.reps || s.done);   // loose on purpose — see swapExercise
     setExercises(prev => prev.filter((_, i) => i !== idx));
     setLogs(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
-    setLastSession(prev => { const a = asArray(prev, len); a.splice(idx, 1); return reArray(a); });
     setActiveExIdx(a => (a > idx ? a - 1 : Math.min(a, len - 2)));
-    if (hadData) postLog(idx, removed, []); // clear its saved volume on the server
+    if (hadData) postLog(idx, removed, []).catch(clearFailed); // clear its saved volume on the server
     showToast(`🗑 Removed ${removed?.name || 'exercise'}`);
   };
 
@@ -539,7 +589,7 @@ export default function WorkoutPage() {
         fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY },
-          body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: TODAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(logs[idx] || []) })
+          body: JSON.stringify({ userId, planId: activePlan.id, planName: activePlan.name, date: SESSION_DAY, exIdx: idx, exName: ex.name, sets_data: JSON.stringify(logs[idx] || []) })
         })
       ));
       const failed = results.filter(r => !r.ok);
@@ -552,7 +602,7 @@ export default function WorkoutPage() {
       // The sets are already saved by this point, so a failure here isn't worth
       // failing the finish over — but it's the reason "done today" goes missing,
       // so it must not fail silently.
-      fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: TODAY }) })
+      fetch(PROFILES_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY || '' }, body: JSON.stringify({ userId, lastWorkoutDate: SESSION_DAY }) })
         .then(r => {
           if (!r.ok) {
             console.error(`Workout: lastWorkoutDate not saved (${r.status}) — dashboard won't show today as done`);
@@ -571,10 +621,13 @@ export default function WorkoutPage() {
       const newPrs = [];
       exercises.forEach((ex, idx) => {
         const todayMax = Math.max(0, ...(logs[idx] || []).map(s => parseFloat(s.kg) || 0));
-        const prevMax = Math.max(0, ...(lastSession[idx] || []).map(s => parseFloat(s.kg) || 0));
+        const prevMax = Math.max(0, ...(lastSession[ex.name] || []).map(s => parseFloat(s.kg) || 0));
         if (prevMax > 0 && todayMax > prevMax) newPrs.push({ name: ex.name, kg: todayMax, prevKg: prevMax });
       });
       setPrs(newPrs);
+      // Fixed here, once — computing it during render re-read the clock on every
+      // re-render of the completion screen.
+      setDurationMin(Math.max(1, Math.round((Date.now() - (startRef.current || Date.now())) / 60000)));
       setShowComplete(true);
 
       const summary = exercises.map((ex, idx) => {
@@ -628,7 +681,7 @@ export default function WorkoutPage() {
   };
 
   const formatLast = (exIdx) => {
-    const sets = lastSession[exIdx];
+    const sets = lastSession[exercises[exIdx]?.name];
     if (!sets || sets.length === 0) return null;
     // Reads lastSession, NOT logs. This is what came back from the server, so
     // every row in it was really performed — there is no pre-fill to exclude and
@@ -658,8 +711,13 @@ export default function WorkoutPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>📋</div>
-        <p style={{ fontWeight: 800, fontSize: 18 }}>No active session</p>
+        <p style={{ fontWeight: 800, fontSize: 18 }}>{planLoadFailed ? 'Connection problem' : 'No active session'}</p>
         <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>{planError || 'Your coach has not published a session yet.'}</p>
+        {planLoadFailed && (
+          <button onClick={() => window.location.reload()} style={{ marginTop: 8, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 16, padding: '12px 24px', color: 'var(--ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            Retry
+          </button>
+        )}
         <button onClick={() => router.push('/dashboard')} style={{ marginTop: 16, background: 'var(--accent)', border: 'none', borderRadius: 16, padding: '14px 28px', color: 'var(--on-accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
           Back to dashboard
         </button>
@@ -671,7 +729,7 @@ export default function WorkoutPage() {
   // Date-strict: a published plan stays active until replaced, so if it's from a
   // previous day, don't present it as today's workout — prompt for a fresh one.
   const isCoach = userId === COACH_ID;
-  if (userId !== 'demo' && activePlan.date !== TODAY) {
+  if (userId !== 'demo' && activePlan.date !== SESSION_DAY) {
     const whenStr = new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' });
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
@@ -1000,7 +1058,7 @@ export default function WorkoutPage() {
               <p style={{ margin: '3px 0 0', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)' }}>SETS</p>
             </div>
             <div style={{ background: 'var(--card)', border: '1px solid var(--line)', borderRadius: 16, padding: '12px 18px', boxShadow: 'var(--shadow-card)' }}>
-              <p style={{ margin: 0, fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{Math.max(1, Math.round((Date.now() - startRef.current) / 60000))} min</p>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{durationMin} min</p>
               <p style={{ margin: '3px 0 0', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-3)' }}>DURATION</p>
             </div>
             <div style={{ background: 'var(--card)', border: `1px solid ${prs.length ? 'var(--gold)' : 'var(--line)'}`, borderRadius: 16, padding: '12px 18px', boxShadow: 'var(--shadow-card)' }}>

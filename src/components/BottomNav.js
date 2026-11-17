@@ -1,9 +1,8 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
-
-const COACH_ID = '6d765ac9-47b2-4d3f-b36a-9d784015b917';
+import { useMsal } from '@/lib/me';
+import { isCoach as isCoachAccount } from '@/lib/coach';
 
 const ICONS = {
   home:     <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
@@ -20,7 +19,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { accounts } = useMsal();
 
-  const isCoach = accounts[0]?.localAccountId === COACH_ID;
+  const isCoach = isCoachAccount(accounts[0]);
 
   const tabs = [
     { label: 'Home',      key: 'home',      href: '/dashboard' },

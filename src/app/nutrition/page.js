@@ -3,7 +3,7 @@ import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import TargetsSetup from '@/components/TargetsSetup';
 import AddFoodSheet from '@/components/AddFoodSheet';
@@ -139,6 +139,17 @@ export default function NutritionPage() {
   // come back we don't know the stored one, and building from `[]` would send a
   // list containing only today — wiping the history the adaptive targets read.
   const profileLoaded = useRef(false);
+  // The GET failed: we still don't know what's stored, so nutrition writes stay
+  // held back and the error stays on screen rather than overwriting the day.
+  const profileLoadFailed = useRef(false);
+  // A `nutrition` write asked for before the GET landed. Sending it then would
+  // replace today's stored food with only what was added in the meantime, so it
+  // waits and is re-sent (merged with the loaded day) once the load finishes.
+  const pendingNutrition = useRef(false);
+  const [loadDone, setLoadDone] = useState(false);
+  // Field names whose last write failed. They ride along on the next write, and
+  // the error stays up until every one of them has actually been saved.
+  const failedFields = useRef(new Set());
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { waterRef.current = waterMl; }, [waterMl]);
   useEffect(() => { profileLatest.current = profileRef; }, [profileRef]);
@@ -162,7 +173,7 @@ export default function NutritionPage() {
 
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
     const uid = accounts[0].localAccountId;
     setUserId(uid);
     (async () => {
@@ -182,9 +193,14 @@ export default function NutritionPage() {
               // flattenEntries covers days saved before meal buckets were dropped
               const loaded = flattenEntries(p.nutrition.items || p.nutrition.meals);
               const water = migrateWater(p.nutrition);
-              // Don't overwrite anything logged while this request was in flight.
-              if (itemsRef.current.length === 0) { itemsRef.current = loaded; setItems(loaded); }
-              if (waterRef.current === 0) { waterRef.current = water; setWaterMl(water); }
+              // MERGE with anything logged while this request was in flight —
+              // neither the stored day nor the new adds may be dropped. Water
+              // started at 0 before the load, so what's on screen is the delta.
+              const loadedIds = new Set(loaded.map((i) => i.id));
+              const merged = [...loaded, ...itemsRef.current.filter((i) => !loadedIds.has(i.id))];
+              itemsRef.current = merged; setItems(merged);
+              const w = Math.max(0, Math.min(water + waterRef.current, 6000));
+              waterRef.current = w; setWaterMl(w);
               // Restore today's cached slot notes so reopening the screen spends
               // nothing, and a slot that has already spoken stays spent.
               const cached = readCoachNotes(p.nutrition, todayISO());
@@ -194,10 +210,15 @@ export default function NutritionPage() {
               }
             }
           }
+          setLoadDone(true);
+        } else {
+          throw new Error(`Profile load failed (${res.status})`);
         }
       } catch (e) {
         // Silently losing this leaves the screen showing an empty day over the
         // top of food that is actually saved.
+        profileLoadFailed.current = true;
+        setSaveError("Couldn't load today's food, so new entries aren't being saved. Reload to try again.");
         captureError(e, { screen: 'nutrition', action: 'load-day', endpoint: 'userProfiles' });
       }
     })();
@@ -234,6 +255,21 @@ export default function NutritionPage() {
     const next = { ...(profileLatest.current || {}), userId, ...patch };
     profileLatest.current = next;
     setProfileRef(next);
+    // Until the stored day is known, `nutrition` is held back (see
+    // pendingNutrition); everything else in the patch is field-level and safe.
+    let send = patch || {};
+    if (!profileLoaded.current && 'nutrition' in send) {
+      pendingNutrition.current = true;
+      const { nutrition, ...rest } = send;
+      send = rest;
+    }
+    // Re-send anything an earlier write failed to save, at its latest local value.
+    const retry = {};
+    failedFields.current.forEach((k) => {
+      if (!(k in send) && profileLatest.current && k in profileLatest.current) retry[k] = profileLatest.current[k];
+    });
+    const body = { ...retry, ...send };
+    if (Object.keys(body).length === 0) return;
     // But only ever SEND what changed. The API merges by field, so posting the
     // whole document made every write re-assert a snapshot of everything else:
     // it silently reverted whatever another screen had saved in between, and if
@@ -243,19 +279,22 @@ export default function NutritionPage() {
       const res = await fetch(PROFILES_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-functions-key': PROFILES_KEY },
-        body: JSON.stringify({ userId, ...patch }),
+        body: JSON.stringify({ userId, ...body }),
       });
       // The screen already shows the food as logged. If the write failed, say
       // so — otherwise it silently disappears on the next reload.
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
-      setSaveError('');
+      // Only clear the warning once every previously failed field is saved.
+      Object.keys(body).forEach((k) => failedFields.current.delete(k));
+      if (failedFields.current.size === 0 && !profileLoadFailed.current) setSaveError('');
     } catch (e) {
+      Object.keys(body).forEach((k) => failedFields.current.add(k));
       setSaveError("Today's food isn't saved — check your connection.");
       // Field NAMES only — what was being written, never the values, which are
       // this person's weight, goal and food log.
       captureError(e, {
         screen: 'nutrition', action: 'save-profile', endpoint: 'userProfiles',
-        fields: Object.keys(patch || {}).join(','),
+        fields: Object.keys(body).join(','),
       });
     }
   }
@@ -295,6 +334,16 @@ export default function NutritionPage() {
       ...logPatch(itemsArg),
     });
   }
+
+  // The load has landed and merged: send the day that was held back, now built
+  // from the merged items, so nothing logged on either side is lost. Runs in the
+  // render after the load, so `targets` and `TODAY` are current.
+  useEffect(() => {
+    if (!loadDone || !pendingNutrition.current) return;
+    pendingNutrition.current = false;
+    saveNutrition(itemsRef.current, waterRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDone]);
 
   // ── Coach note ───────────────────────────────────────────────────────
   async function generateCoachNote(slot, kcal, count) {

@@ -2,12 +2,12 @@
 
 // Starts error monitoring and keeps it told who and where.
 //
-// Rendered inside MsalProvider alongside EmailCapture, so it's live on every
+// Rendered by AppProvider, so it's live on every
 // screen. With no DSN configured this mounts, does nothing, and costs nothing.
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import { initMonitoring, identifyUser, breadcrumb } from '@/lib/monitoring';
 
 export default function ErrorMonitor() {

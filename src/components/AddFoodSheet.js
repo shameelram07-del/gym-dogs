@@ -251,8 +251,10 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
       const r = photoPreview
         ? await aiFromPhoto(photoPreview, hint || undefined, userId)
         : await aiFromText(hint, userId);
-      setAiResult(r);
-      setPerf({ model: r.model, ms: r.ms });
+      // Everything below reads `.items` as an array; a reply without one is
+      // treated as "nothing spotted" rather than crashing the sheet.
+      setAiResult(r && Array.isArray(r.items) ? r : { ...(r || {}), items: [] });
+      setPerf(r ? { model: r.model, ms: r.ms } : null);
     }
     catch (e) {
       setAiError(e.message);
@@ -671,10 +673,13 @@ export default function AddFoodSheet({ profile, userId, onAdd, onSaveFavourites,
                   // does it. Clamped at 0 as well: type="number" accepts "-5",
                   // and a negative would come straight off the day's totals.
                   const q = (v) => Math.max(0, Math.round(num(v)));
+                  // A blank macro is unknown, not zero — same rule as food.js
+                  // and the edit sheet, so the day shows +? instead of a fake 0.
+                  const qm = (v) => (String(v ?? '').trim() === '' ? null : q(v));
                   commit({
                     id: Date.now(), name: quick.name.trim(),
-                    calories: q(quick.calories), protein: q(quick.protein),
-                    carbs: q(quick.carbs), fat: q(quick.fat),
+                    calories: q(quick.calories), protein: qm(quick.protein),
+                    carbs: qm(quick.carbs), fat: qm(quick.fat),
                   });
                   setQuick({ name: '', calories: '', protein: '', carbs: '', fat: '' });
                 }} style={{ ...primaryBtn(quickValid), width: '100%' }}>Add it</button>

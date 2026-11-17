@@ -1,11 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
-import { eyebrow } from '@/lib/ui';
+import { eyebrow, banner } from '@/lib/ui';
 
 const PROFILES_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/userProfiles';
 const PROFILES_KEY = process.env.NEXT_PUBLIC_PROFILES_API_KEY;
@@ -63,8 +63,10 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { accounts } = useMsal();
+  const { accounts, inProgress } = useMsal();
   const [userId, setUserId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [finished, setFinished] = useState(false);
@@ -73,13 +75,22 @@ export default function OnboardingPage() {
   // The profile used to be fetched here purely to spread into the save below.
   // Now that the save only sends the fields onboarding owns, that read has no
   // purpose — and it was the thing that made a failed GET destructive.
+  // Wait for MSAL to settle, then require a signed-in account. Without one
+  // the answers have nowhere to be saved, so don't let anyone fill them in.
   useEffect(() => {
-    if (!accounts || accounts.length === 0) return;
+    if (inProgress !== 'none') return;
+    if (!accounts || accounts.length === 0) { router.replace('/dashboard'); return; }
     setUserId(accounts[0].localAccountId);
-  }, [accounts]);
+  }, [accounts, inProgress, router]);
 
+  /** Returns true only when the profile write was confirmed. */
   async function saveOnboarding() {
-    if (!userId) return;
+    if (!userId) {
+      captureError(new Error('Onboarding save attempted without a userId'), {
+        screen: 'onboarding', action: 'save-answers', endpoint: 'userProfiles',
+      });
+      return false;
+    }
     let savedOk = false;
     try {
       const res = await fetch(PROFILES_URL, {
@@ -100,7 +111,6 @@ export default function OnboardingPage() {
       }
     } catch (e) {
       console.error('Onboarding: answers not saved', e);
-      // Nothing on screen says this failed — it goes straight to "You are in."
       captureError(e, { screen: 'onboarding', action: 'save-answers', endpoint: 'userProfiles' });
     }
     // Remember on this device so login never loops back to onboarding, even if
@@ -111,6 +121,7 @@ export default function OnboardingPage() {
       // succeeded, so the flag is only a shortcut.
       try { localStorage.setItem('gd-onboarded', userId); } catch (e) {}
     }
+    return savedOk;
   }
 
   const step = STEPS[currentStep];
@@ -143,8 +154,14 @@ export default function OnboardingPage() {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(s => s + 1);
     } else {
+      // Only show "You are in" once the answers are actually saved. On failure
+      // stay on this step with an error; the button becomes the retry.
+      if (saving) return;
+      setSaving(true); setSaveError(false);
+      const ok = await saveOnboarding();
+      setSaving(false);
+      if (!ok) { setSaveError(true); return; }
       setFinished(true);
-      saveOnboarding();
       let p = 0;
       const interval = setInterval(() => {
         p += Math.random() * 8 + 3;
@@ -215,6 +232,9 @@ export default function OnboardingPage() {
       </div>
     );
   }
+
+  // Still waiting on sign-in (or redirecting to /login) — show nothing yet.
+  if (!userId) return null;
 
   // ─── STEPS ───────────────────────────────────────────────
   const selectedVal = answers[step.id] || (step.type === 'multi' ? [] : null);
@@ -314,13 +334,20 @@ export default function OnboardingPage() {
 
       {/* Fixed NEXT */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '16px 20px 32px', background: 'linear-gradient(to top, var(--bg) 72%, transparent)' }}>
-        <button onClick={handleNext} disabled={!canNext()} className="gd-disp" style={{
+        {saveError && currentStep === totalSteps - 1 && (
+          <p role="alert" style={{ ...banner('error'), margin: '0 0 12px' }}>
+            Couldn&rsquo;t save your answers. Check your connection and tap Try again.
+          </p>
+        )}
+        <button onClick={handleNext} disabled={!canNext() || saving} className="gd-disp" style={{
           width: '100%', padding: 17, border: 'none', borderRadius: 18, fontSize: 16, fontWeight: 700, cursor: canNext() ? 'pointer' : 'not-allowed',
           background: canNext() ? 'var(--grad)' : 'var(--soft)',
           color: canNext() ? 'var(--on-accent)' : 'var(--ink-3)',
           boxShadow: canNext() ? 'var(--glow-grad)' : 'none',
         }}>
-          {currentStep === totalSteps - 1 ? 'Build my plan →' : 'Next →'}
+          {currentStep === totalSteps - 1
+            ? (saving ? 'Saving…' : saveError ? 'Try again →' : 'Build my plan →')
+            : 'Next →'}
         </button>
       </div>
     </div>

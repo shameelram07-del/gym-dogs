@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { captureError } from '@/lib/monitoring';
@@ -66,7 +66,7 @@ export default function CommunityPage() {
 
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
     const user = accounts[0];
     const uid = user.localAccountId;
     setUserId(uid);

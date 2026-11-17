@@ -91,7 +91,10 @@ export default function EditItemSheet({ item, userId, onSave, onDelete, onClose 
 
   const fromMacros = Math.round(n(f.protein) * 4 + n(f.carbs) * 4 + n(f.fat) * 9);
   const stated = Math.round(n(f.calories));
-  const drift = stated && fromMacros ? Math.abs(stated - fromMacros) / Math.max(stated, fromMacros) : 0;
+  // A blank macro is unknown, so the macros can't be compared with the stated
+  // calories at all — counting it as 0 flagged a mismatch that wasn't there.
+  const macroUnknown = ['protein', 'carbs', 'fat'].some((k) => String(f[k] ?? '').trim() === '');
+  const drift = !macroUnknown && stated && fromMacros ? Math.abs(stated - fromMacros) / Math.max(stated, fromMacros) : 0;
 
   function save() {
     const grams = f.grams === '' ? null : Math.round(n(f.grams));

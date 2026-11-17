@@ -1,6 +1,7 @@
 'use client';
 import { todayISO } from '@/lib/day';
 import { cardStyle, fieldLabel, hint, chip, inputStyle, R } from '@/lib/ui';
+import { memberName } from '@/lib/coach';
 
 /**
  * Publish — only the things that are true of a finished session.
@@ -31,7 +32,7 @@ export default function PublishCard({ b, clients }) {
                 key={c.userId}
                 onClick={() => b.setAssignedTo((prev) => (on ? prev.filter((u) => u !== c.userId) : [...prev, c.userId]))}
                 style={chip(on)}
-              >{c.name.split(' ')[0]}</button>
+              >{memberName(c.name).split(' ')[0]}</button>
             );
           })}
         </div>

@@ -4,7 +4,7 @@ import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
@@ -39,10 +39,18 @@ function sorenessLabel(level) {
   return 'None';
 }
 
+// Whole-day count for a local 'YYYY-MM-DD'. Date.UTC on the date parts so DST
+// days still count as one, and a bare date never gets parsed as UTC midnight
+// (which put labels a day out in NZ mornings).
+function dayNumber(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
 function getWeekLabel(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(dateStr)) ? String(dateStr) : toLocalISO(dateStr);
+  if (!iso) return '';
+  const diffDays = dayNumber(todayISO()) - dayNumber(iso);
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
@@ -178,7 +186,7 @@ export default function ProgressPage() {
 
   useEffect(() => {
     if (inProgress === 'startup') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
     const uid = accounts[0].localAccountId;
     setUserId(uid);
     // A weigh-in taken before the history arrived has nothing safe to merge
@@ -267,7 +275,7 @@ export default function ProgressPage() {
   }, [userId]);
 
   const cycleLevel = async (areaId) => {
-    const next = LEVELS[(LEVELS.indexOf(sorenessLevels[areaId]) + 1) % LEVELS.length];
+    const next = LEVELS[(LEVELS.indexOf(sorenessLevels[areaId] || 'none') + 1) % LEVELS.length];
     const updated = { ...sorenessLevels, [areaId]: next };
     const readiness = calcRecoveryScore(updated);
     setSorenessLevels(updated);

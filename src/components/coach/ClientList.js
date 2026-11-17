@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Reveal from '@/components/Reveal';
 import { cardStyle, chip, R, T } from '@/lib/ui';
 import Avatar from './Avatar';
+import { memberName } from '@/lib/coach';
 
 function readinessStyle(score) {
   if (!score) return { ink: 'var(--ink-3)', bg: 'var(--soft)', label: 'No data' };
@@ -88,7 +89,7 @@ export default function ClientList({ clients, loading }) {
             <div key={c.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Avatar initials={c.initials} size={30} />
-                <span style={{ fontSize: T.md, fontWeight: 700 }}>{c.name}</span>
+                <span style={{ fontSize: T.md, fontWeight: 700 }}>{memberName(c.name)}</span>
               </div>
               <span style={{ fontSize: T.sm, color: 'var(--orange-ink)', fontWeight: 600 }}>{c.alert}</span>
             </div>
@@ -119,7 +120,7 @@ export default function ClientList({ clients, loading }) {
                   <Avatar initials={client.initials} size={44} online={client.trainedToday} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{client.name}</p>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{memberName(client.name)}</p>
                       {client.alert && <span style={{ fontSize: 13 }}>⚠️</span>}
                     </div>
                     <p style={{ margin: '2px 0 0', fontSize: T.sm, color: 'var(--ink-3)' }}>{client.goal}</p>

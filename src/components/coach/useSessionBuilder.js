@@ -7,6 +7,7 @@ import {
   parseAiReply, findExercise,
 } from '@/lib/session';
 import { captureError } from '@/lib/monitoring';
+import { memberName } from '@/lib/coach';
 
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
@@ -390,7 +391,7 @@ export function useSessionBuilder({ userId, clients }) {
     assignedTo.length === 0
       ? 'the whole pack'
       : assignedTo
-          .map((uid) => clients.find((c) => c.userId === uid)?.name?.split(' ')[0])
+          .map((uid) => memberName(clients.find((c) => c.userId === uid)?.name, '').split(' ')[0])
           .filter(Boolean).join(', ') || 'the selected members'
   );
 
@@ -419,11 +420,12 @@ export function useSessionBuilder({ userId, clients }) {
       // Never cached at module scope — computed here so a phone left open
       // overnight publishes for the real today, not yesterday.
       const date = dateMode === 'today' ? todayISO() : sessionDate;
+      const now = new Date();
       const plan = {
-        id: draftId || Date.now().toString(),
+        id: draftId || String(now.getTime()),
         name: planName, tag: planTag, date, notes: fullNotes,
         exercises: cleanExercises, isActive, assignedTo,
-        createdAt: new Date().toISOString(),
+        createdAt: now.toISOString(),
       };
       const res = await fetch(PLANS_API_URL, {
         method: 'POST',
@@ -447,7 +449,7 @@ export function useSessionBuilder({ userId, clients }) {
 
       // Announce it on the community feed.
       try {
-        await fetch(COMMUNITY_URL, {
+        const postRes = await fetch(COMMUNITY_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-functions-key': CLIENTS_KEY || '' },
           body: JSON.stringify({
@@ -458,6 +460,12 @@ export function useSessionBuilder({ userId, clients }) {
             tag: '📋 New session',
           }),
         });
+        if (!postRes.ok) {
+          // The session published fine; only the announcement failed.
+          captureError(new Error(`Session announcement failed (${postRes.status})`), {
+            screen: 'coach', action: 'announce-session', endpoint: 'communityPosts', status: postRes.status,
+          });
+        }
       } catch (e) {
         // The session published fine; only the announcement failed.
         captureError(e, { screen: 'coach', action: 'announce-session', endpoint: 'communityPosts' });

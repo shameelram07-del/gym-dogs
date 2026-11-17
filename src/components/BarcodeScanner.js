@@ -39,7 +39,13 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const readerRef = useRef(null);
-  const stopRef = useRef(false);
+  // Points at the CURRENT run's stop flag. Each effect run owns its own flag, so
+  // a torn-down run can never be revived by a later one resetting a shared ref.
+  const stopRef = useRef({ stopped: false });
+  // Latest callback, read at call time. The parent passes a new function every
+  // render; depending on it restarted the camera mid-scan.
+  const onDetectedRef = useRef(onDetected);
+  useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
   const [error, setError] = useState(null);
   const [manual, setManual] = useState('');
   const [status, setStatus] = useState('Starting camera…');
@@ -59,14 +65,16 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
   }, []);
 
   useEffect(() => {
-    stopRef.current = false;
+    const run = { stopped: false };
+    stopRef.current = run;
     let rafId = null;
+    let stream = null;
 
     const finish = (code) => {
-      if (stopRef.current || !code) return;
-      stopRef.current = true;
+      if (run.stopped || !code) return;
+      run.stopped = true;
       if (navigator.vibrate) navigator.vibrate(40);
-      onDetected(String(code).replace(/\D/g, ''));
+      onDetectedRef.current(String(code).replace(/\D/g, ''));
     };
 
     (async () => {
@@ -77,12 +85,14 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
 
         // ── Path A: native detector (Chrome/Android) ──
         if ('BarcodeDetector' in window) {
-          const stream = await navigator.mediaDevices.getUserMedia({
+          stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } },
             audio: false,
           });
+          // Closed while the permission prompt / camera start was pending: the
+          // cleanup has already run, so this stream is ours to switch off.
+          if (run.stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
           streamRef.current = stream;
-          if (stopRef.current) return;
 
           const video = videoRef.current;
           if (!video) return;
@@ -101,7 +111,7 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
 
           const detector = new window.BarcodeDetector({ formats: supported });
           const scan = async () => {
-            if (stopRef.current) return;
+            if (run.stopped) return;
             try {
               const hits = await detector.detect(video);
               if (hits && hits.length) return finish(hits[0].rawValue);
@@ -119,7 +129,7 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
         // ── Path B: ZXing owns the video element entirely ──
         setStatus('Loading scanner…');
         await loadScript(ZXING_CDN);
-        if (stopRef.current) return;
+        if (run.stopped) return;
         const ZX = window.ZXing;
         if (!ZX || !ZX.BrowserMultiFormatReader) throw new Error('Scanner unavailable. Type the number in instead.');
 
@@ -130,10 +140,17 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
           videoRef.current,
           (result) => { if (result) finish(result.getText()); }
         );
-        if (stopRef.current) return;
+        // Closed while ZXing was starting the camera: reset it now, since the
+        // cleanup ran before the reader had a stream to stop.
+        if (run.stopped) {
+          // Deliberate: teardown after unmount, nothing left to salvage.
+          try { reader.reset(); } catch (e) {}
+          return;
+        }
         setLive(true);
         setStatus('Point at the barcode');
       } catch (e) {
+        if (run.stopped) return;
         setStatus('');
         const denied = e && e.name === 'NotAllowedError';
         setError(
@@ -148,18 +165,19 @@ export default function BarcodeScanner({ onDetected, onLabel, onClose }) {
     })();
 
     return () => {
-      stopRef.current = true;
+      run.stopped = true;
       if (rafId) cancelAnimationFrame(rafId);
       // Deliberate: unmount teardown, nothing left to salvage if reset throws.
       try { if (readerRef.current) readerRef.current.reset(); } catch (e) {}
+      if (stream) stream.getTracks().forEach((t) => t.stop());
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };
-  }, [onDetected]);
+  }, []);
 
   const shootLabel = () => {
     const frame = captureFrame();
     if (!frame) { setError('Camera is not ready yet — give it a second.'); return; }
-    stopRef.current = true;
+    stopRef.current.stopped = true;
     onLabel(frame);
   };
 

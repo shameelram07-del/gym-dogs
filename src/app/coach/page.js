@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import Avatar from '@/components/coach/Avatar';
@@ -11,6 +11,7 @@ import ChallengePanel from '@/components/coach/ChallengePanel';
 import SessionBuilder from '@/components/coach/SessionBuilder';
 import { useSessionBuilder } from '@/components/coach/useSessionBuilder';
 import { captureError } from '@/lib/monitoring';
+import { isCoach } from '@/lib/coach';
 
 const CLIENTS_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/clients';
 
@@ -67,7 +68,10 @@ export default function CoachDashboard() {
 
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
+    // Client-side guard only — the API must enforce coach access too. userId
+    // stays null for a non-coach, so nothing below renders or fetches.
+    if (!isCoach(accounts[0])) { router.replace('/dashboard'); return; }
     setUserId(accounts[0].localAccountId);
   }, [accounts, inProgress, router]);
 

@@ -3,7 +3,7 @@ import { todayISO, toLocalISO } from '@/lib/day';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import { heatLevel, heatMax, heatStyle } from '@/lib/heat';
@@ -47,7 +47,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (inProgress !== 'none') return;
-    if (accounts.length === 0) { router.push('/login'); return; }
+    if (accounts.length === 0) { router.push('/dashboard'); return; }
     setUserId(accounts[0].localAccountId);
   }, [accounts, inProgress, router]);
 

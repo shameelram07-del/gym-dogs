@@ -1,6 +1,6 @@
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import AuthProvider from "@/components/MsalProvider";
+import AppProvider from "@/components/AppProvider";
 
 // Inter keeps the old --font-geist-sans variable name so every existing
 // style that references it picks up the new body face automatically.
@@ -56,9 +56,9 @@ export default function RootLayout({ children }) {
             __html: `try{if(!localStorage.getItem('gd-theme-v2')){localStorage.setItem('gd-theme','dark');localStorage.setItem('gd-theme-v2','1');}var t=localStorage.getItem('gd-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}`,
           }}
         />
-        <AuthProvider>
+        <AppProvider>
           <div className="app-shell">{children}</div>
-        </AuthProvider>
+        </AppProvider>
       </body>
     </html>
   );

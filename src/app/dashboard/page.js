@@ -1,9 +1,9 @@
 'use client';
-import { todayISO, toLocalISO } from '@/lib/day';
+import { todayISO, toLocalISO, onDayChange } from '@/lib/day';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
 import ThemeToggle from '@/components/ThemeToggle';
 import QuoteCard from '@/components/QuoteCard';
@@ -236,6 +236,8 @@ export default function DashboardPage() {
   // it loads and null when nothing is running — both mean no card.
   const [challenge, setChallenge] = useState(null);
   const [loading, setLoading]       = useState(true);
+  // The local date this screen was built for — changes on rollover, which re-renders the header date too.
+  const [day, setDay] = useState(todayISO());
 
   const dismissSetup = () => {
     setShowSetup(false);
@@ -243,18 +245,6 @@ export default function DashboardPage() {
     // reappears next visit.
     try { localStorage.setItem('gd-setup-dismissed', userId); } catch (e) {}
   };
-
-  useEffect(() => {
-    if (!accounts || accounts.length === 0) return;
-    const account = accounts[0];
-    const uid = account.localAccountId;
-    setUserId(uid);
-    const msalName = (account.name && account.name !== 'unknown' && !looksLikeGuid(account.name))
-      ? account.name
-      : account.username?.split('@')[0] || '';
-    setUserName(titleCase(msalName));
-    loadDashboardData(uid);
-  }, [accounts]);
 
   // uidArg matters: the first call comes from loadDashboardData, which runs in
   // the same tick as setUserId(uid) — so the `userId` state is still '' and this
@@ -412,6 +402,33 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }
+
+  // Declared after loadDashboardData so the effect never reads it before it exists.
+  useEffect(() => {
+    if (!accounts || accounts.length === 0) return;
+    const account = accounts[0];
+    const uid = account.localAccountId;
+    setUserId(uid);
+    const msalName = (account.name && account.name !== 'unknown' && !looksLikeGuid(account.name))
+      ? account.name
+      : account.username?.split('@')[0] || '';
+    setUserName(titleCase(msalName));
+    loadDashboardData(uid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts]);
+
+  // A phone left on this screen overnight must not keep showing yesterday: when
+  // the local day changes, reload so the week strip, streak, today's plan and
+  // the done-today tick are all worked out against the new date.
+  useEffect(() => {
+    if (!userId) return;
+    return onDayChange(day, (next) => {
+      setDay(next);
+      setDoneToday(false);
+      loadDashboardData(userId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day, userId]);
 
   function handleAskWhy() {
     if (coachLoading) return;
