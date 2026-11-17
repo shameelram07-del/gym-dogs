@@ -28,25 +28,29 @@
   --line-2:    rgba(17,17,20,0.05);
 
   /* brand + semantic — STEEL */
-  --accent:        #3F5170;   /* primary steel blue */
-  --accent-strong: #2E3D56;   /* readable steel text on light tint */
-  --accent-tint:   rgba(63,81,112,0.10);
-  --accent-glow:   rgba(63,81,112,0.20);
+  /* EMBER: --accent is the neutral "30%" (ink on light, white on dark). The
+     one loud colour is --ember / --grad, kept for the single thing to tap or
+     celebrate on a screen. --on-accent reads on both. */
+  --accent:        #111114;
+  --accent-strong: #111114;
+  --accent-tint:   rgba(17,17,20,0.06);
+  --accent-glow:   rgba(200,68,13,0.22);
   --on-accent:     #FFFFFF;
 
   --gold:      #D9A514;
   --gold-tint: rgba(217,165,20,0.14);
   --card-2:    #FFFFFF;
 
-  --orange:      #F2542D;
-  --orange-ink:  #B23A1A;
-  --orange-tint: rgba(242,84,45,0.12);
+  --orange:      #C8440D;
+  --orange-ink:  #A8380A;
+  --orange-tint: rgba(200,68,13,0.10);
 
-  --blue:      #0EA5C9;
-  --blue-ink:  #0A7FA0;
-  --blue-tint: rgba(14,165,201,0.10);
+  /* Formerly ice blue / violet. Neutral now: one accent only. */
+  --blue:      #5E5E66;
+  --blue-ink:  #3A3A41;
+  --blue-tint: rgba(17,17,20,0.06);
 
-  --violet:    #7A5AF8;
+  --violet:    #5E5E66;
   --red:       #F04438;
   --red-ink:   #B42318;
   --red-tint:  rgba(240,68,56,0.12);
@@ -74,37 +78,37 @@
 [data-theme="dark"] {
   /* SLATE palette */
   --bg:        #080B11;
-  --card:      #111823;
-  --soft:      #1A2331;
+  --card:      #121822;
+  --soft:      #1C2431;
   --shell-1:   #131C28;
   --shell-2:   #060910;
 
-  --ink:       #EEF3FA;
-  --ink-2:     #8C9AAF;
-  --ink-3:     #5E6C80;
+  --ink:       #F1F4F8;
+  --ink-2:     #9AA4B4;
+  --ink-3:     #7F8A9C;
 
   --line:      rgba(255,255,255,0.08);
   --line-2:    rgba(255,255,255,0.045);
 
-  --accent:        #6C8CB8;
-  --accent-strong: #A9C6E4;
-  --accent-tint:   rgba(108,140,184,0.16);
-  --accent-glow:   rgba(108,140,184,0.34);
-  --on-accent:     #FFFFFF;
+  --accent:        #F1F4F8;
+  --accent-strong: #F1F4F8;
+  --accent-tint:   rgba(255,255,255,0.08);
+  --accent-glow:   rgba(255,107,44,0.30);
+  --on-accent:     #170A03;
 
   --gold:      #FFD166;
   --gold-tint: rgba(255,209,102,0.12);
   --card-2:    #131C28;
 
-  --orange:      #FF7A45;
-  --orange-ink:  #FFC0A3;
-  --orange-tint: rgba(255,122,69,0.16);
+  --orange:      #FF6B2C;
+  --orange-ink:  #FFB896;
+  --orange-tint: rgba(255,107,44,0.14);
 
-  --blue:      #6EE7F9;
-  --blue-ink:  #9FF0FF;
-  --blue-tint: rgba(110,231,249,0.12);
+  --blue:      #C5CEDA;
+  --blue-ink:  #DCE3EC;
+  --blue-tint: rgba(255,255,255,0.07);
 
-  --violet:    #8B5CF6;
+  --violet:    #9AA4B4;
   --red:       #F04438;
   --red-ink:   #FF9F93;
   --red-tint:  rgba(240,68,56,0.18);
@@ -129,31 +133,33 @@
    --steel was called --mag until this palette landed; it has meant steel blue
    since commit 9dcbd28, so the old name only misled. No alias is kept. */
 :root, [data-theme="light"], [data-theme="dark"] {
-  --ember: #FF7A45;
-  --steel: #6C8CB8;
-  --ice:   #6EE7F9;
-  --vio:   #8B5CF6;
+  /* EMBER (Nov 2026): 60% slate, 30% white, 10% ember. --steel/--ice/--vio
+     are kept as names so nothing breaks, but they are neutrals now. If you
+     want colour, the answer is --ember, and only once per screen. */
+  --ember: #FF6B2C;
+  --steel: #9AA4B4;
+  --ice:   #C5CEDA;
+  --vio:   #9AA4B4;
   /* The dark end of --grad, named so the logo tile can sit on the same run. */
-  --steel-deep: #3E5273;
+  --steel-deep: #2A3342;
   /* Cutouts on the logo tile. Fixed in both themes — the tile is always dark. */
   --logo-ink:   #08121C;
-  --grad:      linear-gradient(135deg, #8DE9F8 0%, #6C8CB8 52%, #3E5273 100%);
-  --grad-soft: linear-gradient(135deg, rgba(141,233,248,0.14), rgba(108,140,184,0.13) 52%, rgba(62,82,115,0.16));
-  --glow-grad: 0 8px 32px rgba(108,140,184,0.34);
+  /* --grad IS the accent fill. Still a gradient value so every existing
+     `background: var(--grad)` keeps working, but it is one hue. */
+  --grad:      linear-gradient(135deg, #FF7A3D 0%, #FF5F1F 100%);
+  --grad-soft: linear-gradient(135deg, rgba(255,107,44,0.14), rgba(255,107,44,0.08));
+  --glow-grad: 0 8px 28px rgba(255,107,44,0.28);
 
   /* The dashboard "today's session" hero: a dark mesh panel that stays dark in
      both themes (its text is white), so it lives here rather than per-theme. */
-  --hero-mesh: radial-gradient(120% 160% at 10% 0%, rgba(110,231,249,0.30), transparent 52%),
-               radial-gradient(130% 150% at 95% 20%, rgba(108,140,184,0.52), transparent 58%),
-               radial-gradient(120% 180% at 60% 110%, rgba(62,82,115,0.62), transparent 55%),
-               #0E1622;
-  --hero-line: rgba(255,255,255,0.14);
+  --hero-mesh: #121822;
+  --hero-line: rgba(255,255,255,0.07);
 
   /* Text on the always-dark panels (--ai-card-*, --hero-mesh). Fixed in both
      themes: --ink flips to near-black in light and would vanish on them. */
-  --on-dark:      #E7EEF9;
-  --on-dark-2:    #A9C6E4;
-  --on-dark-soft: rgba(169,198,228,0.18);   /* chips/buttons on those panels */
+  --on-dark:      #F1F4F8;
+  --on-dark-2:    #9AA4B4;
+  --on-dark-soft: rgba(255,255,255,0.10);   /* chips/buttons on those panels */
 
   /* The hero's inverse "Start workout" pill: light plate, dark ink, on a panel
      that is dark in both themes — so neither --card nor --ink can serve. */
@@ -164,18 +170,18 @@
   /* Consistency heatmap intensity ramp — one hue climbing into the gradient.
      Used by progress; history should read from these too rather than inventing
      a second scale. */
-  --heat-1: rgba(108,140,184,0.22);
-  --heat-2: rgba(108,140,184,0.52);
+  --heat-1: rgba(241,244,248,0.16);
+  --heat-2: rgba(241,244,248,0.42);
 
   /* Trophy coins. Deliberately their own hues — a shelf of identical steel
      discs reads as one award, not four. Kept as tokens so the ember coin
      tracks --ember instead of drifting to whatever the palette used to be. */
   --coin-gold:       linear-gradient(135deg, #8A6A14, #FFD166);
   --coin-gold-glow:  rgba(255,209,102,0.35);
-  --coin-ice:        linear-gradient(135deg, #164B5E, #2AA8C9);
-  --coin-ice-glow:   rgba(110,231,249,0.30);
-  --coin-ember:      linear-gradient(135deg, #7A3418, #FF7A45);
-  --coin-ember-glow: rgba(255,122,69,0.35);
+  --coin-ice:        linear-gradient(135deg, #4A5464, #C5CEDA);
+  --coin-ice-glow:   rgba(197,206,218,0.25);
+  --coin-ember:      linear-gradient(135deg, #7A3418, #FF6B2C);
+  --coin-ember-glow: rgba(255,107,44,0.35);
 
   /* Podium metals. --gold already exists; these are its companions, plus the
      two shades the challenge bar and Join button need. */
@@ -211,6 +217,7 @@
   --t-xl:  20px;   /* section headings */
   --t-2xl: 26px;   /* screen headings */
   --t-3xl: 34px;   /* hero numbers */
+  --t-mega: clamp(52px, 17vw, 72px);   /* the one big word on a screen */
 
   /* Vertical rhythm, so gaps stop being 6/7/8/9/10/11/12 at random. */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
@@ -222,11 +229,13 @@
    Keyed to the explicit attribute: dark is the default, so no attribute must
    keep the dark run rather than briefly flashing the light one. */
 [data-theme="light"] {
-  --grad:      linear-gradient(135deg, #1F8AA6 0%, #4C6E9B 52%, #2B3A52 100%);
-  --grad-soft: linear-gradient(135deg, rgba(31,138,166,0.12), rgba(76,110,155,0.11) 52%, rgba(43,58,82,0.13));
+  --ember:     #C8440D;
+  --grad:      linear-gradient(135deg, #D24E12 0%, #BC3F0A 100%);
+  --grad-soft: linear-gradient(135deg, rgba(200,68,13,0.10), rgba(200,68,13,0.06));
+  --glow-grad: 0 8px 24px rgba(200,68,13,0.22);
   --hero-glow: 0 24px 60px rgba(16,24,40,0.18);
-  --heat-1:    rgba(63,81,112,0.18);
-  --heat-2:    rgba(63,81,112,0.45);
+  --heat-1:    rgba(17,17,20,0.14);
+  --heat-2:    rgba(17,17,20,0.40);
 }
 
 /* display face for headings + hero numbers */
@@ -240,6 +249,20 @@
   font-variant-numeric: tabular-nums;
   /* Stops a two-line heading breaking with one orphaned word. */
   text-wrap: balance;
+}
+
+/* The one big word per screen: PUSH DAY. / BENCH PRESS. / DONE. / EAT.
+   Colour stays ink; size and weight do the shouting. */
+.gd-mega {
+  font-family: var(--font-display), 'Space Grotesk', sans-serif;
+  font-size: var(--t-mega);
+  font-weight: 700;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  margin: 0;
 }
 
 /* Tabular digits for a number that ISN'T set in the display face — set totals,
@@ -374,33 +397,8 @@ input[type="number"] {
 
 /* ── WOW premium layer (dark theme) ─────────────────────────── */
 
-/* ambient aurora orbs behind everything */
-@keyframes gdDrift {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(40px, 30px) scale(1.12); }
-}
-[data-theme="dark"] body::before,
-[data-theme="dark"] body::after {
-  content: '';
-  position: fixed;
-  border-radius: 50%;
-  filter: blur(60px);
-  pointer-events: none;
-  z-index: 0;
-  /* Static (no drift animation) — a continuously-animating full-screen
-     blur was killing scroll performance on phones. Same look, no motion. */
-}
-/* Ice top-right, deep steel bottom-left — the gradient's two ends, kept faint
-   so they read as depth rather than colour. */
-[data-theme="dark"] body::before {
-  width: 380px; height: 380px; top: -150px; left: calc(50% + 40px);
-  background: radial-gradient(circle, rgba(110,231,249,0.13), transparent 70%);
-}
-[data-theme="dark"] body::after {
-  width: 360px; height: 360px; bottom: -140px; left: calc(50% - 330px);
-  background: radial-gradient(circle, rgba(62,82,115,0.30), transparent 70%),
-              radial-gradient(circle at 30% 70%, rgba(108,140,184,0.14), transparent 60%);
-}
+/* The ambient aurora orbs lived here. EMBER is a flat slate ground: the
+   colour budget goes to the one accent, not the wallpaper. */
 /* Pages declare most of their motion as inline styles, which a targeted CSS
    rule can never reach — an inline `animation` beats any selector. This blanket
    reset is the only thing that actually holds for them, infinite ones included. */

@@ -73,7 +73,7 @@ export default function BottomNav() {
             <span style={{
               position: 'absolute', top: -10, left: '50%',
               width: 34, height: 3, borderRadius: 99,
-              background: 'var(--grad)', boxShadow: '0 0 12px var(--accent-glow)',
+              background: 'var(--accent)',
               // Always rendered, only revealed — mounting it on selection made
               // the indicator pop into place instead of sliding up.
               transform: `translateX(-50%) scaleX(${active ? 1 : 0.3})`,

@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMsal } from '@/lib/me';
 import BottomNav from '@/components/BottomNav';
-import ThemeToggle from '@/components/ThemeToggle';
 import QuoteCard from '@/components/QuoteCard';
 import Reveal from '@/components/Reveal';
 import { captureError, breadcrumb } from '@/lib/monitoring';
@@ -50,9 +49,9 @@ function challengeLine(ch) {
 
 function getGreeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
 }
 
 function titleCase(s) {
@@ -470,40 +469,29 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 96 }}>
 
-      {/* ── HEADER ── */}
-      <div style={{ padding: '52px 20px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>{dateStr}</p>
-          <h1 className="gd-disp" style={{ margin: '2px 0 0', fontSize: 27, fontWeight: 700 }}>
-            {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}
-            <span className="gd-grad-text">.</span>
+      {/* ── HEADER ── big greeting left, streak right. The streak is the one
+          ember thing up here; everything else is ink. */}
+      <div style={{ padding: '56px 22px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ ...eyebrow, letterSpacing: '0.14em' }}>{dateStr}</p>
+          <h1 className="gd-disp" style={{ margin: '8px 0 0', fontSize: 42, fontWeight: 700, lineHeight: 0.96, letterSpacing: '-0.03em' }}>
+            {getGreeting()}{userName ? ',' : '.'}
+            {userName ? <><br />{userName.split(' ')[0]}.</> : null}
           </h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ThemeToggle />
-          <div style={{ position: 'relative' }}>
-            <Avatar name={userName} onClick={() => router.push('/profile')} />
-            {weekStats.streak > 0 && (
-              <span style={{
-                position: 'absolute', bottom: -4, right: -6,
-                background: 'linear-gradient(135deg, var(--ember), var(--steel))',
-                borderRadius: 99, padding: '2px 7px', fontSize: 10, fontWeight: 800,
-                color: 'var(--on-accent)', border: '2px solid var(--bg)',
-                boxShadow: '0 4px 14px var(--orange-tint)',
-                animation: 'gdFlick 2.2s ease-in-out infinite',
-              }}>
-                {weekStats.streak}
-              </span>
-            )}
-          </div>
-        </div>
+        {weekStats.streak > 0 && (
+          <button onClick={() => router.push('/history')} aria-label={`${weekStats.streak} day streak, view history`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'right', flexShrink: 0 }}>
+            <div className="gd-disp" style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: 'var(--ember)' }}>{weekStats.streak}</div>
+            <div style={{ ...eyebrow, letterSpacing: '0.12em', marginTop: 2 }}>day streak</div>
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '0 20px' }}>
 
         {/* ── SETUP NUDGE ── */}
         {showSetup && (
-          <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--accent)', padding: '14px 16px' }}>
+          <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
             <div style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="0.8" fill="var(--accent)" /></svg>
             </div>
@@ -520,94 +508,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── WEEK STRIP ── */}
-        {weekDays.length > 0 && (
-          <Reveal>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            {weekDays.map((d, i) => (
-              <button key={i} onClick={() => router.push('/history?date=' + d.iso)} style={{
-                flex: 1, textAlign: 'center', padding: '9px 0 8px', borderRadius: 14, cursor: 'pointer',
-                background: d.isToday ? 'var(--grad)' : 'var(--card)',
-                border: `1px solid ${d.isToday ? 'transparent' : 'var(--line)'}`,
-                boxShadow: d.isToday ? '0 6px 20px var(--accent-glow)' : 'none',
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: d.isToday ? 'var(--on-accent)' : 'var(--ink-3)' }}>{d.label}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: d.isToday ? 'var(--on-accent)' : 'var(--ink)' }}>{d.dayNum}</div>
-                <div style={{
-                  width: 5, height: 5, borderRadius: 999, margin: '5px auto 0',
-                  background: d.trained ? (d.isToday ? 'var(--on-accent)' : 'var(--accent)') : 'transparent',
-                  boxShadow: d.trained && !d.isToday ? '0 0 6px var(--accent-glow)' : 'none',
-                }} />
-              </button>
-            ))}
-          </div>
-          </Reveal>
-        )}
-
-        {/* ── LEVEL / XP ── */}
-        {levelInfo && (
-          <Reveal delay={60}>
-          <div style={{ ...card, padding: '14px 18px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 11, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bolt()}</div>
-                <div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Level {levelInfo.level} · {levelInfo.title}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)' }}>{levelInfo.xpToNext} XP to Level {levelInfo.level + 1}</p>
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--accent-strong)' }}>{levelInfo.totalXp.toLocaleString()} XP</p>
-            </div>
-            <div style={{ height: 9, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
-              <div className="gd-shimbar" style={{
-                height: '100%', borderRadius: 999,
-                background: 'var(--grad)',
-                width: xpAnimated ? `${levelInfo.pct}%` : 0,
-                transition: 'width 1.4s cubic-bezier(0.22, 1, 0.36, 1)',
-              }} />
-            </div>
-          </div>
-          </Reveal>
-        )}
-
-        {/* ── READINESS ── */}
-        <Reveal delay={100}>
-        <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 18 }}>
-          <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
-            <svg width="100" height="100" viewBox="0 0 120 120">
-              <defs>
-                <linearGradient id="gdReadyGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="var(--ice)" />
-                  <stop offset="1" stopColor="var(--vio)" />
-                </linearGradient>
-              </defs>
-              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
-              {readiness && (
-                <circle cx="60" cy="60" r={R} fill="none" stroke="url(#gdReadyGrad)" strokeWidth="11"
-                  strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={ringOffset}
-                  style={{
-                    transition: 'stroke-dashoffset 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
-                    filter: 'drop-shadow(0 0 10px rgba(110,231,249,0.4))',
-                  }}
-                  transform="rotate(-90 60 60)" />
-              )}
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
-                {readiness ? <CountUp value={readiness} /> : '—'}
-              </span>
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ink-3)', marginTop: 3 }}>READY</span>
-            </div>
-          </div>
-          <div>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{readinessLabel}</p>
-            <p style={{ margin: '7px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)' }}>{readinessSub}</p>
-          </div>
-        </div>
-        </Reveal>
-
-        {/* ── TODAY'S SESSION — SLATE mesh hero ── */}
-        <Reveal delay={140}>
+        {/* ── TODAY'S SESSION ── the main event: one big word, one ember button */}
+        <Reveal>
         <div style={{
           borderRadius: 26, padding: 0, overflow: 'hidden', marginBottom: 14,
           background: 'var(--hero-mesh)',
@@ -617,31 +519,22 @@ export default function DashboardPage() {
         }}>
           <div
             onClick={() => effPlan?.exercises?.length && setSessionOpen(o => !o)}
-            style={{ padding: '20px 20px 14px', cursor: effPlan?.exercises?.length ? 'pointer' : 'default' }}
+            style={{ padding: '22px 22px 16px', cursor: effPlan?.exercises?.length ? 'pointer' : 'default' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={{ ...eyebrow, color: 'rgba(255,255,255,0.75)' }}>{sessionEyebrow}</p>
-                <p className="gd-disp" style={{ margin: '6px 0 0', fontSize: 32, fontWeight: 700, lineHeight: 1.05, textTransform: 'uppercase' }}>
-                  {sessionName || (stalePlan ? 'No session today' : 'Rest day')}
-                  {effPlan?.exercises?.length ? (
-                    <span style={{
-                      display: 'inline-block', marginLeft: 8, fontSize: 15, color: 'rgba(255,255,255,0.7)',
-                      transform: sessionOpen ? 'rotate(90deg)' : 'none',
-                      transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
-                    }}>›</span>
-                  ) : null}
+                <p style={{ ...eyebrow, letterSpacing: '0.14em', color: 'var(--on-dark-2)' }}>{sessionEyebrow}</p>
+                <p className="gd-mega" style={{ margin: '14px 0 0' }}>
+                  {sessionName || (stalePlan ? 'No session today' : 'Rest day')}.
                 </p>
-              </div>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: 'rgba(255,255,255,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {Icon.dumbbell('var(--on-dark)')}
               </div>
             </div>
             {sessionName && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 13, flexWrap: 'wrap' }}>
-                {exerciseCount && <span style={heroChip}>{exerciseCount} exercises</span>}
-                {sessionMins && <span style={heroChip}>~{sessionMins} min</span>}
-                {sessionFocus && <span style={heroChip}>{sessionFocus}</span>}
+              <div style={{ display: 'flex', gap: 16, marginTop: 16, flexWrap: 'wrap', fontSize: 14, color: 'var(--on-dark-2)' }}>
+                {exerciseCount && <span>{exerciseCount} exercises</span>}
+                {sessionMins && <span>~{sessionMins} min</span>}
+                {sessionFocus && <span>{sessionFocus}</span>}
+                {effPlan?.exercises?.length ? <span style={{ color: 'var(--on-dark)', fontWeight: 600 }}>{sessionOpen ? 'Hide list' : 'See list'}</span> : null}
               </div>
             )}
           </div>
@@ -667,22 +560,22 @@ export default function DashboardPage() {
             </div>
           )}
           {effPlan ? (
-            <div style={{ padding: '0 20px 20px' }}>
+            <div style={{ padding: '0 22px 22px' }}>
               {doneToday ? (
                 <div style={{ width: '100%', borderRadius: 17, background: 'var(--on-dark-soft)', color: 'var(--on-dark)', padding: 15, fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--on-dark)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12.5l5 5L20 6.5" /></svg>
                   Completed today
                 </div>
               ) : (
-                /* mockup: white pill button on the mesh card */
-                <button onClick={() => router.push('/workout')} className="gd-disp" style={{
-                  width: '100%', border: 'none', borderRadius: 17,
-                  background: 'var(--hero-btn)', color: 'var(--hero-btn-ink)', padding: 15, fontSize: 16, fontWeight: 700,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
+                /* THE accent on this screen. Nothing else on Home is a filled ember. */
+                <button onClick={() => router.push('/workout')} style={{
+                  width: '100%', border: 'none', borderRadius: 18, minHeight: 58,
+                  background: 'var(--grad)', color: 'var(--on-accent)', padding: '0 16px', fontSize: 17, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  boxShadow: 'var(--glow-grad)',
                 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--hero-btn-ink)"><polygon points="6 3 20 12 6 21 6 3" /></svg>
-                  START WORKOUT
+                  Start session
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                 </button>
               )}
             </div>
@@ -696,8 +589,26 @@ export default function DashboardPage() {
         </div>
         </Reveal>
 
+        {/* ── WEEK STRIP ── trained = filled white, today = white outline. No ember. */}
+        {weekDays.length > 0 && (
+          <Reveal>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {weekDays.map((d, i) => (
+              <button key={i} onClick={() => router.push('/history?date=' + d.iso)} style={{
+                flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 14, cursor: 'pointer',
+                background: d.trained ? 'var(--accent)' : 'var(--card)',
+                border: d.isToday ? '2px solid var(--accent)' : `2px solid ${d.trained ? 'var(--accent)' : 'transparent'}`,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: d.trained ? 'var(--on-accent)' : 'var(--ink-3)' }}>{d.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2, color: d.trained ? 'var(--on-accent)' : 'var(--ink)' }}>{d.dayNum}</div>
+              </button>
+            ))}
+          </div>
+          </Reveal>
+        )}
+
         {/* ── THIS WEEK ── */}
-        <Reveal delay={180}>
+        <Reveal delay={100}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 4px 9px' }}>
           <p style={eyebrow}>This week</p>
           <button onClick={() => router.push('/history')} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
@@ -707,7 +618,46 @@ export default function DashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
           <Stat value={weekStats.sessions !== null ? <CountUp value={weekStats.sessions} /> : '—'} label="sessions" />
           <Stat value={weekStats.kgLifted !== null ? <CountUp value={weekStats.kgLifted} format="k" /> : '—'} label="kg lifted" />
-          <Stat value={weekStats.streak !== null ? <CountUp value={weekStats.streak} /> : '—'} label="day streak" color="var(--orange)" suffix={Icon.flame()} />
+          <Stat value={weekStats.streak !== null ? <CountUp value={weekStats.streak} /> : '—'} label="day streak" />
+        </div>
+        </Reveal>
+
+        <Reveal delay={140}>
+        <button onClick={() => router.push('/nutrition')} style={{ ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
+          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bowl()}</div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Fuel</p>
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>Log meals and macros</p>
+          </div>
+          <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
+        </button>
+        </Reveal>
+        {/* ── READINESS ── */}
+        <Reveal delay={180}>
+        <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
+            <svg width="100" height="100" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--soft)" strokeWidth="11" />
+              {readiness && (
+                <circle cx="60" cy="60" r={R} fill="none" stroke="var(--accent)" strokeWidth="11"
+                  strokeLinecap="round" strokeDasharray={CIRC} strokeDashoffset={ringOffset}
+                  style={{
+                    transition: 'stroke-dashoffset 1.6s cubic-bezier(0.22, 1, 0.36, 1)',
+                  }}
+                  transform="rotate(-90 60 60)" />
+              )}
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>
+                {readiness ? <CountUp value={readiness} /> : '—'}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ink-3)', marginTop: 3 }}>READY</span>
+            </div>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 16 }}>{readinessLabel}</p>
+            <p style={{ margin: '7px 0 0', fontSize: 13, lineHeight: 1.5, color: 'var(--ink-2)' }}>{readinessSub}</p>
+          </div>
         </div>
         </Reveal>
 
@@ -735,12 +685,38 @@ export default function DashboardPage() {
         </div>
         </Reveal>
 
+        {/* ── LEVEL / XP ── */}
+        {levelInfo && (
+          <Reveal delay={260}>
+          <div style={{ ...card, padding: '14px 18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 11, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bolt()}</div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Level {levelInfo.level} · {levelInfo.title}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-3)' }}>{levelInfo.xpToNext} XP to Level {levelInfo.level + 1}</p>
+                </div>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--accent-strong)' }}>{levelInfo.totalXp.toLocaleString()} XP</p>
+            </div>
+            <div style={{ height: 9, background: 'var(--soft)', borderRadius: 999, overflow: 'hidden' }}>
+              <div className="gd-shimbar" style={{
+                height: '100%', borderRadius: 999,
+                background: 'var(--accent)',
+                width: xpAnimated ? `${levelInfo.pct}%` : 0,
+                transition: 'width 1.4s cubic-bezier(0.22, 1, 0.36, 1)',
+              }} />
+            </div>
+          </div>
+          </Reveal>
+        )}
+
         {/* ── CHALLENGE TEASER ── */}
         {/* No challenge running means no card. It used to name the 100,000 kg
             club whatever was actually on, which outlived that challenge by
             three weeks and disagreed with Community the whole time. */}
         {challenge && (
-        <Reveal delay={240}>
+        <Reveal delay={280}>
         <button onClick={() => router.push('/community')} className="gd-shine" style={{
           ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14,
           cursor: 'pointer', textAlign: 'left', border: '1px solid var(--gold-tint)',
@@ -759,19 +735,8 @@ export default function DashboardPage() {
         </Reveal>
         )}
 
-        <Reveal delay={260}>
-        <div style={{ marginBottom: 14 }}><QuoteCard mode="random" /></div>
-        </Reveal>
-
         <Reveal delay={300}>
-        <button onClick={() => router.push('/nutrition')} style={{ ...card, width: '100%', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
-          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'var(--accent-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.bowl()}</div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Nutrition</p>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-2)' }}>Log meals and macros</p>
-          </div>
-          <span style={{ color: 'var(--ink-3)', fontSize: 18 }}>›</span>
-        </button>
+        <div style={{ marginBottom: 14 }}><QuoteCard mode="random" /></div>
         </Reveal>
 
       </div>
@@ -784,12 +749,6 @@ export default function DashboardPage() {
 const chip = {
   fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 999,
   background: 'var(--soft)', color: 'var(--ink-2)',
-};
-
-// light-on-mesh chips for the IGNITE hero card
-const heroChip = {
-  fontSize: 12, fontWeight: 600, padding: '6px 11px', borderRadius: 999,
-  background: 'rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.88)',
 };
 
 function Stat({ value, label, color, suffix }) {
