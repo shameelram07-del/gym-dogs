@@ -772,7 +772,7 @@ export default function NutritionPage() {
         <Reveal delay={220} style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
             <p style={eyebrow}>Water</p>
-            <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
+            <button onClick={() => setEditingWater(!editingWater)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', fontWeight: 600, minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'baseline', justifyContent: 'flex-end', paddingTop: 12, margin: '-12px -8px', padding: '0 8px' }}>
               <strong className="gd-disp" style={{ fontSize: 17, color: 'var(--ink)' }}>{(waterMl / 1000).toFixed(2).replace(/\.?0+$/, '')}</strong>
               {' / '}{(waterGoalMl / 1000).toFixed(1)} L
             </button>

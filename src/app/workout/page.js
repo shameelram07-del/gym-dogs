@@ -12,6 +12,8 @@ import { captureError, breadcrumb } from '@/lib/monitoring';
 import { eyebrow } from '@/lib/ui';
 import { COACH_ID } from '@/lib/coach';
 
+const EXERCISE_PHOTOS = false;
+
 const API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/gymLogs';
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/workoutPlans';
@@ -56,7 +58,9 @@ function toSlug(name) {
 function ExercisePhoto({ name, size = 80 }) {
   const [error, setError] = useState(false);
   const slug = toSlug(name);
-  if (error) {
+  // No photos in /public/images/exercises yet, so every exercise asked for a
+  // file that 404'd before falling back. Turn on once the photos are added.
+  if (!EXERCISE_PHOTOS || error) {
     return (
       <div style={{
         width: size, height: size, borderRadius: 14, flexShrink: 0,
@@ -748,7 +752,7 @@ export default function WorkoutPage() {
             Home
           </button>
         </div>
-        <button onClick={() => router.push('/history')} style={{ marginTop: 2, background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>📅 View past workouts</button>
+        <button onClick={() => router.push('/history')} style={{ marginTop: 2, background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minHeight: 44, padding: '0 12px' }}>📅 View past workouts</button>
         <BottomNav />
       </div>
     );
@@ -943,15 +947,15 @@ export default function WorkoutPage() {
                     }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-3)', textAlign: 'center' }}>{setIdx + 1}</div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px' }}>
-                        <button onClick={() => adjustKg(idx, setIdx, -2.5)} aria-label="decrease" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>−</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '0 2px', minHeight: 44 }}>
+                        <button onClick={() => adjustKg(idx, setIdx, -2.5)} aria-label="Decrease weight by 2.5 kg" style={{ background: 'none', border: 'none', color: 'var(--ink-2)', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1, width: 32, height: 44, flexShrink: 0 }}>−</button>
                         <input type="number" inputMode="decimal" value={set.kg} onChange={(e) => updateSet(idx, setIdx, 'kg', e.target.value)}
                           style={{ flex: 1, background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none', width: '100%', minWidth: 0 }}
                           placeholder="0" />
-                        <button onClick={() => adjustKg(idx, setIdx, 2.5)} aria-label="increase" style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>+</button>
+                        <button onClick={() => adjustKg(idx, setIdx, 2.5)} aria-label="Increase weight by 2.5 kg" style={{ background: 'none', border: 'none', color: 'var(--ink-2)', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1, width: 32, height: 44, flexShrink: 0 }}>+</button>
                       </div>
 
-                      <div style={{ background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '8px 8px', display: 'flex', alignItems: 'center' }}>
+                      <div style={{ background: set.done ? 'var(--accent-tint)' : 'var(--soft)', borderRadius: 10, padding: '0 8px', minHeight: 44, display: 'flex', alignItems: 'center' }}>
                         <input type="number" inputMode="numeric" value={set.reps} onChange={(e) => updateSet(idx, setIdx, 'reps', e.target.value)}
                           style={{ width: '100%', background: 'none', border: 'none', color: set.done ? 'var(--accent-strong)' : 'var(--ink)', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none' }}
                           placeholder="0" />

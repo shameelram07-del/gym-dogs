@@ -462,11 +462,26 @@ export default function ProgressPage() {
           </div>
 
           {goalKg == null ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="number" inputMode="decimal" value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="Target weight (kg)"
-                style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
-              <button onClick={saveGoal} disabled={savingGoal || !goalInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingGoal || !goalInput ? 0.5 : 1 }}>Set</button>
-            </div>
+            <>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" inputMode="decimal" value={goalInput} onChange={e => setGoalInput(e.target.value)} placeholder="Target weight (kg)"
+                  style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
+                <button onClick={saveGoal} disabled={savingGoal || !goalInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingGoal || !goalInput ? 0.5 : 1 }}>Set</button>
+              </div>
+              {/* Weigh in without a goal too. It used to be hidden until a goal
+                  was set, so the weight trend (and adaptive calories) had no data. */}
+              <p style={{ margin: '14px 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--ink-3)' }}>Or just log today&rsquo;s weight</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" inputMode="decimal" value={wiInput} onChange={e => setWiInput(e.target.value)} placeholder="Weight today (kg)"
+                  style={{ flex: 1, background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', fontSize: 14, fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
+                <button onClick={logWeighIn} disabled={savingWi || !wiInput} style={{ background: 'var(--accent)', border: 'none', borderRadius: 12, padding: '0 18px', color: 'var(--on-accent)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingWi || !wiInput ? 0.5 : 1 }}>{savingWi ? '…' : 'Log'}</button>
+              </div>
+              {saveError && (
+                <div style={{ background: 'var(--red-tint)', borderRadius: 12, padding: '9px 12px', marginTop: 10 }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--red-ink)' }}>&#9888; {saveError}</p>
+                </div>
+              )}
+            </>
           ) : (
             <>
               <div style={{ background: 'var(--soft)', borderRadius: 999, height: 9, overflow: 'hidden', marginBottom: 8 }}>

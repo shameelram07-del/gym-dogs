@@ -256,7 +256,7 @@ export default function OnboardingPage() {
             Step {currentStep + 1} of {totalSteps}
           </div>
           <button onClick={async () => { await saveOnboarding(); router.push('/dashboard'); }} style={{
-            background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0,
+            background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 12, fontWeight: 600, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '-12px -8px', padding: '0 8px',
           }}>
             Skip for now
           </button>

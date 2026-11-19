@@ -149,8 +149,11 @@ export default function ExercisePage() {
           <div style={{ display: 'flex', justifyContent: 'center', gap: 6, paddingBottom: 16 }}>
             {selected.cues.map((_, i) => (
               <button key={i} onClick={() => setActiveCue(i)} aria-label={`Cue ${i + 1}`} style={{
-                border: 'none', cursor: 'pointer', padding: 0, borderRadius: 999,
-                width: i === activeCue ? 16 : 6, height: 6,
+                // The dot stays 6px; the tap box around it is 44px tall
+                // (padding + content-box background), so it is easy to hit.
+                border: 'none', cursor: 'pointer', borderRadius: 999,
+                width: (i === activeCue ? 16 : 6) + 28, height: 44, padding: '19px 14px', margin: '-19px -12px',
+                backgroundClip: 'content-box', boxSizing: 'border-box',
                 background: i === activeCue ? 'var(--accent)' : 'var(--line)',
                 transition: 'all 0.2s',
               }} />

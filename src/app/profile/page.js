@@ -358,7 +358,7 @@ export default function ProfilePage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 18px 12px' }}>
             <p style={eyebrow}>Body stats</p>
             {!editingStats ? (
-              <button onClick={() => { setTempStats(stats); setEditingStats(true); }} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Edit ›</button>
+              <button onClick={() => { setTempStats(stats); setEditingStats(true); }} style={{ background: 'none', border: 'none', color: 'var(--accent-strong)', fontSize: 13, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '-12px -8px', padding: '0 8px' }}>Edit ›</button>
             ) : (
               <div style={{ display: 'flex', gap: 14 }}>
                 <button onClick={() => { setTempStats(stats); setEditingStats(false); }} style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>

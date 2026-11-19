@@ -21,7 +21,7 @@
   /* text */
   --ink:       #111114;
   --ink-2:     #5E5E66;
-  --ink-3:     #9A9AA3;
+  --ink-3:     #6B6B73;   /* was #9A9AA3: 2.7:1 on white, too faint for small labels */
 
   /* lines */
   --line:      rgba(17,17,20,0.08);
@@ -84,8 +84,8 @@
   --shell-2:   #030303;
 
   --ink:       #EDEAE4;
-  --ink-2:     #8F8B84;
-  --ink-3:     #77736C;
+  --ink-2:     #A8A49C;
+  --ink-3:     #8E8A83;
 
   --line:      rgba(255,255,255,0.08);
   --line-2:    rgba(255,255,255,0.045);
@@ -231,7 +231,8 @@
    keep the dark run rather than briefly flashing the light one. */
 [data-theme="light"] {
   --ember:     #7A6238;
-  --grad:      linear-gradient(135deg, #86703F 0%, #6E5830 100%);
+  /* Deep enough that white button text reads at well over 4.5:1. */
+  --grad:      linear-gradient(135deg, #6E5830 0%, #5A4726 100%);
   --grad-soft: linear-gradient(135deg, rgba(122,98,56,0.10), rgba(122,98,56,0.06));
   --glow-grad: 0 0 0 transparent;
   --hero-glow: 0 24px 60px rgba(16,24,40,0.18);
