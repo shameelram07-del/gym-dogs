@@ -1,27 +1,38 @@
-import { Inter, Space_Grotesk, Barlow_Condensed } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import AppProvider from "@/components/AppProvider";
 
+// Fonts ship with the app (src/app/fonts, OFL licences alongside) instead of
+// being fetched from Google at build time. That fetch failed the Azure
+// deploy at random ("next/font/google queries have exactly one entry").
+
 // Inter keeps the old --font-geist-sans variable name so every existing
 // style that references it picks up the new body face automatically.
-const interSans = Inter({
+const interSans = localFont({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  src: [{ path: "./fonts/inter-var.woff2", weight: "100 900", style: "normal" }],
+  display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
+const spaceGrotesk = localFont({
   variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  src: [
+    { path: "./fonts/space-grotesk-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/space-grotesk-600.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/space-grotesk-700.woff2", weight: "700", style: "normal" },
+  ],
+  display: "swap",
 });
 
 // The one big word per screen (.gd-mega): heavy condensed italic, so it reads
 // as speed rather than as a heading.
-const barlowCondensed = Barlow_Condensed({
+const barlowCondensed = localFont({
   variable: "--font-mega",
-  subsets: ["latin"],
-  weight: ["700", "900"],
-  style: ["italic"],
+  src: [
+    { path: "./fonts/barlow-condensed-700-italic.woff2", weight: "700", style: "italic" },
+    { path: "./fonts/barlow-condensed-900-italic.woff2", weight: "900", style: "italic" },
+  ],
+  display: "swap",
 });
 
 export const metadata = {
