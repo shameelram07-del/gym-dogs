@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local scratch — holds a 16MB source tarball that must not enter history
 _to_delete/
+
+# database backups made by scripts/reset-database.js (personal data, never commit)
+/backups/

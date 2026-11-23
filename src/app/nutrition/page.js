@@ -554,10 +554,10 @@ export default function NutritionPage() {
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER ── */}
-      <div style={{ padding: '52px 20px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <h1 className="gd-disp" style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Nutrition</h1>
-          <p style={{ margin: '1px 0 0', fontSize: 13, color: 'var(--ink-3)' }}>Today</p>
+      <div style={{ padding: '56px 22px 18px', display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Today</p>
+          <h1 className="gd-title">Eat.</h1>
         </div>
         {targets && (
           <button onClick={openSetup} style={{ ...pillBase, padding: '7px 12px', fontSize: 12 }}>Targets</button>

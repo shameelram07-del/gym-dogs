@@ -1,21 +1,68 @@
 {
   "navigationFallback": {
     "rewrite": "/dashboard.html",
-    "exclude": ["/_next/*", "/favicon.ico", "/*.svg", "/*.ico", "/*.png", "/*.json", "/*.txt"]
+    "exclude": [
+      "/_next/*",
+      "/favicon.ico",
+      "/*.svg",
+      "/*.ico",
+      "/*.png",
+      "/*.json",
+      "/*.txt"
+    ]
   },
   "routes": [
-    { "route": "/", "redirect": "/dashboard", "statusCode": 302 },
-    { "route": "/login", "redirect": "/dashboard", "statusCode": 302 },
-    { "route": "/dashboard", "rewrite": "/dashboard.html" },
-    { "route": "/workout", "rewrite": "/workout.html" },
-    { "route": "/progress", "rewrite": "/progress.html" },
-    { "route": "/exercise", "rewrite": "/exercise.html" },
-    { "route": "/profile", "rewrite": "/profile.html" },
-    { "route": "/onboarding", "rewrite": "/onboarding.html" },
-    { "route": "/coach", "rewrite": "/coach.html" },
-    { "route": "/community", "rewrite": "/community.html" },
-    { "route": "/nutrition", "rewrite": "/nutrition.html" },
-    { "route": "/history", "rewrite": "/history.html" }
+    {
+      "route": "/",
+      "redirect": "/dashboard",
+      "statusCode": 302
+    },
+    {
+      "route": "/login",
+      "redirect": "/dashboard",
+      "statusCode": 302
+    },
+    {
+      "route": "/community",
+      "redirect": "/dashboard",
+      "statusCode": 302
+    },
+    {
+      "route": "/dashboard",
+      "rewrite": "/dashboard.html"
+    },
+    {
+      "route": "/workout",
+      "rewrite": "/workout.html"
+    },
+    {
+      "route": "/progress",
+      "rewrite": "/progress.html"
+    },
+    {
+      "route": "/exercise",
+      "rewrite": "/exercise.html"
+    },
+    {
+      "route": "/profile",
+      "rewrite": "/profile.html"
+    },
+    {
+      "route": "/onboarding",
+      "rewrite": "/onboarding.html"
+    },
+    {
+      "route": "/coach",
+      "rewrite": "/coach.html"
+    },
+    {
+      "route": "/nutrition",
+      "rewrite": "/nutrition.html"
+    },
+    {
+      "route": "/history",
+      "rewrite": "/history.html"
+    }
   ],
   "platform": {
     "apiRuntime": "node:18"

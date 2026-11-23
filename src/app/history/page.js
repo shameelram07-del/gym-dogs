@@ -118,7 +118,7 @@ export default function HistoryPage() {
         <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
         <div>
           <p style={eyebrow}>Train history</p>
-          <h1 className="gd-disp" style={{ margin: '1px 0 0', fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em' }}>Calendar</h1>
+          <h1 className="gd-title" style={{ marginTop: 4 }}>History.</h1>
         </div>
       </div>
 

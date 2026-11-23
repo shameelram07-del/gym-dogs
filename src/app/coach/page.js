@@ -7,7 +7,6 @@ import BottomNav from '@/components/BottomNav';
 import Reveal from '@/components/Reveal';
 import Avatar from '@/components/coach/Avatar';
 import ClientList from '@/components/coach/ClientList';
-import ChallengePanel from '@/components/coach/ChallengePanel';
 import SessionBuilder from '@/components/coach/SessionBuilder';
 import { useSessionBuilder } from '@/components/coach/useSessionBuilder';
 import { captureError } from '@/lib/monitoring';
@@ -37,7 +36,6 @@ const CLIENTS_KEY = process.env.NEXT_PUBLIC_API_KEY;
 const TABS = [
   { key: 'clients', label: 'Clients' },
   { key: 'session', label: 'Session' },
-  { key: 'challenges', label: 'Challenges' },
 ];
 
 /**
@@ -107,10 +105,8 @@ export default function CoachDashboard() {
 
       <div style={{ padding: '52px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-2)' }}>Coach view</p>
-          <h1 className="gd-disp" style={{ margin: '2px 0 0', fontSize: 28, fontWeight: 700 }}>
-            Coach <span className="gd-grad-text">HQ</span>
-          </h1>
+          <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Build today&rsquo;s session</p>
+          <h1 className="gd-title">Coach.</h1>
         </div>
         <Avatar initials="SC" size={42} />
       </div>
@@ -147,9 +143,6 @@ export default function CoachDashboard() {
           <SessionBuilder b={builder} clients={clients} />
         </Panel>
 
-        <Panel show={view === 'challenges'}>
-          <ChallengePanel userId={userId} />
-        </Panel>
 
       </div>
 

@@ -267,6 +267,20 @@
   margin: 0;
 }
 /* Second line of a mega word: outline only. Same trick as a race livery. */
+.gd-title {
+  /* A screen's own name, in the same face as the big word on Home: EAT.,
+     PROGRESS., CALENDAR. Smaller than .gd-mega so it heads a screen rather
+     than shouting over it. */
+  font-family: var(--font-mega), 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  font-size: clamp(44px, 13vw, 56px);
+  line-height: 0.88;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
 .gd-mega .gd-outline {
   color: transparent;
   -webkit-text-stroke: 2px currentColor;

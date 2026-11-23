@@ -426,9 +426,9 @@ export default function ProgressPage() {
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', color: 'var(--ink)', paddingBottom: 100 }}>
 
       {/* ── HEADER ── */}
-      <div style={{ padding: '52px 20px 14px' }}>
-        <h1 className="gd-disp" style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>Progress</h1>
-        <p style={{ margin: '2px 0 0', fontSize: 14, color: 'var(--ink-2)' }}>All time</p>
+      <div style={{ padding: '56px 22px 18px' }}>
+        <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>All time</p>
+        <h1 className="gd-title">Progress.</h1>
       </div>
 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>

@@ -26,7 +26,6 @@ export default function BottomNav() {
     { label: 'Train',     key: 'train',     href: '/workout'   },
     { label: 'Eat',       key: 'eat',       href: '/nutrition' },
     { label: 'Progress',  key: 'progress',  href: '/progress'  },
-    { label: 'Community', key: 'community', href: '/community' },
     ...(isCoach ? [{ label: 'Coach', key: 'coach', href: '/coach' }] : []),
     { label: 'Profile',   key: 'profile',   href: '/profile'   },
   ];

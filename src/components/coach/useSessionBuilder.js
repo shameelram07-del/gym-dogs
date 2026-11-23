@@ -13,7 +13,6 @@ const PLANS_API_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.a
 const PLANS_API_KEY = process.env.NEXT_PUBLIC_PLANS_API_KEY;
 const AI_COACH_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/aiCoach';
 const AI_COACH_KEY = process.env.NEXT_PUBLIC_AI_COACH_KEY;
-const COMMUNITY_URL = 'https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts';
 const CLIENTS_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
 export const emptyExercise = () => ({ muscleGroup: 'CHEST', name: '', equipment: '', sets: 3, reps: '10-12', cue: '' });
@@ -399,13 +398,11 @@ export function useSessionBuilder({ userId, clients }) {
     if (!planName.trim()) { setSaveMsg({ type: 'error', text: 'Give the session a name.' }); return; }
     if (exercises.some((e) => !e.name.trim())) { setSaveMsg({ type: 'error', text: 'Every row needs an exercise chosen.' }); return; }
 
-    // Publishing is immediate and public: it goes live for every member and
-    // posts to the feed. Ending a challenge already confirms and is the less
-    // risky action, so the riskier button was the unguarded one.
+    // Publishing is immediate: it replaces the active session.
     if (isActive) {
       const ok = window.confirm(
         `Publish "${planName.trim()}" to ${audienceLabel()}?\n\n` +
-        'It becomes the active session immediately and is announced on the community feed.'
+        'It becomes the active session immediately.'
       );
       if (!ok) return;
     }
@@ -446,30 +443,6 @@ export function useSessionBuilder({ userId, clients }) {
 
       setActivePlan(plan);
       reset();
-
-      // Announce it on the community feed.
-      try {
-        const postRes = await fetch(COMMUNITY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-functions-key': CLIENTS_KEY || '' },
-          body: JSON.stringify({
-            userId,
-            name: 'Coach Shameel',
-            initials: 'CS',
-            text: `📋 New session published: ${plan.name} (${exCountLabel(plan.exercises.length)}) — assigned to ${audienceLabel()}. Get after it.`,
-            tag: '📋 New session',
-          }),
-        });
-        if (!postRes.ok) {
-          // The session published fine; only the announcement failed.
-          captureError(new Error(`Session announcement failed (${postRes.status})`), {
-            screen: 'coach', action: 'announce-session', endpoint: 'communityPosts', status: postRes.status,
-          });
-        }
-      } catch (e) {
-        // The session published fine; only the announcement failed.
-        captureError(e, { screen: 'coach', action: 'announce-session', endpoint: 'communityPosts' });
-      }
     } catch (e) {
       setSaveMsg({ type: 'error', text: 'Failed to save. Try again.' });
       captureError(e, { screen: 'coach', action: isActive ? 'publish' : 'save-draft', endpoint: 'workoutPlans' });

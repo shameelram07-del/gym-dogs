@@ -11,6 +11,7 @@ import { exerciseLibrary, muscleGroups } from '@/lib/exercises';
 import { captureError, breadcrumb } from '@/lib/monitoring';
 import { eyebrow } from '@/lib/ui';
 import { COACH_ID } from '@/lib/coach';
+import { pickPlan } from '@/lib/plan';
 
 const EXERCISE_PHOTOS = false;
 
@@ -191,8 +192,6 @@ export default function WorkoutPage() {
   const [coachNoteLoading, setCoachNoteLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [finishQuote, setFinishQuote] = useState('');
-  const [shared, setShared] = useState(false);
-  const [sharing, setSharing] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [prs, setPrs] = useState([]); // [{name, kg, prevKg}]
   // Session start time (ms). Set when the plan loads — from the saved startedAt
@@ -247,7 +246,7 @@ export default function WorkoutPage() {
   }, [accounts, inProgress, router]);
 
   // Prefer the saved profile display name (e.g. "Gym Daddy") over the raw login
-  // name, so shared posts and coach notes use the nickname like the other screens.
+  // name, so coach notes use the nickname like the other screens.
   useEffect(() => {
     if (!userId || userId === 'demo') return;
     (async () => {
@@ -284,7 +283,9 @@ export default function WorkoutPage() {
       try {
         const res = await fetch(`${PLANS_API_URL}?userId=${userId}`, { headers: { 'x-functions-key': PLANS_API_KEY } });
         if (res.ok) {
-          const data = await res.json();
+          // Same reading as Home (list or single plan), so the two never disagree.
+          const data = pickPlan(await res.json());
+          if (!data) { setPlanError('No active session found.'); return; }
           const loadDay = todayISO();
           setActivePlan(data);
           setSessionDate(loadDay);
@@ -649,41 +650,6 @@ export default function WorkoutPage() {
     finally { setSaving(false); }
   };
 
-  const shareToFeed = async () => {
-    if (!userId || !activePlan || shared || sharing) return;
-    setSharing(true);
-    try {
-      const vol = Object.values(logs).flat().reduce((a, s) => a + (parseFloat(s.kg) || 0) * (parseInt(s.reps) || 0), 0);
-      // Carries its own unit. The two post texts below appended `kg` themselves,
-      // which is how the feed came to read "3.6kkg".
-      const volStr = vol >= 1000 ? `${(vol / 1000).toFixed(1)}k kg` : `${Math.round(vol)} kg`;
-      const nSets = Object.values(logs).flat().filter(isLogged).length;
-      const res = await fetch('https://gymdogs-api-g9d0gve4angygdcj.newzealandnorth-01.azurewebsites.net/api/communityPosts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-functions-key': API_KEY || '' },
-        body: JSON.stringify({
-          userId,
-          name: userName,
-          text: prs.length > 0
-            ? `Crushed ${activePlan.name} — ${nSets} sets, ${volStr} total volume. NEW PR: ${prs[0].name} ${prs[0].kg}kg 🏆`
-            : `Crushed ${activePlan.name} — ${nSets} sets, ${volStr} total volume 💪`,
-          tag: prs.length > 0 ? '🏆 New PR' : '🏋️ Session done',
-        }),
-      });
-      if (res.ok) { setShared(true); showToast('🔥 Posted to the community feed'); }
-      else {
-        showToast('Could not share — try again');
-        captureError(new Error(`Share failed (${res.status})`), {
-          screen: 'workout', action: 'share-to-feed', endpoint: 'communityPosts', status: res.status,
-        });
-      }
-    } catch (e) {
-      showToast('Could not share — try again');
-      captureError(e, { screen: 'workout', action: 'share-to-feed', endpoint: 'communityPosts' });
-    }
-    finally { setSharing(false); }
-  };
-
   const formatLast = (exIdx) => {
     const sets = lastSession[exercises[exIdx]?.name];
     if (!sets || sets.length === 0) return null;
@@ -734,19 +700,23 @@ export default function WorkoutPage() {
   // previous day, don't present it as today's workout — prompt for a fresh one.
   const isCoach = userId === COACH_ID;
   if (userId !== 'demo' && activePlan.date !== SESSION_DAY) {
-    const whenStr = new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' });
+    const whenStr = activePlan.date && !Number.isNaN(new Date(activePlan.date + 'T00:00:00').getTime())
+      ? new Date(activePlan.date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'short' })
+      : null;
     return (
       <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 14, color: 'var(--ink)', padding: '0 28px', textAlign: 'center' }}>
         <div style={{ fontSize: 48 }}>🐕</div>
         <p className="gd-disp" style={{ fontWeight: 700, fontSize: 21 }}>No session for today yet</p>
         <p style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6, maxWidth: 300 }}>
           {isCoach
-            ? `Your last session (${activePlan.name} · ${whenStr}) isn't today's. Publish today's workout in the Coach tab.`
+            ? (activePlan.name && whenStr
+              ? `Your last session (${activePlan.name} · ${whenStr}) isn't today's. Build today's in the Coach tab.`
+              : 'Build today\u2019s workout in the Coach tab.')
             : `Nothing's been published for today yet. Ask Coach Shameel to set today's session, or give Gym Daddy a nudge.`}
         </p>
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-          <button onClick={() => router.push(isCoach ? '/coach' : '/community')} style={{ background: 'var(--accent)', border: 'none', borderRadius: 16, padding: '14px 24px', color: 'var(--on-accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-            {isCoach ? "Create today's session" : 'Message the pack'}
+          <button onClick={() => router.push('/coach')} style={{ background: 'var(--accent)', border: 'none', borderRadius: 16, padding: '14px 24px', color: 'var(--on-accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+            Create today&rsquo;s session
           </button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'var(--soft)', border: '1px solid var(--line)', borderRadius: 16, padding: '14px 24px', color: 'var(--ink-2)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
             Home
@@ -775,11 +745,11 @@ export default function WorkoutPage() {
           <button onClick={() => router.push('/dashboard')} aria-label="Back" style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--soft)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
           <div>
             <p style={eyebrow}>Active session</p>
-            <p className="gd-disp" style={{ margin: '1px 0 0', fontSize: 18, fontWeight: 700 }}>{activePlan.name}</p>
+            <h1 className="gd-title" style={{ fontSize: 'clamp(30px, 9vw, 38px)', marginTop: 4 }}>{activePlan.name}</h1>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
+          <p className="gd-disp" style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}><DurationTimer /></p>
           <p style={{ ...eyebrow, fontSize: 9 }}>Duration</p>
           {autoSaveStatus && (
             <p style={{ margin: '5px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: autoSaveStatus === 'saved' ? 'var(--accent-strong)' : autoSaveStatus === 'unsaved' ? 'var(--red-ink)' : 'var(--ink-3)' }}>
@@ -835,20 +805,11 @@ export default function WorkoutPage() {
           </div>
         )}
 
-        {/* ── GYM DADDY QUOTE + SHARE (after saving) ── */}
+        {/* ── GYM DADDY QUOTE (after saving) ── */}
         {finishQuote && (
           <div style={{ background: 'var(--accent-tint)', borderRadius: CARD_R, padding: '14px 16px', marginBottom: 14 }}>
             <p style={{ ...eyebrow, fontSize: 10, color: 'var(--accent-strong)', marginBottom: 4 }}>🐕 Gym Daddy</p>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.5 }}>&ldquo;{finishQuote}&rdquo;</p>
-            <button onClick={shareToFeed} disabled={shared || sharing} style={{
-              marginTop: 12, width: '100%', border: 'none', borderRadius: 12, padding: '11px 0',
-              background: shared ? 'var(--soft)' : 'var(--accent)',
-              color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
-              fontSize: 13, fontWeight: 700, cursor: shared ? 'default' : 'pointer',
-              opacity: sharing ? 0.7 : 1,
-            }}>
-              {shared ? '✓ Shared with the pack' : sharing ? 'Sharing…' : '🔥 Share to the pack'}
-            </button>
           </div>
         )}
 
@@ -1049,6 +1010,7 @@ export default function WorkoutPage() {
           </div>
 
           <p className="gdc" style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>Session complete</p>
+          <h1 className="gdc gd-mega" style={{ margin: '14px 0 18px' }}>Done.</h1>
           <p className="gdc gd-disp gd-grad-text" style={{ margin: '10px 0 2px', fontSize: 56, fontWeight: 700, letterSpacing: '-0.04em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
             {totalVolume >= 1000
               ? <CountNum value={totalVolume / 1000} decimals={1} suffix="k" />
@@ -1084,15 +1046,6 @@ export default function WorkoutPage() {
             <p className="gdc" style={{ margin: '16px auto 24px', maxWidth: 300, fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic', lineHeight: 1.55 }}>&ldquo;{finishQuote}&rdquo;</p>
           )}
 
-          <button className="gdc" onClick={shareToFeed} disabled={shared || sharing} style={{
-            width: '100%', border: 'none', borderRadius: 16, padding: 16,
-            background: shared ? 'var(--soft)' : 'var(--grad)',
-            color: shared ? 'var(--accent-strong)' : 'var(--on-accent)',
-            fontSize: 15, fontWeight: 800, cursor: shared ? 'default' : 'pointer',
-            boxShadow: shared ? 'none' : 'var(--glow-grad)',
-          }}>
-            {shared ? '✓ Shared with the pack' : sharing ? 'Sharing…' : 'Share to the pack'}
-          </button>
           <button className="gdc" onClick={() => { setShowComplete(false); router.push('/dashboard'); }} style={{
             width: '100%', marginTop: 10, border: '1px solid var(--line)', borderRadius: 16, padding: 15,
             background: 'transparent', color: 'var(--ink-2)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
