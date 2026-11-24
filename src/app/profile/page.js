@@ -162,7 +162,9 @@ export default function ProfilePage() {
       try {
         const res = await fetch(`${API_URL}?userId=${userId}`, { headers: { 'x-functions-key': API_KEY } });
         if (res.ok) {
-          const data = await res.json();
+          const raw = await res.json();
+          // An empty database can come back as {} rather than [].
+          const data = Array.isArray(raw) ? raw : [];
           setLogs(data);
           setJoinDate(getJoinDate(data));
         }

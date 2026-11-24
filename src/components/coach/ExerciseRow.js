@@ -83,7 +83,7 @@ export default function ExerciseRow({
               color: 'var(--accent-strong)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
             }}>
-              &#8646; Swap this exercise
+              {ex.name ? <>&#8646; Swap this exercise</> : 'Choose an exercise'}
             </button>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

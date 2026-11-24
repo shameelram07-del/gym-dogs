@@ -261,7 +261,9 @@ export default function ProgressPage() {
     const fetchLogs = async () => {
       try {
         const res = await fetch(`${API_URL}?userId=${userId}`, { headers: { 'x-functions-key': API_KEY } });
-        if (res.ok) setLogs(await res.json());
+        // An empty database can come back as {} rather than [], and every
+        // chart below loops over this, so anything that isn't a list is none.
+        if (res.ok) { const d = await res.json(); setLogs(Array.isArray(d) ? d : []); }
         else captureError(new Error(`gymLogs failed (${res.status})`), {
           screen: 'progress', action: 'load-logs', endpoint: 'gymLogs', status: res.status,
         });
